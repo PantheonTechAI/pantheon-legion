@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pantheon-legion:schema:mission-command:v1",
+  "title": "Pantheon Legion MissionCommand",
+  "description": "An explicit request to change Mission state or request a bounded operational action.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "schema_version",
+    "mission_id",
+    "expected_version",
+    "idempotency_key",
+    "command_type",
+    "payload",
+    "requested_by",
+    "actor",
+    "issued_at",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "mission_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "expected_version": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "command_type": {
+      "type": "string",
+      "enum": [
+        "UPDATE_OBJECTIVE",
+        "ADD_CONSTRAINT",
+        "REMOVE_CONSTRAINT",
+        "SET_ROE",
+        "ADD_PARTICIPANT",
+        "REMOVE_PARTICIPANT",
+        "START",
+        "PAUSE",
+        "RESUME",
+        "REQUEST_ACTION",
+        "CANCEL",
+        "COMPLETE"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "requested_by": {
+      "$ref": "#/$defs/principal"
+    },
+    "actor": {
+      "$ref": "#/$defs/principal"
+    },
+    "delegated_by": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/principal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlation_id": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "causation_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["SUBMITTED", "ACCEPTED", "APPLIED", "AWAITING_APPROVAL", "REJECTED", "NOOP"]
+    },
+    "outcome": {
+      "$ref": "#/$defs/outcome"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"command_type": {"const": "UPDATE_OBJECTIVE"}},
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/update_objective_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"command_type": {"const": "ADD_CONSTRAINT"}},
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/add_constraint_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"command_type": {"const": "REMOVE_CONSTRAINT"}},
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/remove_constraint_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"command_type": {"const": "SET_ROE"}},
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/set_roe_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"command_type": {"const": "ADD_PARTICIPANT"}},
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/add_participant_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"command_type": {"const": "REMOVE_PARTICIPANT"}},
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/remove_participant_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"command_type": {"const": "REQUEST_ACTION"}},
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/request_action_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "command_type": {
+            "enum": ["START", "PAUSE", "RESUME", "CANCEL", "COMPLETE"]
+          }
+        },
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "subject"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["HUMAN", "WORKLOAD", "SYSTEM", "EXTERNAL"]
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "issuer": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "update_objective_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["objective"],
+      "properties": {
+        "objective": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        }
+      }
+    },
+    "add_constraint_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["constraint"],
+      "properties": {
+        "constraint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "text"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 5000
+            },
+            "severity": {
+              "type": "string",
+              "enum": ["REQUIRED", "PREFERRED", "PROHIBITED"]
+            }
+          }
+        }
+      }
+    },
+    "remove_constraint_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["constraint_id"],
+      "properties": {
+        "constraint_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "set_roe_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "reason"],
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["OBSERVE", "RECOMMEND", "REVIEW", "BOUNDED_AUTONOMOUS"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "allowed_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 200}
+        },
+        "denied_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 200}
+        }
+      }
+    },
+    "add_participant_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participant"],
+      "properties": {
+        "participant": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["principal", "role"],
+          "properties": {
+            "principal": {"$ref": "#/$defs/principal"},
+            "role": {
+              "type": "string",
+              "enum": ["OWNER", "OPERATOR", "OBSERVER", "APPROVER", "WORKLOAD", "EXTERNAL"]
+            },
+            "scope": {"type": "string", "maxLength": 2000}
+          }
+        }
+      }
+    },
+    "remove_participant_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject"],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "request_action_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_id", "capability", "arguments"],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "target": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "side_effect_class": {
+          "type": "string",
+          "enum": ["READ", "ANALYSIS", "MUTATION", "EXTERNAL_SIDE_EFFECT"]
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "applied_version": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

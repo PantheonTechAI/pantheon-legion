@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pantheon-legion:schema:audit-event:v1",
+  "title": "Pantheon Legion AuditEvent",
+  "description": "An append-only, authoritative record of a security-, authority-, lifecycle-, or state-relevant fact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "schema_version",
+    "sequence",
+    "mission_id",
+    "mission_version",
+    "event_type",
+    "occurred_at",
+    "recorded_at",
+    "actor",
+    "resource",
+    "result",
+    "correlation_id"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "mission_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "mission_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "MISSION_CREATED",
+        "MISSION_UPDATED",
+        "MISSION_STATE_CHANGED",
+        "COMMAND_SUBMITTED",
+        "COMMAND_ACCEPTED",
+        "COMMAND_REJECTED",
+        "APPROVAL_REQUESTED",
+        "APPROVAL_DECIDED",
+        "APPROVAL_REVOKED",
+        "ROE_CHANGED",
+        "AUTHORIZATION_DECIDED",
+        "EXECUTION_STARTED",
+        "EXECUTION_PAUSED",
+        "EXECUTION_RESUMED",
+        "EXECUTION_RETRIED",
+        "EXECUTION_CANCELLED",
+        "EXECUTION_COMPLETED",
+        "EXECUTION_FAILED",
+        "ARTIFACT_RECORDED",
+        "PARTICIPANT_CHANGED",
+        "AUDIT_CORRECTION"
+      ]
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "actor": {
+      "$ref": "#/$defs/principal"
+    },
+    "requested_by": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/principal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "delegated_by": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/principal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "executed_by": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/principal"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resource": {
+      "$ref": "#/$defs/resource_reference"
+    },
+    "result": {
+      "type": "string",
+      "enum": ["SUCCESS", "REJECTED", "DENIED", "PENDING", "DUPLICATE", "FAILED"]
+    },
+    "command_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "approval_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "causation_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "authorization": {
+      "$ref": "#/$defs/authorization_context"
+    },
+    "trace": {
+      "$ref": "#/$defs/trace_reference"
+    },
+    "data": {
+      "type": "object"
+    },
+    "integrity": {
+      "$ref": "#/$defs/integrity"
+    }
+  },
+  "$defs": {
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "subject"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["HUMAN", "WORKLOAD", "SYSTEM", "EXTERNAL"]
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "issuer": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "resource_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "authorization_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "evaluated_at"],
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": ["ALLOW", "DENY"]
+        },
+        "evaluated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_bundle": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "decision_id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "trace_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trace_id"],
+      "properties": {
+        "trace_id": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{32}$"
+        },
+        "span_id": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{16}$"
+        },
+        "traceparent": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "event_hash"],
+      "properties": {
+        "algorithm": {
+          "const": "SHA-256"
+        },
+        "previous_event_hash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Fa-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "event_hash": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

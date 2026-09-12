@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pantheon-legion:schema:mission:v1",
+  "title": "Pantheon Legion Mission",
+  "description": "The durable, authoritative operational object for a bounded objective.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "schema_version",
+    "organization_id",
+    "workspace_id",
+    "title",
+    "objective",
+    "status",
+    "version",
+    "roe",
+    "created_at",
+    "updated_at",
+    "created_by"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "organization_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "project_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "environment_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 10000
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "ACTIVE",
+        "PAUSED",
+        "AWAITING_APPROVAL",
+        "COMPLETED",
+        "CANCELLED",
+        "FAILED",
+        "SUSPENDED"
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "roe": {
+      "$ref": "#/$defs/rules_of_engagement"
+    },
+    "constraints": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/constraint"
+      }
+    },
+    "participants": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/participant"
+      }
+    },
+    "labels": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9._/-]{1,100}$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "active_execution": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/execution_reference"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "last_event_id": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "$ref": "#/$defs/principal"
+    }
+  },
+  "$defs": {
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "subject"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["HUMAN", "WORKLOAD", "SYSTEM", "EXTERNAL"]
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "display_name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "issuer": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "added_at", "added_by"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["REQUIRED", "PREFERRED", "PROHIBITED"]
+        },
+        "added_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "added_by": {
+          "$ref": "#/$defs/principal"
+        }
+      }
+    },
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal", "role"],
+      "properties": {
+        "principal": {
+          "$ref": "#/$defs/principal"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["OWNER", "OPERATOR", "OBSERVER", "APPROVER", "WORKLOAD", "EXTERNAL"]
+        },
+        "scope": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    },
+    "rules_of_engagement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "revision", "level", "effective_at", "changed_by"],
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "level": {
+          "type": "string",
+          "enum": ["OBSERVE", "RECOMMEND", "REVIEW", "BOUNDED_AUTONOMOUS"]
+        },
+        "effective_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "changed_by": {
+          "$ref": "#/$defs/principal"
+        },
+        "allowed_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "denied_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "approval": {
+          "$ref": "#/$defs/approval_policy"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 5000
+        }
+      }
+    },
+    "approval_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_for", "minimum_approvals"],
+      "properties": {
+        "required_for": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["MUTATION", "EXTERNAL_SIDE_EFFECT", "CREDENTIAL_USE", "PRODUCTION_ACCESS"]
+          }
+        },
+        "approver_roles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "minimum_approvals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
+      }
+    },
+    "execution_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["execution_id", "adapter", "state"],
+      "properties": {
+        "execution_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "adapter": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "state": {
+          "type": "string",
+          "enum": ["STARTING", "RUNNING", "PAUSED", "WAITING", "CANCELLING", "COMPLETED", "FAILED"]
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
