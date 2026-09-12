@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pantheon-legion:schema:rules-of-engagement:v1",
+  "title": "Pantheon Legion RulesOfEngagement",
+  "description": "The maximum autonomy and permitted action policy for a Mission scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "revision", "level", "effective_at", "changed_by"],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "level": {
+      "type": "string",
+      "enum": ["OBSERVE", "RECOMMEND", "REVIEW", "BOUNDED_AUTONOMOUS"]
+    },
+    "effective_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "changed_by": {
+      "$ref": "#/$defs/principal"
+    },
+    "allowed_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "denied_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "approval": {
+      "$ref": "#/$defs/approval_policy"
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 5000
+    }
+  },
+  "$defs": {
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "subject"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["HUMAN", "WORKLOAD", "SYSTEM", "EXTERNAL"]
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "issuer": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "approval_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_for", "minimum_approvals"],
+      "properties": {
+        "required_for": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["MUTATION", "EXTERNAL_SIDE_EFFECT", "CREDENTIAL_USE", "PRODUCTION_ACCESS"]
+          }
+        },
+        "approver_roles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "minimum_approvals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
+      }
+    }
+  }
+}
