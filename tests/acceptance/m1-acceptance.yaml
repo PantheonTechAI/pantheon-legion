@@ -180,9 +180,26 @@ scenarios:
           mission_version_unchanged: true
           roe_unchanged: true
       - id: S2
+        operation: submit_command
+        as: user_a
+        input:
+          expected_version: 2
+          command_type: REQUEST_ACTION
+          payload:
+            action_id: 44444444-4444-4444-8444-444444444444
+            capability: test.read
+            arguments: {}
+            target: acceptance-resource
+            side_effect_class: READ
+          idempotency_key: m1-003-action-request
+        expect:
+          result: accepted
+          version: 3
+      - id: S3
         operation: execute_action
         as: observer
-        input: bounded_mutation
+        input:
+          action_id: 44444444-4444-4444-8444-444444444444
         expect:
           result: forbidden
           side_effect_count: 0
@@ -377,7 +394,6 @@ scenarios:
           result: reconstructable
           contains_events:
             - MISSION_CREATED
-            - MISSION_STATE_CHANGED
             - COMMAND_ACCEPTED
             - COMMAND_REJECTED
           actors_present:

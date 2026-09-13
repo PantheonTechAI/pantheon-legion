@@ -9,6 +9,17 @@ The M1 acceptance harness proves the Legion Mission kernel without requiring an 
 
 The harness is an executable specification: an implementation under test (IUT) supplies a small adapter, the harness drives the same scenarios against that adapter, and the harness asserts observable Mission, Approval, execution, and audit behavior.
 
+The repository includes a dependency-free Aquila reference runner. Run it with:
+
+```sh
+/usr/bin/python3 -m tests.acceptance.runner
+```
+
+It emits one evidence record per catalog scenario and exits nonzero on a failed
+scenario. The runner reads the scenario IDs from the YAML catalog and fails if
+the catalog and its executable procedures diverge; this keeps the catalog as
+the CI gate without adding a YAML-parser dependency.
+
 ## Scope
 
 M1 acceptance covers:
