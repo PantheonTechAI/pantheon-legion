@@ -12,6 +12,13 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
+from legion_cognition import (
+    CognitionRuntimeAdapter,
+    MissionContext,
+    ScoutEvidence,
+    ScoutRequest,
+    ScoutResult,
+)
 from legion_kernel import (
     AuthorizationError,
     LegionKernel,
@@ -276,6 +283,47 @@ class AquilaService:
             raise
         self.execution.complete(execution_id, {"outcome": outcome})
         return outcome
+
+    def run_scout(
+        self,
+        *,
+        mission_id: str,
+        scout: Principal,
+        delegation: DelegationGrant | None,
+        runtime: CognitionRuntimeAdapter,
+        query: str,
+        granted_capabilities: frozenset[str],
+        evidence: tuple[ScoutEvidence, ...] = (),
+    ) -> ScoutResult:
+        """Run a bounded Scout without exposing Mission mutation authority.
+
+        The Scout is authorized as a workload read of the current Mission and
+        receives only a stable context projection.  Read observations are not
+        authoritative Mission events, so this operation intentionally does not
+        mutate Mission state or append audit timeline entries.
+        """
+        mission = self.kernel.get_mission(mission_id)
+        decision = self.authorization.decide(
+            AuthorizationRequest(
+                principal=scout,
+                mission_id=mission_id,
+                operation="READ_MISSION",
+                roe_level=mission.roe.level,
+                mission_status=mission.status,
+                delegation=delegation,
+            )
+        )
+        if decision.decision == Decision.DENY:
+            raise AuthorizationError(decision.reason)
+        return runtime.run_scout(
+            ScoutRequest(
+                context=MissionContext.from_mission(mission),
+                scout=scout,
+                query=query,
+                granted_capabilities=granted_capabilities,
+                evidence=evidence,
+            )
+        )
 
     def decide_approval(
         self,
