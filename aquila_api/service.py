@@ -505,7 +505,14 @@ class AquilaService:
                 }
                 for constraint in mission.constraints
             ],
-            "participants": [],
+            "participants": [
+                {
+                    "principal": _principal_payload(participant.principal),
+                    "role": participant.role,
+                    "scope": participant.scope,
+                }
+                for participant in mission.participants
+            ],
             "labels": {},
             "active_execution": None,
             "last_event_id": last_event_id,

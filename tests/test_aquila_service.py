@@ -71,6 +71,25 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(read.status_code, 200)
         self.assertEqual(read.body["version"], 3)
 
+    def test_participants_are_exposed_in_the_mission_projection(self):
+        added = self.command(
+            self.owner,
+            1,
+            "add-approver",
+            "ADD_PARTICIPANT",
+            {"participant": {
+                "principal": {"type": "HUMAN", "subject": "approver"},
+                "role": "APPROVER", "scope": "production",
+            }},
+        )
+        self.assertEqual(added.status_code, 200)
+        mission = self.service.get_mission(actor=self.owner, mission_id=self.mission_id)
+        self.assertEqual(mission.body["participants"], [{
+            "principal": {"type": "HUMAN", "subject": "approver"},
+            "role": "APPROVER",
+            "scope": "production",
+        }])
+
     def test_approval_request_and_decision_are_openapi_shaped(self):
         self.command(self.owner, 1, "start", "START", {})
         requested = self.command(

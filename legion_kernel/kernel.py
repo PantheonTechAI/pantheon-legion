@@ -79,6 +79,13 @@ class Constraint:
 
 
 @dataclass
+class Participant:
+    principal: Principal
+    role: str
+    scope: str | None = None
+
+
+@dataclass
 class RulesOfEngagement:
     revision: int
     level: RoeLevel
@@ -151,6 +158,7 @@ class Mission:
     version: int = 1
     roe: RulesOfEngagement | None = None
     constraints: list[Constraint] = field(default_factory=list)
+    participants: list[Participant] = field(default_factory=list)
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)
     actions: dict[str, Action] = field(default_factory=dict)
@@ -331,6 +339,36 @@ class LegionKernel:
         elif command_type == "REMOVE_CONSTRAINT":
             constraint_id = str(payload["constraint_id"])
             mission.constraints = [c for c in mission.constraints if c.id != constraint_id]
+        elif command_type == "ADD_PARTICIPANT":
+            participant = self._make_participant(payload)
+            existing = next(
+                (index for index, item in enumerate(mission.participants)
+                 if item.principal.subject == participant.principal.subject),
+                None,
+            )
+            if existing is None:
+                mission.participants.append(participant)
+                event_type = "PARTICIPANT_ADDED"
+            else:
+                mission.participants[existing] = participant
+                event_type = "PARTICIPANT_UPDATED"
+        elif command_type == "REMOVE_PARTICIPANT":
+            subject = str(payload["subject"])
+            if not any(item.principal.subject == subject for item in mission.participants):
+                result = self._reject(
+                    mission,
+                    actor,
+                    "PARTICIPANT_NOT_FOUND",
+                    "Participant is not part of this Mission.",
+                    correlation_id,
+                    command_id=command_id,
+                )
+                self._remember(idempotency_key_ref, fingerprint, result)
+                return result
+            mission.participants = [
+                item for item in mission.participants if item.principal.subject != subject
+            ]
+            event_type = "PARTICIPANT_REMOVED"
         elif command_type == "SET_ROE":
             requested_level = RoeLevel(payload["level"])
             mission.roe = RulesOfEngagement(
@@ -407,6 +445,15 @@ class LegionKernel:
         event_data = {"command_type": command_type, "requested_by": requested_by.subject}
         if command_type == "SUSPEND":
             event_data["reason"] = payload["reason"].strip()
+        if command_type == "ADD_PARTICIPANT":
+            event_data["participant"] = {
+                "subject": participant.principal.subject,
+                "type": participant.principal.type.value,
+                "role": participant.role,
+                "scope": participant.scope,
+            }
+        if command_type == "REMOVE_PARTICIPANT":
+            event_data["subject"] = subject
         self._record(
             mission,
             event_type=event_type,
@@ -666,6 +713,26 @@ class LegionKernel:
             return self.missions[mission_id]
         except KeyError as exc:
             raise KeyError(f"Unknown Mission {mission_id}") from exc
+
+    @staticmethod
+    def _make_participant(payload: dict[str, Any]) -> Participant:
+        raw = payload["participant"]
+        principal = raw["principal"]
+        scope = raw.get("scope")
+        if not isinstance(principal, dict) or not isinstance(principal.get("subject"), str):
+            raise ValueError("participant principal must include a subject")
+        if not principal["subject"]:
+            raise ValueError("participant principal subject must not be empty")
+        if scope is not None and not isinstance(scope, str):
+            raise TypeError("participant scope must be a string")
+        role = str(raw["role"])
+        if role not in {"OWNER", "OPERATOR", "OBSERVER", "APPROVER", "WORKLOAD", "EXTERNAL"}:
+            raise ValueError("Unsupported participant role")
+        return Participant(
+            principal=Principal(PrincipalType(principal["type"]), principal["subject"]),
+            role=role,
+            scope=scope,
+        )
 
     def _authorize_command(self, mission: Mission, actor: Principal, command_type: str) -> str | None:
         if actor.type == PrincipalType.HUMAN and actor.has_any_role("MISSION_OWNER", "OPERATOR"):

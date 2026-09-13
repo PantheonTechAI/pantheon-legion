@@ -188,6 +188,33 @@ class PersistentAquilaServiceTests(unittest.TestCase):
         self.assertEqual(conflict.body['code'], 'IDEMPOTENCY_KEY_REUSE')
         restarted.close()
 
+    def test_participant_projection_survives_service_restart(self):
+        service = self.create_service()
+        created = service.create_mission(actor=self.owner, body={
+            'organization_id': '11111111-1111-4111-8111-111111111111',
+            'workspace_id': '22222222-2222-4222-8222-222222222222',
+            'title': 'Participant Mission', 'objective': 'Persist participants.',
+        })
+        mission_id = created.body['id']
+        added = service.submit_command(actor=self.owner, mission_id=mission_id, body={
+            'expected_version': 1, 'idempotency_key': 'add-observer',
+            'command_type': 'ADD_PARTICIPANT',
+            'payload': {'participant': {
+                'principal': {'type': 'HUMAN', 'subject': 'observer'},
+                'role': 'OBSERVER', 'scope': 'read-only',
+            }},
+        })
+        self.assertEqual(added.status_code, 200)
+        service.close()
+
+        restarted = self.create_service()
+        mission = restarted.get_mission(actor=self.owner, mission_id=mission_id)
+        self.assertEqual(mission.body['participants'], [{
+            'principal': {'type': 'HUMAN', 'subject': 'observer'},
+            'role': 'OBSERVER', 'scope': 'read-only',
+        }])
+        restarted.close()
+
 
 if __name__ == '__main__':
     unittest.main()
