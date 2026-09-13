@@ -57,4 +57,18 @@ class DurableExecutionTests(unittest.TestCase):
         adapter = InMemoryDurableExecutionAdapter()
         record = self.start(adapter)
         self.assertEqual(adapter.fail(record.execution_id, "worker timeout").state, ExecutionState.FAILED)
+        with self.assertRaisesRegex(ValueError, "INVALID_EXECUTION_TRANSITION"):
+            adapter.signal(record.execution_id, "PAUSE")
+        with self.assertRaisesRegex(ValueError, "INVALID_EXECUTION_TRANSITION"):
+            adapter.complete(record.execution_id, {"ok": True})
+        self.assertEqual(adapter.query(record.execution_id).state, ExecutionState.FAILED)
         self.assertEqual(adapter.recover(record.execution_id).state, ExecutionState.RUNNING)
+
+    def test_recovery_does_not_resume_paused_or_waiting_work(self):
+        adapter = InMemoryDurableExecutionAdapter()
+        record = self.start(adapter)
+        paused = adapter.signal(record.execution_id, "PAUSE")
+        self.assertEqual(adapter.recover(record.execution_id), paused)
+        adapter.signal(record.execution_id, "RESUME")
+        waiting = adapter.signal(record.execution_id, "WAIT")
+        self.assertEqual(adapter.recover(record.execution_id), waiting)
