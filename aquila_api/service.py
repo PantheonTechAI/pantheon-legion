@@ -108,11 +108,9 @@ class AquilaService:
         correlation_id: str | None = None,
     ) -> ApiResponse:
         try:
-            self._require_fields(body, "expected_version", "idempotency_key", "command_type", "payload")
-            if not isinstance(body["payload"], dict):
-                raise TypeError("payload must be an object")
+            self._validate_command_submission(body)
             mission = self.kernel.get_mission(mission_id)
-            command_type = str(body["command_type"])
+            command_type = body["command_type"]
             requested_roe = mission.roe.level
             if command_type == "SET_ROE":
                 requested_roe = RoeLevel(body["payload"].get("level", mission.roe.level.value))
@@ -159,11 +157,11 @@ class AquilaService:
             result = self.kernel.submit_command(
                 mission_id=mission_id,
                 actor=actor,
-                expected_version=int(body["expected_version"]),
-                idempotency_key=str(body["idempotency_key"]),
+                expected_version=body["expected_version"],
+                idempotency_key=body["idempotency_key"],
                 command_type=command_type,
                 payload=body["payload"],
-                requested_by=self._principal_from_body(body.get("requested_by"), actor),
+                requested_by=actor,
                 correlation_id=correlation_id,
             )
             if result.status == "ACCEPTED" and command_type in {"PAUSE", "SUSPEND", "RESUME", "CANCEL"}:
@@ -425,6 +423,25 @@ class AquilaService:
         missing = [name for name in names if name not in body]
         if missing:
             raise ValueError(f"missing required fields: {', '.join(missing)}")
+
+    @staticmethod
+    def _validate_command_submission(body: Any) -> None:
+        if not isinstance(body, dict):
+            raise ValueError("INVALID_COMMAND_SUBMISSION")
+        required = {"expected_version", "idempotency_key", "command_type", "payload"}
+        if set(body) != required:
+            raise ValueError("INVALID_COMMAND_SUBMISSION")
+        version = body["expected_version"]
+        if isinstance(version, bool) or not isinstance(version, int) or version < 0:
+            raise ValueError("INVALID_COMMAND_SUBMISSION")
+        key = body["idempotency_key"]
+        if not isinstance(key, str) or not 1 <= len(key) <= 256:
+            raise ValueError("INVALID_COMMAND_SUBMISSION")
+        command_type = body["command_type"]
+        if not isinstance(command_type, str):
+            raise ValueError("INVALID_COMMAND_SUBMISSION")
+        if not isinstance(body["payload"], dict):
+            raise ValueError("INVALID_COMMAND_SUBMISSION")
 
     @staticmethod
     def _validate_uuid(value: str) -> None:

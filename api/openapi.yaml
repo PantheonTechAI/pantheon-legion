@@ -109,8 +109,7 @@ paths:
         Submits an explicit state-change or bounded action request. The
         expected_version is compared atomically with the current Mission
         version. A mismatch returns 409 VERSION_CONFLICT and does not mutate
-        Mission state. The authenticated principal is the actor; requested_by
-        may identify the originating principal for a delegated request.
+        Mission state. The authenticated principal is both actor and requester.
 
         The command may return AWAITING_APPROVAL when the current ROE or policy
         requires a fresh Approval. It never executes a requested tool merely
@@ -125,7 +124,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MissionCommandRequest'
+              $ref: '#/components/schemas/CommandSubmission'
             examples:
               addConstraint:
                 value:
@@ -137,9 +136,6 @@ paths:
                       id: 33333333-3333-4333-8333-333333333333
                       text: Do not mutate production resources without explicit review.
                       severity: PROHIBITED
-                  requested_by:
-                    type: HUMAN
-                    subject: operator-a
       responses:
         '200':
           description: Command evaluated; inspect status for applied, pending, or rejected outcome.
@@ -452,7 +448,7 @@ components:
               severity:
                 type: string
                 enum: [REQUIRED, PREFERRED, PROHIBITED]
-    MissionCommandRequest:
+    CommandSubmission:
       type: object
       additionalProperties: false
       required:
@@ -487,36 +483,6 @@ components:
         payload:
           type: object
           description: Command-specific payload validated against the MissionCommand protocol.
-        requested_by:
-          type: object
-          additionalProperties: false
-          required: [type, subject]
-          properties:
-            type:
-              type: string
-              enum: [HUMAN, WORKLOAD, SYSTEM, EXTERNAL]
-            subject:
-              type: string
-              minLength: 1
-              maxLength: 512
-            issuer:
-              type: string
-              maxLength: 500
-        delegated_by:
-          type: [object, 'null']
-          additionalProperties: false
-          required: [type, subject]
-          properties:
-            type:
-              type: string
-              enum: [HUMAN, WORKLOAD, SYSTEM, EXTERNAL]
-            subject:
-              type: string
-              minLength: 1
-              maxLength: 512
-            issuer:
-              type: string
-              maxLength: 500
     ApprovalDecisionRequest:
       type: object
       additionalProperties: false
