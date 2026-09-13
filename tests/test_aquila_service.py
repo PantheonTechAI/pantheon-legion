@@ -51,7 +51,7 @@ class AquilaServiceTests(unittest.TestCase):
             "ADD_CONSTRAINT",
             {
                 "constraint": {
-                    "id": "constraint-1",
+                    "id": "33333333-3333-4333-8333-333333333333",
                     "text": "Keep evidence.",
                     "severity": "REQUIRED",
                 }
@@ -102,7 +102,7 @@ class AquilaServiceTests(unittest.TestCase):
             1,
             "remove-missing-constraint",
             "REMOVE_CONSTRAINT",
-            {"constraint_id": "missing"},
+            {"constraint_id": "ffffffff-ffff-4fff-8fff-ffffffffffff"},
         )
         self.assertEqual(rejected.status_code, 422)
         self.assertEqual(rejected.body["code"], "CONSTRAINT_NOT_FOUND")
@@ -125,6 +125,12 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(rejected.body["code"], "INVALID_COMMAND_PAYLOAD")
         self.assertEqual(rejected.body["current_version"], 1)
 
+
+    def test_schema_invalid_constraint_payload_is_rejected_without_a_version_change(self):
+        rejected = self.command(self.owner, 1, "invalid-constraint", "ADD_CONSTRAINT", {"constraint": {"id": "invalid", "text": "invalid id"}})
+        self.assertEqual(rejected.status_code, 422)
+        self.assertEqual(rejected.body["code"], "INVALID_COMMAND_PAYLOAD")
+        self.assertEqual(rejected.body["current_version"], 1)
     def test_approval_request_and_decision_are_openapi_shaped(self):
         self.command(self.owner, 1, "start", "START", {})
         requested = self.command(

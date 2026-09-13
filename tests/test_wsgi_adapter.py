@@ -120,6 +120,16 @@ class WsgiAdapterTests(unittest.TestCase):
         self.assertEqual(body["code"], "INVALID_COMMAND_PAYLOAD")
         self.assertEqual(body["current_version"], 1)
 
+
+    def test_schema_invalid_objective_payload_is_rejected(self):
+        _, _, created = self.request("POST", "/missions", self.create_body())
+        status, _, body = self.request(
+            "POST", f"/missions/{created['id']}/commands",
+            {"expected_version": 1, "idempotency_key": "invalid-objective", "command_type": "UPDATE_OBJECTIVE",
+             "payload": {"objective": ["not", "a", "string"]}},
+        )
+        self.assertEqual(status, 422)
+        self.assertEqual(body["code"], "INVALID_COMMAND_PAYLOAD")
     def test_invalid_json_is_rejected(self):
         environ = {
             "REQUEST_METHOD": "POST",

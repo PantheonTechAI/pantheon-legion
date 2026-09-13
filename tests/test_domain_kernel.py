@@ -63,7 +63,7 @@ class DomainKernelTests(unittest.TestCase):
             command_type="ADD_CONSTRAINT",
             payload={
                 "constraint": {
-                    "id": "constraint-1",
+                    "id": "33333333-3333-4333-8333-333333333333",
                     "text": "Preserve evidence.",
                     "severity": "REQUIRED",
                 }
@@ -104,7 +104,7 @@ class DomainKernelTests(unittest.TestCase):
             expected_version=1,
             idempotency_key="remove-missing-constraint",
             command_type="REMOVE_CONSTRAINT",
-            payload={"constraint_id": "missing"},
+            payload={"constraint_id": "ffffffff-ffff-4fff-8fff-ffffffffffff"},
         )
         self.assertEqual(rejected.error_code, "CONSTRAINT_NOT_FOUND")
         self.assertEqual(self.kernel.get_mission(self.mission.id).version, 1)
@@ -131,6 +131,11 @@ class DomainKernelTests(unittest.TestCase):
             ("REQUEST_ACTION", {"action_id": "not-a-uuid", "capability": "test.read", "arguments": {}}),
             ("REQUEST_ACTION", {"action_id": "11111111-1111-4111-8111-111111111111", "capability": "x" * 201, "arguments": []}),
             ("REQUEST_ACTION", {"action_id": "11111111-1111-4111-8111-111111111111", "capability": "test.read", "arguments": {}, "side_effect_class": "INVALID"}),
+            ("UPDATE_OBJECTIVE", {"objective": "x" * 10001}),
+            ("ADD_CONSTRAINT", {"constraint": {"id": "not-a-uuid", "text": "invalid id"}}),
+            ("ADD_CONSTRAINT", {"constraint": {"id": "33333333-3333-4333-8333-333333333333", "text": "valid", "severity": "INVALID"}}),
+            ("REMOVE_CONSTRAINT", {"constraint_id": "not-a-uuid"}),
+            ("REMOVE_PARTICIPANT", {"subject": ""}),
         )
         for index, (command_type, payload) in enumerate(invalid_payloads):
             with self.subTest(command_type=command_type, index=index):
@@ -383,7 +388,7 @@ class DomainKernelTests(unittest.TestCase):
             command_type="ADD_CONSTRAINT",
             payload={
                 "constraint": {
-                    "id": "constraint-1",
+                    "id": "33333333-3333-4333-8333-333333333333",
                     "text": "Preserve evidence.",
                     "severity": "PROHIBITED",
                 }
