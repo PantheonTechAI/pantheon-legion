@@ -69,6 +69,7 @@ An accepted command MUST return the resulting Mission version or an explicit dur
 | `REMOVE_PARTICIPANT` | Principal subject | Removes the participant if authorized. |
 | `START` | Empty object | `DRAFT` → `ACTIVE`. |
 | `PAUSE` | Empty object | `ACTIVE` → `PAUSED`. |
+| `SUSPEND` | Suspension reason | `ACTIVE`/`PAUSED`/`AWAITING_APPROVAL` → `SUSPENDED`; durable work receives a pause signal. |
 | `RESUME` | Empty object | `PAUSED`/`SUSPENDED`/authorized `FAILED` → `ACTIVE`. |
 | `REQUEST_ACTION` | Action ID, capability, arguments, side-effect class | Creates a bounded action request; may enter `AWAITING_APPROVAL`. |
 | `CANCEL` | Empty object | Any non-terminal state → `CANCELLED`. |
@@ -121,6 +122,7 @@ The API MUST expose stable machine-readable codes. At minimum:
 | `MISSION_TERMINAL` | Mission is completed, cancelled, or failed. | None. |
 | `MISSION_PAUSED` | Mission execution is paused. | No execution. |
 | `MISSION_SUSPENDED` | Mission execution is suspended by a control-plane or safety condition. | No execution. |
+| `SUSPENSION_REASON_REQUIRED` | Suspension control omitted a non-empty reason. | None. |
 | `CAPABILITY_DENIED` | Requested capability is not declared or allowed. | None. |
 | `POLICY_UNAVAILABLE` | Required policy context cannot be evaluated. | Fail closed. |
 

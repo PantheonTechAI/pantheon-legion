@@ -479,6 +479,7 @@ components:
             - REMOVE_PARTICIPANT
             - START
             - PAUSE
+            - SUSPEND
             - RESUME
             - REQUEST_ACTION
             - CANCEL
