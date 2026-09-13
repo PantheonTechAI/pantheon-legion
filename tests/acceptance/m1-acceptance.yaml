@@ -1,0 +1,452 @@
+suite_version: "1.0"
+name: Pantheon Legion M1 Mission Kernel Acceptance
+description: >-
+  Framework-neutral acceptance scenarios for durable multi-user Mission control.
+  These scenarios require no LLM or cognition runtime.
+execution:
+  isolation: one-fresh-workspace-per-scenario
+  deterministic_clock: required
+  failure_injection: required
+  required_model_runtime: false
+actors:
+  user_a:
+    type: HUMAN
+    subject: acceptance-user-a
+    roles: [MISSION_OWNER, OPERATOR]
+  user_b:
+    type: HUMAN
+    subject: acceptance-user-b
+    roles: [OPERATOR]
+  approver:
+    type: HUMAN
+    subject: acceptance-approver
+    roles: [APPROVER]
+  observer:
+    type: HUMAN
+    subject: acceptance-observer
+    roles: [OBSERVER]
+  mission_worker:
+    type: WORKLOAD
+    subject: acceptance-mission-worker
+    roles: [MISSION_WORKER]
+fixtures:
+  base_mission:
+    title: M1 acceptance Mission
+    objective: Verify durable Mission control without cognition.
+    initial_roe_level: REVIEW
+    labels:
+      suite: m1
+      source: acceptance
+  bounded_mutation:
+    action_id: 11111111-1111-4111-8111-111111111111
+    capability: test.bounded_mutation
+    arguments:
+      target: acceptance-resource
+      value: one
+    target: acceptance-resource
+    side_effect_class: MUTATION
+scenarios:
+  - id: M1-001
+    name: Two humans collaborate on one Mission
+    requirements: [multi-user-collaboration, authoritative-versioning]
+    setup:
+      - reset
+      - authenticate: user_a
+      - authenticate: user_b
+    steps:
+      - id: S1
+        operation: create_mission
+        as: user_a
+        input: base_mission
+        expect:
+          result: accepted
+          status: DRAFT
+          version: 1
+      - id: S2
+        operation: submit_command
+        as: user_a
+        input:
+          expected_version: 1
+          command_type: START
+          payload: {}
+          idempotency_key: m1-001-start-a
+        expect:
+          result: accepted
+          mission_status: ACTIVE
+          version: 2
+      - id: S3
+        operation: submit_command
+        as: user_b
+        input:
+          expected_version: 2
+          command_type: ADD_CONSTRAINT
+          payload:
+            constraint:
+              id: 22222222-2222-4222-8222-222222222222
+              text: Preserve evidence before any bounded mutation.
+              severity: REQUIRED
+          idempotency_key: m1-001-constraint-b
+        expect:
+          result: accepted
+          version: 3
+          constraint_present: 22222222-2222-4222-8222-222222222222
+      - id: S4
+        operation: get_mission
+        as: observer
+        expect:
+          version: 3
+          constraint_present: 22222222-2222-4222-8222-222222222222
+    assertions:
+      - id: A1
+        text: Both human principals can act on the same Mission within their scopes.
+      - id: A2
+        text: Each accepted state change advances Mission version exactly once.
+
+  - id: M1-002
+    name: Stale command is rejected deterministically
+    requirements: [version-conflict, no-implicit-merge]
+    setup:
+      - reset
+      - authenticate: user_a
+      - authenticate: user_b
+      - create_mission: user_a
+      - start_mission: user_a
+    steps:
+      - id: S1
+        operation: submit_command
+        as: user_b
+        input:
+          expected_version: 2
+          command_type: ADD_CONSTRAINT
+          payload:
+            constraint:
+              id: 33333333-3333-4333-8333-333333333333
+              text: First constraint.
+              severity: REQUIRED
+          idempotency_key: m1-002-b-constraint
+        expect:
+          result: accepted
+          version: 3
+      - id: S2
+        operation: submit_command
+        as: user_a
+        input:
+          expected_version: 2
+          command_type: UPDATE_OBJECTIVE
+          payload:
+            objective: Stale objective must not overwrite current Mission state.
+          idempotency_key: m1-002-a-stale
+        expect:
+          result: version_conflict
+          error_code: VERSION_CONFLICT
+          mission_version_unchanged: true
+          rejected_command_audited: true
+      - id: S3
+        operation: get_mission
+        as: user_a
+        expect:
+          version: 3
+          constraint_present: 33333333-3333-4333-8333-333333333333
+          objective_absent: Stale objective must not overwrite current Mission state.
+    assertions:
+      - id: A1
+        text: The stale command does not mutate Mission state.
+      - id: A2
+        text: The rejected command is present in authoritative audit history.
+
+  - id: M1-003
+    name: Authorization denies an out-of-scope action
+    requirements: [authorization, fail-closed]
+    setup:
+      - reset
+      - authenticate: user_a
+      - authenticate: observer
+      - create_mission: user_a
+      - start_mission: user_a
+    steps:
+      - id: S1
+        operation: submit_command
+        as: observer
+        input:
+          expected_version: 2
+          command_type: SET_ROE
+          payload:
+            level: BOUNDED_AUTONOMOUS
+            reason: Unauthorized elevation attempt.
+          idempotency_key: m1-003-observer-roe
+        expect:
+          result: forbidden
+          error_code: FORBIDDEN
+          mission_version_unchanged: true
+          roe_unchanged: true
+      - id: S2
+        operation: execute_action
+        as: observer
+        input: bounded_mutation
+        expect:
+          result: forbidden
+          side_effect_count: 0
+          audit_result: DENIED
+    assertions:
+      - id: A1
+        text: A valid identity without authority cannot change ROE.
+      - id: A2
+        text: An unauthorized action fails closed without an external side effect.
+
+  - id: M1-004
+    name: ROE narrowing invalidates an otherwise valid Approval
+    requirements: [roe-narrowing, approval-freshness, execution-gate]
+    setup:
+      - reset
+      - authenticate: user_a
+      - authenticate: approver
+      - authenticate: mission_worker
+      - create_mission: user_a
+      - start_mission: user_a
+    steps:
+      - id: S1
+        operation: submit_command
+        as: user_a
+        input:
+          expected_version: 2
+          command_type: REQUEST_ACTION
+          payload: bounded_mutation
+          idempotency_key: m1-004-action-request
+        expect:
+          result: approval_required
+          status: AWAITING_APPROVAL
+          approval_status: PENDING
+          action_not_executed: true
+      - id: S2
+        operation: decide_approval
+        as: approver
+        input:
+          decision: APPROVE
+          reason: Approved for the current bounded action.
+        expect:
+          result: accepted
+          approval_status: APPROVED
+      - id: S3
+        operation: change_roe
+        as: user_a
+        input:
+          expected_version: 3
+          level: OBSERVE
+          reason: Narrow authority while evidence is reviewed.
+          idempotency_key: m1-004-narrow-roe
+        expect:
+          result: accepted
+          roe_level: OBSERVE
+          roe_revision_incremented: true
+      - id: S4
+        operation: execute_action
+        as: mission_worker
+        input: bounded_mutation
+        expect:
+          result: approval_stale
+          error_code: ROE_DENIED
+          side_effect_count: 0
+          approval_consumed: false
+    assertions:
+      - id: A1
+        text: Narrowing ROE takes effect before execution.
+      - id: A2
+        text: A stale Approval cannot bypass a newly narrower ROE.
+      - id: A3
+        text: Execution re-evaluates current authorization at the boundary.
+
+  - id: M1-005
+    name: Worker restart recovers durable work without duplicate side effects
+    requirements: [worker-recovery, idempotent-execution, durable-state]
+    setup:
+      - reset
+      - authenticate: user_a
+      - authenticate: approver
+      - authenticate: mission_worker
+      - create_mission: user_a
+      - start_mission: user_a
+    steps:
+      - id: S1
+        operation: submit_command
+        as: user_a
+        input:
+          expected_version: 2
+          command_type: REQUEST_ACTION
+          payload:
+            action_id: 55555555-5555-4555-8555-555555555555
+            capability: test.idempotent_side_effect
+            arguments:
+              target: acceptance-resource
+            side_effect_class: MUTATION
+          idempotency_key: m1-005-action-request
+        expect:
+          result: approval_required
+      - id: S2
+        operation: decide_approval
+        as: approver
+        input:
+          decision: APPROVE
+          reason: Approved for recovery test.
+        expect:
+          result: accepted
+          approval_status: APPROVED
+      - id: S3
+        operation: execute_action
+        as: mission_worker
+        input:
+          failure_point: after-side-effect-before-ack
+        expect:
+          worker_state: killed
+          side_effect_count: 1
+      - id: S4
+        operation: restart_worker
+        as: mission_worker
+        expect:
+          result: recovered
+          action_resumed: true
+      - id: S5
+        operation: get_side_effects
+        expect:
+          action_id: 55555555-5555-4555-8555-555555555555
+          count: 1
+      - id: S6
+        operation: get_timeline
+        as: user_a
+        expect:
+          recovery_event_present: true
+          duplicate_execution_event_absent: true
+    assertions:
+      - id: A1
+        text: Durable Mission state survives worker termination.
+      - id: A2
+        text: Recovery does not create an uncontrolled duplicate side effect.
+      - id: A3
+        text: Recovery and execution outcome are authoritative events.
+
+  - id: M1-006
+    name: Timeline reconstructs all actors decisions and state changes
+    requirements: [audit-reconstruction, authoritative-timeline]
+    setup:
+      - reset
+      - authenticate: user_a
+      - authenticate: user_b
+      - authenticate: approver
+      - create_mission: user_a
+    steps:
+      - id: S1
+        operation: submit_command
+        as: user_a
+        input:
+          expected_version: 1
+          command_type: START
+          payload: {}
+          idempotency_key: m1-006-start
+        expect:
+          result: accepted
+          version: 2
+      - id: S2
+        operation: submit_command
+        as: user_b
+        input:
+          expected_version: 2
+          command_type: ADD_CONSTRAINT
+          payload:
+            constraint:
+              id: 66666666-6666-4666-8666-666666666666
+              text: Preserve the current deployment.
+              severity: PROHIBITED
+          idempotency_key: m1-006-constraint
+        expect:
+          result: accepted
+          version: 3
+      - id: S3
+        operation: submit_command
+        as: user_a
+        input:
+          expected_version: 2
+          command_type: PAUSE
+          payload: {}
+          idempotency_key: m1-006-stale-pause
+        expect:
+          result: version_conflict
+          rejected_command_audited: true
+      - id: S4
+        operation: get_timeline
+        as: user_a
+        expect:
+          result: reconstructable
+          contains_events:
+            - MISSION_CREATED
+            - MISSION_STATE_CHANGED
+            - COMMAND_ACCEPTED
+            - COMMAND_REJECTED
+          actors_present:
+            - acceptance-user-a
+            - acceptance-user-b
+          versions_contiguous: true
+      - id: S5
+        operation: get_audit
+        as: user_a
+        expect:
+          result: reconstructable
+          rejected_attempt_present: true
+          authorization_context_present: true
+          correlation_ids_present: true
+    assertions:
+      - id: A1
+        text: Accepted state changes and rejected attempts are reconstructable from authoritative records.
+      - id: A2
+        text: Actor, version, causation, correlation, and authorization context are preserved.
+
+  - id: M1-007
+    name: Mission kernel runs with no cognition runtime
+    requirements: [no-llm-dependency, provider-neutrality]
+    setup:
+      - reset
+      - assert:
+          model_runtime_available: false
+      - authenticate: user_a
+      - authenticate: user_b
+    steps:
+      - id: S1
+        operation: create_mission
+        as: user_a
+        input: base_mission
+        expect:
+          result: accepted
+      - id: S2
+        operation: submit_command
+        as: user_a
+        input:
+          expected_version: 1
+          command_type: START
+          payload: {}
+          idempotency_key: m1-007-start
+        expect:
+          result: accepted
+          mission_status: ACTIVE
+      - id: S3
+        operation: submit_command
+        as: user_b
+        input:
+          expected_version: 2
+          command_type: ADD_CONSTRAINT
+          payload:
+            constraint:
+              id: 77777777-7777-4777-8777-777777777777
+              text: No model is required for Mission control.
+              severity: REQUIRED
+          idempotency_key: m1-007-constraint
+        expect:
+          result: accepted
+          version: 3
+      - id: S4
+        operation: get_timeline
+        as: user_a
+        expect:
+          result: reconstructable
+    assertions:
+      - id: A1
+        text: Mission creation, commands, concurrency, and audit work with no cognition runtime.
+      - id: A2
+        text: No step imports or invokes an LLM/model provider.
