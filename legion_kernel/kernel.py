@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import hashlib
 import json
@@ -19,6 +19,11 @@ from uuid import UUID, uuid4
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _expires_at(value: str, minutes: int = 15) -> str:
+    instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return (instant + timedelta(minutes=minutes)).isoformat().replace("+00:00", "Z")
 
 
 class PrincipalType(str, Enum):
@@ -373,7 +378,7 @@ class LegionKernel:
                     roe_revision=mission.roe.revision,
                     action_hash=self._action_hash(action),
                     requested_by=requested_by,
-                    expires_at=None,
+                    expires_at=_expires_at(self.clock()),
                 )
                 self.approvals[approval_id] = approval
                 event_type = "APPROVAL_REQUESTED"
