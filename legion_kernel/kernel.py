@@ -435,6 +435,8 @@ class LegionKernel:
         mission = self._mission(approval.mission_id)
         if not approver.has_any_role("APPROVER", "MISSION_OWNER"):
             raise AuthorizationError("FORBIDDEN")
+        if self._expire_approval_if_needed(mission, approval):
+            raise AuthorizationError("APPROVAL_STALE")
         if approval.status != "PENDING":
             raise AuthorizationError("APPROVAL_ALREADY_DECIDED")
         if expected_mission_version != mission.version or mission.version != approval.mission_version:
@@ -659,9 +661,9 @@ class LegionKernel:
         )
         if approval:
             error_code = None
-            if approval.status != "APPROVED":
+            if self._expire_approval_if_needed(mission, approval):
                 error_code = "APPROVAL_STALE"
-            elif approval.expires_at and self.clock() >= approval.expires_at:
+            elif approval.status != "APPROVED":
                 error_code = "APPROVAL_STALE"
             elif mission.version != approval.mission_version:
                 error_code = "APPROVAL_STALE"
@@ -678,6 +680,22 @@ class LegionKernel:
                 )
                 raise AuthorizationError(error_code)
         return approval
+
+    def _expire_approval_if_needed(self, mission: Mission, approval: Approval) -> bool:
+        if not approval.expires_at or self.clock() < approval.expires_at:
+            return False
+        if approval.status not in {"PENDING", "APPROVED"}:
+            return approval.status == "EXPIRED"
+        approval.status = "EXPIRED"
+        self._record(
+            mission,
+            event_type="APPROVAL_EXPIRED",
+            actor=Principal(PrincipalType.SYSTEM, "approval-expiry"),
+            result="SUCCESS",
+            approval_id=approval.id,
+            data={"expires_at": approval.expires_at},
+        )
+        return True
 
     @staticmethod
     def _make_action(
