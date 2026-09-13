@@ -1,0 +1,623 @@
+openapi: 3.1.0
+info:
+  title: Pantheon Legion Aquila API
+  version: 0.1.0
+  description: |
+    Provider-neutral control-plane API for durable Missions, commands, approvals,
+    and authoritative timeline access.
+
+    Aquila is the authority boundary. Clients submit explicit commands and
+    approvals; they do not write Mission state directly. A successful HTTP
+    response does not replace the authoritative MissionTimelineEvent or
+    AuditEvent returned/referenced by the control plane.
+  license:
+    name: Proprietary
+servers:
+  - url: https://aquila.example.invalid
+    description: Placeholder deployment endpoint; configure per Castrum.
+tags:
+  - name: Missions
+    description: Mission resource lifecycle and state.
+  - name: Commands
+    description: Explicit Mission state-change and action requests.
+  - name: Approvals
+    description: Time- and scope-bound approval decisions.
+  - name: Timeline
+    description: Authoritative Mission history.
+security:
+  - bearerAuth: []
+paths:
+  /missions:
+    post:
+      operationId: createMission
+      summary: Create a Mission
+      description: |
+        Creates a new Mission at version 1 in DRAFT state. The authenticated
+        principal becomes the creator and owner context is checked against the
+        supplied Organization and Workspace. The server assigns Mission ID,
+        timestamps, ROE revision 1, and authoritative audit/timeline events.
+      tags: [Missions]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MissionCreateRequest'
+            examples:
+              incident:
+                value:
+                  organization_id: 11111111-1111-4111-8111-111111111111
+                  workspace_id: 22222222-2222-4222-8222-222222222222
+                  title: Investigate elevated API errors
+                  objective: Determine the cause and produce a remediation recommendation.
+                  initial_roe_level: OBSERVE
+                  labels:
+                    source: alert
+                    severity: high
+      responses:
+        '201':
+          description: Mission created.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /missions/{mission_id}:
+    parameters:
+      - $ref: '#/components/parameters/MissionId'
+    get:
+      operationId: getMission
+      summary: Get a Mission
+      description: Returns the current authoritative Mission snapshot.
+      tags: [Missions]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current Mission snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /missions/{mission_id}/commands:
+    parameters:
+      - $ref: '#/components/parameters/MissionId'
+    post:
+      operationId: submitMissionCommand
+      summary: Submit a MissionCommand
+      description: |
+        Submits an explicit state-change or bounded action request. The
+        expected_version is compared atomically with the current Mission
+        version. A mismatch returns 409 VERSION_CONFLICT and does not mutate
+        Mission state. The authenticated principal is the actor; requested_by
+        may identify the originating principal for a delegated request.
+
+        The command may return AWAITING_APPROVAL when the current ROE or policy
+        requires a fresh Approval. It never executes a requested tool merely
+        because the HTTP request was accepted.
+      tags: [Commands]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MissionCommandRequest'
+            examples:
+              addConstraint:
+                value:
+                  expected_version: 1
+                  idempotency_key: operator-a-command-001
+                  command_type: ADD_CONSTRAINT
+                  payload:
+                    constraint:
+                      id: 33333333-3333-4333-8333-333333333333
+                      text: Do not mutate production resources without explicit review.
+                      severity: PROHIBITED
+                  requested_by:
+                    type: HUMAN
+                    subject: operator-a
+      responses:
+        '200':
+          description: Command evaluated; inspect status for applied, pending, or rejected outcome.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionCommand'
+        '202':
+          description: Command accepted for durable asynchronous processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionCommand'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /missions/{mission_id}/approvals:
+    parameters:
+      - $ref: '#/components/parameters/MissionId'
+    post:
+      operationId: decideMissionApproval
+      summary: Decide a pending Approval
+      description: |
+        Records an authenticated approval decision for one pending Approval.
+        The decision is checked against the current Mission version, ROE
+        revision, policy, action hash, and approver eligibility. Approval does
+        not execute the action; the execution boundary must re-authorize and
+        atomically consume the Approval.
+      tags: [Approvals]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+            examples:
+              approve:
+                value:
+                  approval_id: 44444444-4444-4444-8444-444444444444
+                  expected_mission_version: 3
+                  decision: APPROVE
+                  reason: Reviewed the bounded remediation and verification window.
+      responses:
+        '200':
+          description: Approval decision recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Approval'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Approval is stale, already decided, or Mission version conflicts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                staleApproval:
+                  value:
+                    code: APPROVAL_STALE
+                    message: Approval no longer matches the current ROE revision.
+                    correlation_id: 55555555-5555-4555-8555-555555555555
+                    current_version: 4
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /missions/{mission_id}/timeline:
+    parameters:
+      - $ref: '#/components/parameters/MissionId'
+    get:
+      operationId: getMissionTimeline
+      summary: Get the authoritative Mission timeline
+      description: |
+        Returns ordered authoritative events for reconstructing Mission
+        history. Trace spans and application logs are supporting telemetry;
+        they are not substitutes for this ledger.
+      tags: [Timeline]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/AfterSequence'
+      responses:
+        '200':
+          description: A page of authoritative timeline events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelinePage'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /missions/{mission_id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/MissionId'
+    post:
+      operationId: cancelMission
+      summary: Cancel a Mission
+      description: |
+        Convenience endpoint for the CANCEL MissionCommand. It applies the
+        same authentication, authorization, expected-version, idempotency,
+        audit, and terminal-state rules as command submission.
+      tags: [Missions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelMissionRequest'
+            examples:
+              cancel:
+                value:
+                  expected_version: 5
+                  idempotency_key: operator-a-cancel-001
+                  reason: Incident resolved by an external change.
+      responses:
+        '200':
+          description: Mission cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mission'
+        '202':
+          description: Cancellation accepted for durable asynchronous processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MissionCommand'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/VersionConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Authentik/OIDC access token. Claims are inputs to Aquila authorization.
+  parameters:
+    MissionId:
+      name: mission_id
+      in: path
+      required: true
+      description: Stable Mission identifier.
+      schema:
+        type: string
+        format: uuid
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: Client correlation identifier; generated by Aquila when omitted.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 256
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+        maxLength: 2048
+    AfterSequence:
+      name: after_sequence
+      in: query
+      required: false
+      description: Return events after this authoritative ledger sequence.
+      schema:
+        type: integer
+        minimum: 0
+  headers:
+    Location:
+      description: URL of the newly created Mission.
+      schema:
+        type: string
+        format: uri-reference
+  schemas:
+    Mission:
+      $ref: '../schemas/mission.schema.json'
+    MissionCommand:
+      $ref: '../schemas/mission-command.schema.json'
+    Approval:
+      $ref: '../schemas/approval.schema.json'
+    RulesOfEngagement:
+      $ref: '../schemas/rules-of-engagement.schema.json'
+    AuditEvent:
+      $ref: '../schemas/audit-event.schema.json'
+    MissionCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - organization_id
+        - workspace_id
+        - title
+        - objective
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        project_id:
+          type: [string, 'null']
+          format: uuid
+        environment_id:
+          type: [string, 'null']
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        objective:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        initial_roe_level:
+          type: string
+          enum: [OBSERVE, RECOMMEND, REVIEW, BOUNDED_AUTONOMOUS]
+          default: OBSERVE
+        labels:
+          type: object
+          propertyNames:
+            pattern: '^[A-Za-z0-9._/-]{1,100}$'
+          additionalProperties:
+            type: string
+            maxLength: 500
+        constraints:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            required: [text]
+            properties:
+              text:
+                type: string
+                minLength: 1
+                maxLength: 5000
+              severity:
+                type: string
+                enum: [REQUIRED, PREFERRED, PROHIBITED]
+    MissionCommandRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - expected_version
+        - idempotency_key
+        - command_type
+        - payload
+      properties:
+        expected_version:
+          type: integer
+          minimum: 0
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 256
+        command_type:
+          type: string
+          enum:
+            - UPDATE_OBJECTIVE
+            - ADD_CONSTRAINT
+            - REMOVE_CONSTRAINT
+            - SET_ROE
+            - ADD_PARTICIPANT
+            - REMOVE_PARTICIPANT
+            - START
+            - PAUSE
+            - RESUME
+            - REQUEST_ACTION
+            - CANCEL
+            - COMPLETE
+        payload:
+          type: object
+          description: Command-specific payload validated against the MissionCommand protocol.
+        requested_by:
+          type: object
+          additionalProperties: false
+          required: [type, subject]
+          properties:
+            type:
+              type: string
+              enum: [HUMAN, WORKLOAD, SYSTEM, EXTERNAL]
+            subject:
+              type: string
+              minLength: 1
+              maxLength: 512
+            issuer:
+              type: string
+              maxLength: 500
+        delegated_by:
+          type: [object, 'null']
+          additionalProperties: false
+          required: [type, subject]
+          properties:
+            type:
+              type: string
+              enum: [HUMAN, WORKLOAD, SYSTEM, EXTERNAL]
+            subject:
+              type: string
+              minLength: 1
+              maxLength: 512
+            issuer:
+              type: string
+              maxLength: 500
+    ApprovalDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [approval_id, expected_mission_version, decision, reason]
+      properties:
+        approval_id:
+          type: string
+          format: uuid
+        expected_mission_version:
+          type: integer
+          minimum: 1
+        decision:
+          type: string
+          enum: [APPROVE, DENY, REVOKE]
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 5000
+    CancelMissionRequest:
+      type: object
+      additionalProperties: false
+      required: [expected_version, idempotency_key, reason]
+      properties:
+        expected_version:
+          type: integer
+          minimum: 0
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 256
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 5000
+    TimelinePage:
+      type: object
+      additionalProperties: false
+      required: [mission_id, events, has_more]
+      properties:
+        mission_id:
+          type: string
+          format: uuid
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        next_cursor:
+          type: [string, 'null']
+          maxLength: 2048
+        has_more:
+          type: boolean
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message, correlation_id]
+      properties:
+        code:
+          type: string
+          enum:
+            - VERSION_CONFLICT
+            - UNAUTHENTICATED
+            - FORBIDDEN
+            - DELEGATION_INVALID
+            - INVALID_STATE_TRANSITION
+            - ROE_DENIED
+            - APPROVAL_REQUIRED
+            - APPROVAL_STALE
+            - IDEMPOTENCY_KEY_REUSE
+            - MISSION_TERMINAL
+            - CAPABILITY_DENIED
+            - POLICY_UNAVAILABLE
+            - NOT_FOUND
+            - INVALID_REQUEST
+        message:
+          type: string
+          maxLength: 5000
+        correlation_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        current_version:
+          type: [integer, 'null']
+          minimum: 0
+        details:
+          type: object
+  responses:
+    BadRequest:
+      description: Malformed request or invalid command envelope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Request shape is valid JSON but violates the contract.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthenticated:
+      description: Authentication is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Authenticated principal is not authorized for the operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Mission or referenced resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    VersionConflict:
+      description: Expected Mission version is stale.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            staleCommand:
+              value:
+                code: VERSION_CONFLICT
+                message: Mission version 4 is current; command expected version 3.
+                correlation_id: 66666666-6666-4666-8666-666666666666
+                current_version: 4
