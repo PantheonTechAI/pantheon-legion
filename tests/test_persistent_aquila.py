@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from aquila_api import DelegationGrant, PersistentAquilaService
+from legion_fabrica import InMemoryFabrica, ToolDefinition
 from legion_kernel import AuthorizationError, Principal, PrincipalType, RoeLevel, WorkerKilled
 from legion_runtime import ExecutionState
 
@@ -213,6 +214,46 @@ class PersistentAquilaServiceTests(unittest.TestCase):
             'principal': {'type': 'HUMAN', 'subject': 'observer'},
             'role': 'OBSERVER', 'scope': 'read-only',
         }])
+        restarted.close()
+
+    def test_fabrica_read_tool_audit_survives_service_restart(self):
+        service = self.create_service()
+        created = service.create_mission(actor=self.owner, body={
+            'organization_id': '11111111-1111-4111-8111-111111111111',
+            'workspace_id': '22222222-2222-4222-8222-222222222222',
+            'title': 'Persistent tool audit', 'objective': 'Persist Fabrica audit facts.',
+        })
+        mission_id = created.body['id']
+        fabrica = InMemoryFabrica()
+        fabrica.register(ToolDefinition(
+            capability='metrics.read', side_effect_class='READ',
+            handler=lambda arguments: {'service': arguments['service']},
+        ))
+        service.invoke_read_tool(
+            mission_id=mission_id,
+            worker=self.worker,
+            delegation=DelegationGrant(
+                grant_id='read-tool-grant', issuer=self.owner, subject=self.worker,
+                mission_id=mission_id, allowed_operations=frozenset({'READ_TOOL'}),
+                roe_ceiling=RoeLevel.OBSERVE, expires_at='9999-01-01T00:00:00Z',
+            ),
+            fabrica=fabrica,
+            capability='metrics.read',
+            arguments={'service': 'api'},
+            correlation_id='persistent-tool-correlation',
+        )
+        service.close()
+
+        restarted = self.create_service()
+        events = restarted.get_timeline(actor=self.owner, mission_id=mission_id).body['events']
+        tool_events = [event for event in events if event['event_type'].startswith('TOOL_')]
+        self.assertEqual(
+            [(event['event_type'], event['result']) for event in tool_events],
+            [('TOOL_AUTHORIZATION_EVALUATED', 'ALLOW'), ('TOOL_EXECUTION_COMPLETED', 'SUCCESS')],
+        )
+        self.assertEqual(
+            {event['correlation_id'] for event in tool_events}, {'persistent-tool-correlation'},
+        )
         restarted.close()
 
 

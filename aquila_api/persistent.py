@@ -112,6 +112,17 @@ class PersistentAquilaService(AquilaService):
                     self._persist_approval(approval.id)
             self._persist_execution_state()
 
+    def invoke_read_tool(self, **kwargs: Any) -> Any:
+        """Persist the material authorization and result audit facts for a tool read."""
+        mission_id = str(kwargs["mission_id"])
+        mission = self.kernel.missions[mission_id]
+        before_version = mission.version
+        before_sequence = len(self.kernel.audit[mission_id])
+        try:
+            return super().invoke_read_tool(**kwargs)
+        finally:
+            self._persist_operation(mission_id, before_version, before_sequence)
+
     def cancel_mission(
         self,
         *,
