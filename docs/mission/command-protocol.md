@@ -63,7 +63,7 @@ An accepted command MUST return the resulting Mission version or an explicit dur
 |---|---|---|
 | `UPDATE_OBJECTIVE` | New objective | Replaces the objective; version advances. |
 | `ADD_CONSTRAINT` | Constraint ID, text, severity | Appends a constraint; version advances. |
-| `REMOVE_CONSTRAINT` | Constraint ID | Removes an existing constraint; version advances. |
+| `REMOVE_CONSTRAINT` | Constraint ID | Removes an existing constraint; an unknown ID is rejected without a version change. |
 | `SET_ROE` | Level, reason, optional capability bounds | Replaces the ROE revision; version advances. |
 | `ADD_PARTICIPANT` | Principal, role, optional scope | Adds a participant, or replaces the declared role and scope for that subject; version advances. |
 | `REMOVE_PARTICIPANT` | Principal subject | Removes an existing participant if authorized; an unknown subject is rejected without a version change. |
@@ -112,6 +112,7 @@ The API MUST expose stable machine-readable codes. At minimum:
 |---|---|---|
 | `VERSION_CONFLICT` | `expected_version` is not current. | None. |
 | `UNKNOWN_COMMAND_TYPE` | Command type is not part of the supported Mission protocol. | None. |
+| `CONSTRAINT_NOT_FOUND` | Constraint ID is not part of the Mission. | None. |
 | `UNAUTHENTICATED` | Actor identity is missing or invalid. | None. |
 | `FORBIDDEN` | Actor is authenticated but lacks authority. | None. |
 | `DELEGATION_INVALID` | Delegation is missing, expired, revoked, or too broad. | None. |

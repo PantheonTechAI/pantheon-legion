@@ -356,6 +356,17 @@ class LegionKernel:
             )
         elif command_type == "REMOVE_CONSTRAINT":
             constraint_id = str(payload["constraint_id"])
+            if not any(item.id == constraint_id for item in mission.constraints):
+                result = self._reject(
+                    mission,
+                    actor,
+                    "CONSTRAINT_NOT_FOUND",
+                    "Constraint is not part of this Mission.",
+                    correlation_id,
+                    command_id=command_id,
+                )
+                self._remember(idempotency_key_ref, fingerprint, result)
+                return result
             mission.constraints = [c for c in mission.constraints if c.id != constraint_id]
         elif command_type == "ADD_PARTICIPANT":
             participant = self._make_participant(payload)
