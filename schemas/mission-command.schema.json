@@ -50,6 +50,7 @@
         "REMOVE_PARTICIPANT",
         "START",
         "PAUSE",
+        "SUSPEND",
         "RESUME",
         "REQUEST_ACTION",
         "CANCEL",
@@ -189,6 +190,19 @@
     },
     {
       "if": {
+        "properties": {"command_type": {"const": "SUSPEND"}},
+        "required": ["command_type"]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "$ref": "#/$defs/suspend_payload"
+          }
+        }
+      }
+    },
+    {
+      "if": {
         "properties": {
           "command_type": {
             "enum": ["START", "PAUSE", "RESUME", "CANCEL", "COMPLETE"]
@@ -300,6 +314,18 @@
           "type": "array",
           "uniqueItems": true,
           "items": {"type": "string", "minLength": 1, "maxLength": 200}
+        }
+      }
+    },
+    "suspend_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
         }
       }
     },
