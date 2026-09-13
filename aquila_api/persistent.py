@@ -127,7 +127,7 @@ class PersistentAquilaService(AquilaService):
                 "expected_version": body.get("expected_version"),
                 "idempotency_key": body.get("idempotency_key"),
                 "command_type": "CANCEL",
-                "payload": {"reason": body.get("reason")},
+                "payload": {},
             },
             correlation_id=correlation_id,
         )

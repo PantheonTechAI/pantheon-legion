@@ -115,7 +115,7 @@ class AquilaService:
             command_type = str(body["command_type"])
             requested_roe = mission.roe.level
             if command_type == "SET_ROE":
-                requested_roe = RoeLevel(body["payload"]["level"])
+                requested_roe = RoeLevel(body["payload"].get("level", mission.roe.level.value))
             operation = "EXECUTE_ACTION" if command_type == "REQUEST_ACTION" else (
                 "SET_ROE" if command_type == "SET_ROE" else "SUBMIT_COMMAND"
             )
@@ -393,7 +393,7 @@ class AquilaService:
                     "expected_version": int(body["expected_version"]),
                     "idempotency_key": str(body["idempotency_key"]),
                     "command_type": "CANCEL",
-                    "payload": {"reason": body["reason"]},
+                    "payload": {},
                 },
                 correlation_id=correlation_id,
             )

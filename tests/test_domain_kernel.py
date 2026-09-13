@@ -112,6 +112,16 @@ class DomainKernelTests(unittest.TestCase):
         self.assertEqual((event.event_type, event.data["error_code"]),
                          ("COMMAND_REJECTED", "CONSTRAINT_NOT_FOUND"))
 
+    def test_invalid_command_payload_is_rejected_before_state_change(self):
+        rejected = self.kernel.submit_command(
+            mission_id=self.mission.id, actor=self.user_a, expected_version=1,
+            idempotency_key="invalid-payload", command_type="UPDATE_OBJECTIVE",
+            payload={"objective": "valid", "unexpected": True},
+        )
+        self.assertEqual(rejected.error_code, "INVALID_COMMAND_PAYLOAD")
+        self.assertEqual(self.kernel.get_mission(self.mission.id).version, 1)
+        self.assertEqual(self.kernel.timeline(self.mission.id)[-1].data["error_code"], "INVALID_COMMAND_PAYLOAD")
+
     def test_participant_commands_update_the_projection_and_reject_unknown_removal(self):
         added = self.kernel.submit_command(
             mission_id=self.mission.id,

@@ -108,6 +108,17 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(rejected.body["code"], "CONSTRAINT_NOT_FOUND")
         self.assertEqual(rejected.body["current_version"], 1)
 
+    def test_unexpected_command_payload_field_is_rejected_without_a_version_change(self):
+        rejected = self.command(self.owner, 1, "invalid-payload", "START", {"unexpected": True})
+        self.assertEqual(rejected.status_code, 422)
+        self.assertEqual(rejected.body["code"], "INVALID_COMMAND_PAYLOAD")
+        self.assertEqual(rejected.body["current_version"], 1)
+
+    def test_missing_roe_level_is_rejected_as_an_invalid_payload(self):
+        rejected = self.command(self.owner, 1, "missing-roe-level", "SET_ROE", {"reason": "missing level"})
+        self.assertEqual(rejected.status_code, 422)
+        self.assertEqual(rejected.body["code"], "INVALID_COMMAND_PAYLOAD")
+
     def test_approval_request_and_decision_are_openapi_shaped(self):
         self.command(self.owner, 1, "start", "START", {})
         requested = self.command(

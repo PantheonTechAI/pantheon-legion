@@ -98,6 +98,17 @@ class WsgiAdapterTests(unittest.TestCase):
         self.assertTrue(timeline["has_more"])
         self.assertEqual(len(timeline["events"]), 1)
 
+    def test_unexpected_command_payload_field_is_rejected(self):
+        _, _, created = self.request("POST", "/missions", self.create_body())
+        status, _, body = self.request(
+            "POST", f"/missions/{created['id']}/commands",
+            {"expected_version": 1, "idempotency_key": "invalid-payload",
+             "command_type": "START", "payload": {"unexpected": True}},
+        )
+        self.assertEqual(status, 422)
+        self.assertEqual(body["code"], "INVALID_COMMAND_PAYLOAD")
+        self.assertEqual(body["current_version"], 1)
+
     def test_invalid_json_is_rejected(self):
         environ = {
             "REQUEST_METHOD": "POST",
