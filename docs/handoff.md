@@ -6,9 +6,12 @@ Last updated: 2026-09-13
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged PR #40 (`2372b82`).
-- No implementation pull request is active at this checkpoint.
-- The full standard-library test suite passes: **77 tests**.
+- `main` includes merged PR #42 (`51f2483`).
+- [PR #43](https://github.com/PantheonTechAI/pantheon-legion/pull/43),
+  `feat: add LangGraph Scout runtime`, is open from
+  `pr/43-langgraph-scout-runtime` at `7d75374`.
+- On the PR branch, the full test suite passes: **82 tests** after installing
+  `requirements.txt` (which declares LangGraph).
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
 
@@ -64,6 +67,10 @@ The repository now has a framework-neutral Mission control plane with:
 - Scout runtime conformance matrix: future cognition adapters are evaluated
   against the same Mission context and read-only failure matrix before they are
   considered interchangeable.
+- Scoped Tabula retrieval: Aquila requires a delegated `READ_KNOWLEDGE`
+  operation in addition to `READ_MISSION` before retrieval evidence is supplied
+  to a Scout. The first provider-neutral implementation is in-memory and
+  preserves organization, workspace, Mission, and source provenance.
 
 Recent merged implementation slices:
 
@@ -94,6 +101,9 @@ Recent merged implementation slices:
 | #38 | Read-only Scout cognition adapter |
 | #39 | Fabrica declared read-tool boundary and durable audit facts |
 | #40 | Shared Scout runtime conformance matrix |
+| #41 | First-cycle roadmap handoff checkpoint |
+| #42 | Scoped Tabula retrieval for Scout |
+| #43 | LangGraph Scout runtime with an injected model responder (**open**) |
 
 ## New-session quick start
 
@@ -103,13 +113,16 @@ Start from the repository root and establish these facts before changing code:
 git switch main
 git pull --ff-only origin main
 git status --short --branch
-/usr/bin/python3 -m unittest discover -s tests -v
-/usr/bin/python3 -m tests.acceptance.runner
+python3 -m venv /tmp/pantheon-legion-venv
+/tmp/pantheon-legion-venv/bin/pip install -r requirements.txt
+/tmp/pantheon-legion-venv/bin/python -m unittest discover -s tests -v
+/tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
 ```
 
-Expected baseline: a clean `main`, **77 passing tests**, and seven passing M1
-scenarios. Work one bounded feature branch at a time, open a PR, and wait for
-its merge before starting the next implementation slice.
+Expected baseline once PR #43 merges: a clean `main`, **82 passing tests**,
+and seven passing M1 scenarios. Until then, validate the PR branch with the
+same commands. Work one bounded feature branch at a time, open a PR, and wait
+for its merge before starting the next implementation slice.
 
 Use `env -u GH_TOKEN` for GitHub CLI commands: the ambient token is invalid in
 the development environment.
@@ -123,7 +136,8 @@ the development environment.
 | Persistent composition | `aquila_api/persistent.py`, `legion_store/sqlite.py` | SQLite snapshots, audit/idempotency persistence, restart recovery, and persisted execution state. |
 | Authorization | `aquila_api/authorization.py` | Deterministic MVP policy, policy decisions, and bounded workload delegation. |
 | Runtime | `legion_runtime/durable.py` | Provider-neutral durable execution lifecycle and recovery model. |
-| Cognition | `legion_cognition/` | Read-only Scout contract, reference runtime, and adapter conformance matrix. |
+| Cognition | `legion_cognition/` | Read-only Scout contract, reference runtime, LangGraph runtime, and adapter conformance matrix. |
+| Knowledge | `legion_tabula/` | Scoped, provenance-bearing in-memory knowledge retrieval for Scout evidence. |
 | Tool boundary | `legion_fabrica/` | Declared read-tool broker and execution-policy metadata. |
 | HTTP edge | `aquila_api/wsgi.py`, `aquila_api/auth.py` | WSGI routes plus Authentik/OIDC principal mapping. |
 | Contracts | `schemas/`, `api/openapi.yaml`, `docs/mission/` | Canonical resource/command contracts and normative semantics. |
@@ -152,6 +166,14 @@ the development environment.
 - A Scout is a read-only workload. It receives a bounded Mission projection,
   must hold a delegated read capability, and cannot gain command or tool
   authority from model output.
+- A Tabula Scout run requires two distinct delegations: `READ_KNOWLEDGE` for
+  scoped retrieval and `READ_MISSION` for the Scout workload. Tabula records
+  must remain within organization, workspace, and Mission scope, with their
+  source preserved as evidence provenance.
+- `LangGraphScoutRuntime` is a one-node compiled graph. Its injected
+  `ScoutResponder` receives only the validated Mission context, query, and
+  evidence. Do not add a tool node, Aquila service, credentials, or a provider
+  client to this runtime without an explicit authority and audit contract.
 - Fabrica is the only current tool broker. Its read-tool path receives a fresh
   Aquila decision and emits correlated audit facts; mutating tools remain
   blocked until bound to an approved Action and durable execution.
@@ -164,20 +186,25 @@ recovery semantics, and records the facts needed to reconstruct why work was
 allowed, rejected, paused, suspended, cancelled, retried, or invalidated.
 
 The first-cycle substrate is complete: the durable multi-user control plane,
-read-only Scout, Fabrica read-tool boundary, and cognition conformance matrix
-are all dependency-free and provider-neutral. It serializes Mission changes,
-preserves recovery facts, fails closed at command and tool boundaries, and
-exposes scenario-level evidence without selecting an LLM or workflow provider.
+read-only Scout, Fabrica read-tool boundary, Tabula retrieval, and cognition
+conformance matrix serialize Mission changes, preserve recovery facts, fail
+closed at command and tool boundaries, and expose scenario-level evidence.
+PR #43 introduces LangGraph as the selected cognition runtime while retaining
+a provider-neutral model-responder seam; no model vendor, credentials, or
+model-invocation persistence have been selected.
 
 Other known boundaries, deliberately not started here:
 
 - No production durable-workflow provider (for example, Temporal). The
   provider-neutral adapter is the current M1 boundary.
-- No production cognition framework or model provider has been selected. The
-  reference Scout and conformance matrix are intentionally provider-neutral.
+- LangGraph is the selected Scout runtime, but no production model provider,
+  model credentials, model configuration, or model-invocation audit/persistence
+  contract has been selected. The injected `ScoutResponder` remains the
+  provider boundary.
 - Fabrica has only an in-memory read-tool broker. MCP, sandbox enforcement,
   credentials, and Action-bound mutating tools remain future work.
-- No Tabula knowledge system, package signing, or UI.
+- Tabula has only in-memory scoped retrieval. Knowledge promotion, persistence,
+  vector retrieval, indexing, package signing, and UI remain future work.
 - The WSGI surface is intentionally limited to the documented Mission API;
   durable action execution remains a worker/control-plane interface rather
   than a public HTTP endpoint.
@@ -197,13 +224,21 @@ Other known boundaries, deliberately not started here:
   event-volume and retention policy rather than making reads or all policy
   checks write events.
 
-## Recommended next slice
+## Next-session plan
 
-The first-cycle roadmap is complete. Select the next product capability before
-starting implementation: Tabula retrieval, Action-bound mutating Fabrica
-execution, a production cognition/runtime candidate, or a persisted
-MissionCommand import/replay boundary. Each option changes a distinct authority
-surface and needs an explicit contract before code begins.
+1. Wait for PR #43 review and merge. Do not start another implementation slice
+   on this branch. After merge, switch to `main`, fast-forward, and rerun the
+   quick-start verification commands (expect 82 tests and seven scenarios).
+2. If continuing cognition, design a dedicated model-provider adapter behind
+   `ScoutResponder`. Decide request/response provenance, provider credentials,
+   timeout/retry behavior, redaction, and model-invocation audit facts before
+   adding a client or environment configuration. The adapter must remain
+   incapable of receiving command or Fabrica authority.
+3. Alternatively, choose one separately scoped capability: persistent/vector
+   Tabula retrieval, Action-bound mutating Fabrica execution, a production
+   durable-workflow provider, or a persisted `MissionCommand` import/replay
+   boundary. Each changes a distinct authority surface and requires its own
+   contract and acceptance coverage.
 
 ## Workflow notes
 
