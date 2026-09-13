@@ -13,3 +13,9 @@ The Scout cannot submit a Mission command, invoke a tool, promote knowledge,
 or mutate Mission state. A future Fabrica or Tabula integration must add its
 own authorization, provenance, and audit contract rather than extending this
 adapter implicitly.
+
+`LangGraphScoutRuntime` is the first production runtime implementation. It
+uses a compiled LangGraph `StateGraph` with a single recommendation node and
+an injected `ScoutResponder` model-provider boundary. The graph has no tool
+node and receives no Aquila mutation interface, so a model response cannot
+acquire Mission or Fabrica authority.

@@ -10,11 +10,13 @@ from .scout import (
     ScoutResult,
 )
 from .conformance import ConformanceCheck, ScoutRuntimeConformance, ScoutRuntimeConformanceReport
+from .langgraph_runtime import LangGraphScoutRuntime, ScoutResponder
 
 __all__ = [
     "CognitionRuntimeAdapter",
     "ConformanceCheck",
     "InMemoryScoutRuntime",
+    "LangGraphScoutRuntime",
     "MissionContext",
     "ReadOnlyScoutError",
     "ScoutEvidence",
@@ -22,4 +24,5 @@ __all__ = [
     "ScoutResult",
     "ScoutRuntimeConformance",
     "ScoutRuntimeConformanceReport",
+    "ScoutResponder",
 ]

@@ -17,6 +17,9 @@ class ReadOnlyScoutError(ValueError):
     """Raised when a Scout request exceeds its read-only contract."""
 
 
+SCOUT_MISSION_READ_CAPABILITY = "read.mission"
+
+
 @dataclass(frozen=True)
 class MissionContext:
     """The minimum Mission projection supplied to a cognition runtime."""
@@ -80,13 +83,28 @@ class CognitionRuntimeAdapter(Protocol):
     def run_scout(self, request: ScoutRequest) -> ScoutResult: ...
 
 
+def validate_scout_request(request: ScoutRequest) -> None:
+    """Enforce the provider-independent, read-only Scout contract."""
+    if request.scout.type != PrincipalType.WORKLOAD:
+        raise ReadOnlyScoutError("SCOUT_WORKLOAD_REQUIRED")
+    if not request.query.strip():
+        raise ReadOnlyScoutError("SCOUT_QUERY_REQUIRED")
+    if SCOUT_MISSION_READ_CAPABILITY not in request.granted_capabilities:
+        raise ReadOnlyScoutError("SCOUT_MISSION_READ_REQUIRED")
+    if any(not capability.startswith("read.") for capability in request.granted_capabilities):
+        raise ReadOnlyScoutError("SCOUT_CAPABILITY_DENIED")
+    for item in request.evidence:
+        if not item.source or not item.summary or not item.observed_at:
+            raise ReadOnlyScoutError("SCOUT_EVIDENCE_INVALID")
+
+
 class InMemoryScoutRuntime:
     """Deterministic reference Scout with no model or tool dependency."""
 
-    _REQUIRED_CAPABILITY = "read.mission"
+    _REQUIRED_CAPABILITY = SCOUT_MISSION_READ_CAPABILITY
 
     def run_scout(self, request: ScoutRequest) -> ScoutResult:
-        self._validate(request)
+        validate_scout_request(request)
         count = len(request.evidence)
         recommendation = (
             f"Scout collected {count} observation{'s' if count != 1 else ''} "
@@ -100,17 +118,3 @@ class InMemoryScoutRuntime:
             evidence=request.evidence,
             recommendation=recommendation,
         )
-
-    @classmethod
-    def _validate(cls, request: ScoutRequest) -> None:
-        if request.scout.type != PrincipalType.WORKLOAD:
-            raise ReadOnlyScoutError("SCOUT_WORKLOAD_REQUIRED")
-        if not request.query.strip():
-            raise ReadOnlyScoutError("SCOUT_QUERY_REQUIRED")
-        if cls._REQUIRED_CAPABILITY not in request.granted_capabilities:
-            raise ReadOnlyScoutError("SCOUT_MISSION_READ_REQUIRED")
-        if any(not capability.startswith("read.") for capability in request.granted_capabilities):
-            raise ReadOnlyScoutError("SCOUT_CAPABILITY_DENIED")
-        for item in request.evidence:
-            if not item.source or not item.summary or not item.observed_at:
-                raise ReadOnlyScoutError("SCOUT_EVIDENCE_INVALID")
