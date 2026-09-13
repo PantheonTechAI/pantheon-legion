@@ -5,6 +5,7 @@ from .retrieval import (
     KnowledgeRecord,
     KnowledgeScope,
     RetrievedKnowledge,
+    SQLiteTabula,
     TabulaRetrievalAdapter,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "KnowledgeRecord",
     "KnowledgeScope",
     "RetrievedKnowledge",
+    "SQLiteTabula",
     "TabulaRetrievalAdapter",
 ]

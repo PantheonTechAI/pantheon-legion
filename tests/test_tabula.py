@@ -1,9 +1,11 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from aquila_api import AquilaService, DelegationGrant
 from legion_cognition import InMemoryScoutRuntime
 from legion_kernel import AuthorizationError, Principal, PrincipalType, RoeLevel
-from legion_tabula import InMemoryTabula, KnowledgeRecord, KnowledgeScope
+from legion_tabula import InMemoryTabula, KnowledgeRecord, KnowledgeScope, SQLiteTabula
 
 
 class TabulaTests(unittest.TestCase):
@@ -89,6 +91,51 @@ class TabulaTests(unittest.TestCase):
                 delegation=self.grant(frozenset({"READ_MISSION"})),
                 tabula=self.tabula, query="api error",
             )
+
+
+class SQLiteTabulaTests(unittest.TestCase):
+    def test_records_survive_reopen_and_preserve_scope_filtering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = str(Path(directory) / "tabula.sqlite3")
+            scope = KnowledgeScope(
+                organization_id="11111111-1111-4111-8111-111111111111",
+                workspace_id="22222222-2222-4222-8222-222222222222",
+                mission_id="33333333-3333-4333-8333-333333333333",
+            )
+            tabula = SQLiteTabula(database)
+            tabula.add(KnowledgeRecord(
+                id="mission-metrics", scope=scope,
+                source="metrics://api", summary="API error rate increased.",
+                observed_at="2026-09-13T00:00:00Z",
+            ))
+            tabula.add(KnowledgeRecord(
+                id="workspace-metrics", scope=KnowledgeScope(
+                    organization_id=scope.organization_id, workspace_id=scope.workspace_id,
+                ), source="metrics://workspace", summary="API error budget is low.",
+                observed_at="2026-09-13T00:00:00Z",
+            ))
+            tabula.add(KnowledgeRecord(
+                id="other-mission", scope=KnowledgeScope(
+                    organization_id=scope.organization_id, workspace_id=scope.workspace_id,
+                    mission_id="44444444-4444-4444-8444-444444444444",
+                ), source="metrics://other", summary="API error rate increased.",
+                observed_at="2026-09-13T00:00:00Z",
+            ))
+            tabula.close()
+
+            reopened = SQLiteTabula(database)
+            results = reopened.retrieve(scope=scope, query="api error")
+            self.assertEqual(
+                [(item.record_id, item.relevance) for item in results],
+                [("mission-metrics", 2), ("workspace-metrics", 2)],
+            )
+            with self.assertRaisesRegex(ValueError, "KNOWLEDGE_RECORD_DUPLICATE"):
+                reopened.add(KnowledgeRecord(
+                    id="mission-metrics", scope=scope,
+                    source="metrics://duplicate", summary="Duplicate.",
+                    observed_at="2026-09-13T00:00:00Z",
+                ))
+            reopened.close()
 
 
 if __name__ == "__main__":
