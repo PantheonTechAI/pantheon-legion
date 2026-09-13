@@ -3,9 +3,23 @@ import unittest
 from pathlib import Path
 
 from aquila_api import DelegationGrant, PersistentAquilaService
+from legion_cognition import (
+    LangGraphScoutRuntime,
+    ModelInvocationResponse,
+    ModelProviderScoutResponder,
+)
 from legion_fabrica import InMemoryFabrica, ToolDefinition
 from legion_kernel import AuthorizationError, Principal, PrincipalType, RoeLevel, WorkerKilled
 from legion_runtime import ExecutionState
+
+
+class PersistentTestModelProvider:
+    def invoke(self, request):
+        return ModelInvocationResponse(
+            recommendation='Keep the recommendation read-only.',
+            provider='persistent-test-provider', model='persistent-test-model',
+            response_id='persistent-response',
+        )
 
 
 class PersistentAquilaServiceTests(unittest.TestCase):
@@ -254,6 +268,41 @@ class PersistentAquilaServiceTests(unittest.TestCase):
         self.assertEqual(
             {event['correlation_id'] for event in tool_events}, {'persistent-tool-correlation'},
         )
+        restarted.close()
+
+    def test_model_invocation_provenance_survives_service_restart(self):
+        service = self.create_service()
+        created = service.create_mission(actor=self.owner, body={
+            'organization_id': '11111111-1111-4111-8111-111111111111',
+            'workspace_id': '22222222-2222-4222-8222-222222222222',
+            'title': 'Persistent model audit', 'objective': 'Persist model provenance.',
+        })
+        mission_id = created.body['id']
+        service.run_scout(
+            mission_id=mission_id,
+            scout=self.worker,
+            delegation=DelegationGrant(
+                grant_id='persistent-scout-grant', issuer=self.owner, subject=self.worker,
+                mission_id=mission_id, allowed_operations=frozenset({'READ_MISSION'}),
+                roe_ceiling=RoeLevel.OBSERVE, expires_at='9999-01-01T00:00:00Z',
+            ),
+            runtime=LangGraphScoutRuntime(ModelProviderScoutResponder(PersistentTestModelProvider())),
+            query='Summarize the Mission.',
+            granted_capabilities=frozenset({'read.mission'}),
+        )
+        service.close()
+
+        restarted = self.create_service()
+        event = [
+            item for item in restarted.get_timeline(actor=self.owner, mission_id=mission_id).body['events']
+            if item['event_type'] == 'MODEL_INVOCATION_COMPLETED'
+        ][0]
+        self.assertEqual(event['result'], 'SUCCESS')
+        self.assertEqual(event['data']['provider'], 'persistent-test-provider')
+        self.assertEqual(event['data']['model'], 'persistent-test-model')
+        self.assertEqual(event['data']['response_id'], 'persistent-response')
+        self.assertEqual(len(event['data']['request_digest']), 64)
+        self.assertEqual(len(event['data']['response_digest']), 64)
         restarted.close()
 
 

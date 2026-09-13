@@ -19,3 +19,14 @@ uses a compiled LangGraph `StateGraph` with a single recommendation node and
 an injected `ScoutResponder` model-provider boundary. The graph has no tool
 node and receives no Aquila mutation interface, so a model response cannot
 acquire Mission or Fabrica authority.
+
+`ModelProviderScoutResponder` is the optional provider-neutral implementation
+of that boundary. A deployment injects a provider transport that owns its own
+credentials; the cognition contract has no SDK, environment lookup, or
+credential fields. Before each call, common secret-bearing strings are
+redacted from the bounded context, query, and evidence. The transport receives
+a per-attempt timeout (30 seconds by default) and the adapter retries only a
+declared timeout once. Aquila records success or failure as a Mission audit
+fact containing provider/model/response provenance and SHA-256 digests of the
+redacted request and response—never raw prompts, evidence, model output, or
+credentials.

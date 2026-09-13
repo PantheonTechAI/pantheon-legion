@@ -15,6 +15,8 @@ from uuid import UUID, uuid4
 from legion_cognition import (
     CognitionRuntimeAdapter,
     MissionContext,
+    ModelInvocationError,
+    ModelInvocationProvenance,
     ScoutEvidence,
     ScoutRequest,
     ScoutResult,
@@ -301,8 +303,9 @@ class AquilaService:
 
         The Scout is authorized as a workload read of the current Mission and
         receives only a stable context projection.  Read observations are not
-        authoritative Mission events, so this operation intentionally does not
-        mutate Mission state or append audit timeline entries.
+        authoritative Mission events.  A model-backed runtime emits only its
+        digest-only invocation provenance as an append-only audit fact; this
+        never changes Mission state or gives the model authority.
         """
         mission = self.kernel.get_mission(mission_id)
         decision = self.authorization.decide(
@@ -317,14 +320,57 @@ class AquilaService:
         )
         if decision.decision == Decision.DENY:
             raise AuthorizationError(decision.reason)
-        return runtime.run_scout(
-            ScoutRequest(
-                context=MissionContext.from_mission(mission),
-                scout=scout,
-                query=query,
-                granted_capabilities=granted_capabilities,
-                evidence=evidence,
+        try:
+            result = runtime.run_scout(
+                ScoutRequest(
+                    context=MissionContext.from_mission(mission),
+                    scout=scout,
+                    query=query,
+                    granted_capabilities=granted_capabilities,
+                    evidence=evidence,
+                )
             )
+        except ModelInvocationError as exc:
+            self._record_model_invocation(
+                mission_id=mission_id,
+                scout=scout,
+                provenance=exc.provenance,
+                result="FAILED",
+            )
+            raise
+        if result.model_invocation:
+            self._record_model_invocation(
+                mission_id=mission_id,
+                scout=scout,
+                provenance=result.model_invocation,
+                result="SUCCESS",
+            )
+        return result
+
+    def _record_model_invocation(
+        self,
+        *,
+        mission_id: str,
+        scout: Principal,
+        provenance: ModelInvocationProvenance,
+        result: str,
+    ) -> None:
+        self.kernel.record_model_invocation(
+            mission_id=mission_id,
+            actor=scout,
+            invocation_id=provenance.invocation_id,
+            correlation_id=provenance.invocation_id,
+            result=result,
+            data={
+                "provider": provenance.provider,
+                "model": provenance.model,
+                "response_id": provenance.response_id,
+                "attempts": provenance.attempts,
+                "timeout_seconds": provenance.timeout_seconds,
+                "request_digest": provenance.request_digest,
+                "response_digest": provenance.response_digest,
+                "error_code": provenance.error_code,
+            },
         )
 
     def retrieve_knowledge(

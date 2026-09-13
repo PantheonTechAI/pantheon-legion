@@ -13,6 +13,7 @@ from .scout import (
     ScoutResult,
     validate_scout_request,
 )
+from .model_provider import ModelInvocationProvenance, ModelRecommendation
 
 
 class ScoutResponder(Protocol):
@@ -24,12 +25,13 @@ class ScoutResponder(Protocol):
         context: MissionContext,
         query: str,
         evidence: tuple[ScoutEvidence, ...],
-    ) -> str: ...
+    ) -> str | ModelRecommendation: ...
 
 
 class ScoutGraphState(TypedDict):
     request: ScoutRequest
     recommendation: str
+    model_invocation: ModelInvocationProvenance | None
 
 
 class LangGraphScoutRuntime:
@@ -56,14 +58,22 @@ class LangGraphScoutRuntime:
             query=request.query,
             evidence=request.evidence,
             recommendation=recommendation,
+            model_invocation=state.get("model_invocation"),
         )
 
-    def _recommend(self, state: ScoutGraphState) -> dict[str, str]:
+    def _recommend(self, state: ScoutGraphState) -> dict[str, str | ModelInvocationProvenance | None]:
         request = state["request"]
+        response = self._responder.recommend(
+            context=request.context,
+            query=request.query,
+            evidence=request.evidence,
+        )
+        if isinstance(response, ModelRecommendation):
+            return {
+                "recommendation": response.recommendation,
+                "model_invocation": response.provenance,
+            }
         return {
-            "recommendation": self._responder.recommend(
-                context=request.context,
-                query=request.query,
-                evidence=request.evidence,
-            )
+            "recommendation": response,
+            "model_invocation": None,
         }
