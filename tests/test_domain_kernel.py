@@ -213,6 +213,23 @@ class DomainKernelTests(unittest.TestCase):
                 worker=self.worker,
             )
         self.assertEqual(self.kernel.side_effects, {})
+        self.assertEqual(self.kernel.approvals[approval.id].status, "EXPIRED")
+        self.assertEqual(self.kernel.timeline(self.mission.id)[-2].event_type, "APPROVAL_EXPIRED")
+
+    def test_expired_pending_approval_cannot_be_decided(self):
+        self.start()
+        requested = self.request_mutation()
+        self.kernel.approvals[requested.approval_id].expires_at = "2000-01-01T00:00:00Z"
+        with self.assertRaisesRegex(AuthorizationError, "APPROVAL_STALE"):
+            self.kernel.decide_approval(
+                approval_id=requested.approval_id,
+                approver=self.approver,
+                expected_mission_version=3,
+                decision="APPROVE",
+                reason="Too late.",
+            )
+        self.assertEqual(self.kernel.approvals[requested.approval_id].status, "EXPIRED")
+        self.assertEqual(self.kernel.timeline(self.mission.id)[-1].event_type, "APPROVAL_EXPIRED")
 
     def test_audit_reconstructs_accepted_and_rejected_changes(self):
         self.start()

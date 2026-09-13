@@ -77,9 +77,11 @@ class PersistentAquilaService(AquilaService):
         before_version = self.kernel.missions[mission_id].version
         before_sequence = len(self.kernel.audit.get(mission_id, []))
         response = super().decide_approval(actor=actor, mission_id=mission_id, body=body)
-        if response.status_code == 200:
+        if mission_id in self.kernel.missions:
             self._persist_operation(mission_id, before_version, before_sequence)
-            self._persist_approval(response.body["id"])
+            for approval in self.kernel.approvals.values():
+                if approval.mission_id == mission_id:
+                    self._persist_approval(approval.id)
         return response
 
     def execute_action(
