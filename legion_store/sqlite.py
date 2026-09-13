@@ -242,6 +242,7 @@ def _principal_from_payload(payload: dict[str, Any]) -> Principal:
 def _action_payload(action: Action) -> dict[str, Any]:
     return {
         "id": action.id,
+        "command_id": action.command_id,
         "capability": action.capability,
         "arguments": action.arguments,
         "target": action.target,
@@ -254,6 +255,7 @@ def _action_payload(action: Action) -> dict[str, Any]:
 def _action_from_payload(payload: dict[str, Any]) -> Action:
     return Action(
         id=payload["id"],
+        command_id=payload.get("command_id", payload["id"]),
         capability=payload["capability"],
         arguments=payload["arguments"],
         target=payload["target"],

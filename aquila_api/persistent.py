@@ -8,6 +8,7 @@ from typing import Any
 from legion_kernel import AuthorizationError, LegionKernel, Principal, WorkerKilled
 from legion_kernel.kernel import Action, Approval, PrincipalType
 from legion_store import SQLiteMissionStore
+from legion_runtime import InMemoryDurableExecutionAdapter
 
 from .service import ApiResponse, AquilaService, _principal_payload
 
@@ -18,7 +19,12 @@ class PersistentAquilaService(AquilaService):
     def __init__(self, database: str) -> None:
         self.store = SQLiteMissionStore(database)
         self._initialize_auxiliary_tables()
-        super().__init__(LegionKernel())
+        execution_state = self._load_execution_state()
+        super().__init__(
+            LegionKernel(),
+            execution=InMemoryDurableExecutionAdapter(execution_state.get("adapter")),
+        )
+        self.action_executions = dict(execution_state.get("action_executions", {}))
         self._restore()
 
     def close(self) -> None:
@@ -57,6 +63,7 @@ class PersistentAquilaService(AquilaService):
         if mission_id in self.kernel.missions:
             self._persist_operation(mission_id, before_version, before_sequence)
             self._store_idempotency(mission_id, body, actor, response)
+            self._persist_execution_state()
         return response
 
     def decide_approval(
@@ -86,7 +93,7 @@ class PersistentAquilaService(AquilaService):
         before_version = mission.version
         before_sequence = len(self.kernel.audit[mission_id])
         try:
-            return self.kernel.execute_action(
+            return super().execute_action(
                 mission_id=mission_id,
                 action_id=action_id,
                 worker=worker,
@@ -98,6 +105,7 @@ class PersistentAquilaService(AquilaService):
             for approval in self.kernel.approvals.values():
                 if approval.mission_id == mission_id:
                     self._persist_approval(approval.id)
+            self._persist_execution_state()
 
     def cancel_mission(
         self,
@@ -166,6 +174,10 @@ class PersistentAquilaService(AquilaService):
                     mission_id TEXT NOT NULL,
                     count INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS persistent_execution_state (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    payload TEXT NOT NULL
+                );
                 """
             )
 
@@ -197,6 +209,20 @@ class PersistentAquilaService(AquilaService):
                 ON CONFLICT(action_id) DO UPDATE SET count = excluded.count
                 """,
                 (action_id, mission_id, count),
+            )
+
+    def _load_execution_state(self) -> dict[str, Any]:
+        row = self.store.connection.execute(
+            "SELECT payload FROM persistent_execution_state WHERE id = 1"
+        ).fetchone()
+        return json.loads(row["payload"]) if row else {}
+
+    def _persist_execution_state(self) -> None:
+        state = {"adapter": self.execution.snapshot(), "action_executions": self.action_executions}
+        with self.store.connection:
+            self.store.connection.execute(
+                "INSERT INTO persistent_execution_state (id, payload) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload",
+                (json.dumps(state, sort_keys=True),),
             )
 
     def _list_side_effects(self, mission_id: str) -> list[str]:
@@ -265,6 +291,7 @@ def _approval_payload(approval: Approval) -> dict[str, Any]:
         "command_id": approval.command_id,
         "action": {
             "id": approval.action.id,
+            "command_id": approval.action.command_id,
             "capability": approval.action.capability,
             "arguments": approval.action.arguments,
             "target": approval.action.target,
@@ -293,6 +320,7 @@ def _approval_from_payload(payload: dict[str, Any]) -> Approval:
         command_id=payload["command_id"],
         action=Action(
             id=action["id"],
+            command_id=action.get("command_id", payload["command_id"]),
             capability=action["capability"],
             arguments=action["arguments"],
             target=action["target"],
