@@ -798,6 +798,24 @@ class LegionKernel:
             return "INVALID_COMMAND_PAYLOAD"
         if command_type == "REQUEST_ACTION" and not LegionKernel._valid_action_payload(payload):
             return "INVALID_COMMAND_PAYLOAD"
+        if command_type == "UPDATE_OBJECTIVE" and not LegionKernel._bounded_string(
+            payload["objective"], minimum=1, maximum=10000
+        ):
+            return "INVALID_COMMAND_PAYLOAD"
+        if command_type == "ADD_CONSTRAINT" and not LegionKernel._valid_constraint_payload(payload):
+            return "INVALID_COMMAND_PAYLOAD"
+        if command_type == "REMOVE_CONSTRAINT" and not LegionKernel._uuid_string(payload["constraint_id"]):
+            return "INVALID_COMMAND_PAYLOAD"
+        if command_type == "REMOVE_PARTICIPANT" and not LegionKernel._bounded_string(
+            payload["subject"], minimum=1, maximum=512
+        ):
+            return "INVALID_COMMAND_PAYLOAD"
+        if command_type == "SUSPEND":
+            reason = payload["reason"]
+            if not isinstance(reason, str) or not reason.strip():
+                return "SUSPENSION_REASON_REQUIRED"
+            if len(reason) > 5000:
+                return "INVALID_COMMAND_PAYLOAD"
         return None
 
     @staticmethod
@@ -812,6 +830,23 @@ class LegionKernel:
         )
 
     @staticmethod
+
+    @staticmethod
+    def _valid_constraint_payload(payload: dict[str, Any]) -> bool:
+        constraint = payload["constraint"]
+        if not LegionKernel._object_has_only(
+            constraint, required={"id", "text"}, allowed={"id", "text", "severity"}
+        ):
+            return False
+        if not LegionKernel._uuid_string(constraint["id"]):
+            return False
+        if not LegionKernel._bounded_string(constraint["text"], minimum=1, maximum=5000):
+            return False
+        if "severity" not in constraint:
+            return True
+        return isinstance(constraint["severity"], str) and constraint["severity"] in {
+            "REQUIRED", "PREFERRED", "PROHIBITED"
+        }
     def _valid_participant_payload(payload: dict[str, Any]) -> bool:
         participant = payload["participant"]
         if not LegionKernel._object_has_only(
