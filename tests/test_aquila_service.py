@@ -117,6 +117,11 @@ class AquilaServiceTests(unittest.TestCase):
         )
         self.assertEqual(denied.status_code, 403)
         self.assertEqual(denied.body["code"], "OPERATOR_ROLE_REQUIRED")
+        authorization = self.service.kernel.timeline(self.mission_id)[-1]
+        self.assertEqual(authorization.event_type, "AUTHORIZATION_EVALUATED")
+        self.assertEqual(authorization.result, "DENY")
+        self.assertEqual(authorization.data["reason"], "OPERATOR_ROLE_REQUIRED")
+        self.assertTrue(authorization.data["decision_id"])
         timeline = self.service.get_timeline(
             actor=self.observer,
             mission_id=self.mission_id,

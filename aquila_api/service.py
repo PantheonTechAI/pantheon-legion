@@ -119,7 +119,7 @@ class AquilaService:
             operation = "EXECUTE_ACTION" if command_type == "REQUEST_ACTION" else (
                 "SET_ROE" if command_type == "SET_ROE" else "SUBMIT_COMMAND"
             )
-            denied = self._authorize(
+            decision = self.authorization.decide(
                 AuthorizationRequest(
                     principal=actor,
                     mission_id=mission_id,
@@ -138,11 +138,24 @@ class AquilaService:
                         else None
                     ),
                     approval_present=bool(body["payload"].get("approval_present", False)),
-                ),
-                soft_reasons={"APPROVAL_REQUIRED"} if command_type == "REQUEST_ACTION" else set(),
+                )
             )
-            if denied:
-                return denied
+            self.kernel.record_command_authorization(
+                mission_id=mission_id,
+                actor=actor,
+                command_type=command_type,
+                decision_id=decision.decision_id,
+                decision=decision.decision.value,
+                reason=decision.reason,
+                policy_version=decision.policy_version,
+                evaluated_at=decision.evaluated_at,
+                correlation_id=correlation_id,
+            )
+            if decision.decision == Decision.DENY and not (
+                command_type == "REQUEST_ACTION" and decision.reason == "APPROVAL_REQUIRED"
+            ):
+                status = 409 if decision.reason == "MISSION_TERMINAL" else 403
+                return self._error(status, decision.reason)
             result = self.kernel.submit_command(
                 mission_id=mission_id,
                 actor=actor,

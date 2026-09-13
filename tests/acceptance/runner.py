@@ -198,6 +198,11 @@ class M1AcceptanceRunner:
         assert {adapter.owner.subject, adapter.operator.subject}.issubset({event.actor.subject for event in events})
         assert all(event.correlation_id for event in events)
         assert any(event.event_type == "COMMAND_REJECTED" for event in events)
+        assert any(
+            event.event_type == "AUTHORIZATION_EVALUATED"
+            and event.data["policy_version"] == "mvp-1"
+            for event in events
+        )
         return self._result("M1-006", adapter, mission_id, ["A1", "A2"])
 
     def _m1_007(self) -> ScenarioResult:
