@@ -60,7 +60,7 @@ class AuthorizationDecision:
 class AuthorizationPolicy:
     version: str = "mvp-1"
     read_operations: frozenset[str] = frozenset(
-        {"READ_MISSION", "READ_TIMELINE", "READ_ARTIFACT", "READ_TOOL"}
+        {"READ_MISSION", "READ_TIMELINE", "READ_ARTIFACT", "READ_TOOL", "READ_KNOWLEDGE"}
     )
     approver_roles: frozenset[str] = frozenset({"APPROVER", "MISSION_OWNER"})
     operator_roles: frozenset[str] = frozenset({"MISSION_OWNER", "OPERATOR"})
