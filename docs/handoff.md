@@ -6,9 +6,9 @@ Last updated: 2026-09-13
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged PR #36 (`70f224b`).
+- `main` includes merged PR #40 (`2372b82`).
 - No implementation pull request is active at this checkpoint.
-- The full standard-library test suite passes: **66 tests**.
+- The full standard-library test suite passes: **77 tests**.
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
 
@@ -55,6 +55,15 @@ The repository now has a framework-neutral Mission control plane with:
 - Command submission hardening: the HTTP edge accepts the dedicated
   `CommandSubmission` envelope only, rejects client-supplied identity facts,
   and derives both actor and requester from authenticated identity.
+- Read-only Scout cognition adapter: a delegated workload receives a minimal
+  Mission projection and explicit read capabilities, then returns structured
+  evidence without mutating Mission state or its audit timeline.
+- Fabrica read-tool boundary: Aquila authorizes declared read tools against
+  delegation and ROE, correlates decision/result audit facts, and persists
+  those facts across restart. Undeclared and non-read tools fail closed.
+- Scout runtime conformance matrix: future cognition adapters are evaluated
+  against the same Mission context and read-only failure matrix before they are
+  considered interchangeable.
 
 Recent merged implementation slices:
 
@@ -81,6 +90,10 @@ Recent merged implementation slices:
 | #33 | Strict payload validation for ROE, participants, and actions |
 | #34 | Strict validation for the remaining command payloads |
 | #36 | Dedicated CommandSubmission envelope and authenticated requester derivation |
+| #37 | Post-CommandSubmission handoff checkpoint |
+| #38 | Read-only Scout cognition adapter |
+| #39 | Fabrica declared read-tool boundary and durable audit facts |
+| #40 | Shared Scout runtime conformance matrix |
 
 ## New-session quick start
 
@@ -94,7 +107,7 @@ git status --short --branch
 /usr/bin/python3 -m tests.acceptance.runner
 ```
 
-Expected baseline: a clean `main`, **66 passing tests**, and seven passing M1
+Expected baseline: a clean `main`, **77 passing tests**, and seven passing M1
 scenarios. Work one bounded feature branch at a time, open a PR, and wait for
 its merge before starting the next implementation slice.
 
@@ -110,6 +123,8 @@ the development environment.
 | Persistent composition | `aquila_api/persistent.py`, `legion_store/sqlite.py` | SQLite snapshots, audit/idempotency persistence, restart recovery, and persisted execution state. |
 | Authorization | `aquila_api/authorization.py` | Deterministic MVP policy, policy decisions, and bounded workload delegation. |
 | Runtime | `legion_runtime/durable.py` | Provider-neutral durable execution lifecycle and recovery model. |
+| Cognition | `legion_cognition/` | Read-only Scout contract, reference runtime, and adapter conformance matrix. |
+| Tool boundary | `legion_fabrica/` | Declared read-tool broker and execution-policy metadata. |
 | HTTP edge | `aquila_api/wsgi.py`, `aquila_api/auth.py` | WSGI routes plus Authentik/OIDC principal mapping. |
 | Contracts | `schemas/`, `api/openapi.yaml`, `docs/mission/` | Canonical resource/command contracts and normative semantics. |
 | Quality gate | `tests/acceptance/runner.py`, `tests/acceptance/m1-acceptance.yaml` | Dependency-free executable M1 catalog and evidence report. |
@@ -134,6 +149,12 @@ the development environment.
   idempotency key, command type, and payload are validated before authorization;
   actor and requester identity are derived from authentication. The persisted
   `MissionCommand` schema remains server-enriched and is not an HTTP input.
+- A Scout is a read-only workload. It receives a bounded Mission projection,
+  must hold a delegated read capability, and cannot gain command or tool
+  authority from model output.
+- Fabrica is the only current tool broker. Its read-tool path receives a fresh
+  Aquila decision and emits correlated audit facts; mutating tools remain
+  blocked until bound to an approved Action and durable execution.
 
 ## Progress evaluation
 
@@ -142,18 +163,21 @@ the original M1 kernel: it fails closed at the execution boundary, preserves
 recovery semantics, and records the facts needed to reconstruct why work was
 allowed, rejected, paused, suspended, cancelled, retried, or invalidated.
 
-The M1 acceptance harness is now executable and provides a catalog-wide quality
-gate. The control substrate has a credible durable, multi-user baseline: it
-serializes Mission changes, preserves recovery facts, fails closed at execution
-and command boundaries, and exposes scenario-level evidence without requiring
-a cognition runtime or workflow provider.
+The first-cycle substrate is complete: the durable multi-user control plane,
+read-only Scout, Fabrica read-tool boundary, and cognition conformance matrix
+are all dependency-free and provider-neutral. It serializes Mission changes,
+preserves recovery facts, fails closed at command and tool boundaries, and
+exposes scenario-level evidence without selecting an LLM or workflow provider.
 
 Other known boundaries, deliberately not started here:
 
 - No production durable-workflow provider (for example, Temporal). The
   provider-neutral adapter is the current M1 boundary.
-- No Fabrica tool/security boundary, cognition framework, autonomous agents,
-  Tabula knowledge system, package signing, or UI.
+- No production cognition framework or model provider has been selected. The
+  reference Scout and conformance matrix are intentionally provider-neutral.
+- Fabrica has only an in-memory read-tool broker. MCP, sandbox enforcement,
+  credentials, and Action-bound mutating tools remain future work.
+- No Tabula knowledge system, package signing, or UI.
 - The WSGI surface is intentionally limited to the documented Mission API;
   durable action execution remains a worker/control-plane interface rather
   than a public HTTP endpoint.
@@ -175,11 +199,11 @@ Other known boundaries, deliberately not started here:
 
 ## Recommended next slice
 
-Choose the next M1 capability deliberately. The CommandSubmission boundary is
-complete; persisted `MissionCommand` envelope validation is not needed until a
-replay, import, or command-resource persistence interface exists. Any such
-future slice must define its authority, replay/idempotency semantics, and
-server-generated-field rules before adding a validator.
+The first-cycle roadmap is complete. Select the next product capability before
+starting implementation: Tabula retrieval, Action-bound mutating Fabrica
+execution, a production cognition/runtime candidate, or a persisted
+MissionCommand import/replay boundary. Each option changes a distinct authority
+surface and needs an explicit contract before code begins.
 
 ## Workflow notes
 
