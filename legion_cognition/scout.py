@@ -8,9 +8,12 @@ receives bounded Mission context and returns structured observations.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from legion_kernel import Principal, PrincipalType
+
+if TYPE_CHECKING:
+    from .model_provider import ModelInvocationProvenance
 
 
 class ReadOnlyScoutError(ValueError):
@@ -75,6 +78,7 @@ class ScoutResult:
     query: str
     evidence: tuple[ScoutEvidence, ...]
     recommendation: str
+    model_invocation: "ModelInvocationProvenance | None" = None
 
 
 class CognitionRuntimeAdapter(Protocol):

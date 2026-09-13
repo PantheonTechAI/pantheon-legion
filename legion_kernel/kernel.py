@@ -740,6 +740,27 @@ class LegionKernel:
             },
         )
 
+    def record_model_invocation(
+        self,
+        *,
+        mission_id: str,
+        actor: Principal,
+        invocation_id: str,
+        correlation_id: str,
+        result: str,
+        data: dict[str, Any],
+    ) -> None:
+        """Append redacted model-provider provenance without changing Mission state."""
+        mission = self._mission(mission_id)
+        self._record(
+            mission,
+            event_type="MODEL_INVOCATION_COMPLETED" if result == "SUCCESS" else "MODEL_INVOCATION_FAILED",
+            actor=actor,
+            result=result,
+            correlation_id=correlation_id,
+            data={"invocation_id": invocation_id, **data},
+        )
+
     def record_command_authorization(
         self,
         *,

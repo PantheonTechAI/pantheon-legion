@@ -123,6 +123,17 @@ class PersistentAquilaService(AquilaService):
         finally:
             self._persist_operation(mission_id, before_version, before_sequence)
 
+    def run_scout(self, **kwargs: Any) -> Any:
+        """Persist the digest-only model invocation fact when a Scout uses one."""
+        mission_id = str(kwargs["mission_id"])
+        mission = self.kernel.missions[mission_id]
+        before_version = mission.version
+        before_sequence = len(self.kernel.audit[mission_id])
+        try:
+            return super().run_scout(**kwargs)
+        finally:
+            self._persist_operation(mission_id, before_version, before_sequence)
+
     def cancel_mission(
         self,
         *,
