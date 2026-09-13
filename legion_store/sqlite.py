@@ -14,6 +14,7 @@ from legion_kernel.kernel import (
     Constraint,
     Mission,
     MissionStatus,
+    Participant,
     Principal,
     PrincipalType,
     RulesOfEngagement,
@@ -296,6 +297,14 @@ def _mission_payload(mission: Mission) -> dict[str, Any]:
             }
             for item in mission.constraints
         ],
+        "participants": [
+            {
+                "principal": _principal_payload(item.principal),
+                "role": item.role,
+                "scope": item.scope,
+            }
+            for item in mission.participants
+        ],
         "created_at": mission.created_at,
         "updated_at": mission.updated_at,
         "actions": {key: _action_payload(value) for key, value in mission.actions.items()},
@@ -332,6 +341,14 @@ def _mission_from_payload(payload: dict[str, Any]) -> Mission:
                 added_at=item["added_at"],
             )
             for item in payload["constraints"]
+        ],
+        participants=[
+            Participant(
+                principal=_principal_from_payload(item["principal"]),
+                role=item["role"],
+                scope=item.get("scope"),
+            )
+            for item in payload.get("participants", [])
         ],
         created_at=payload["created_at"],
         updated_at=payload["updated_at"],

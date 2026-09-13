@@ -65,8 +65,8 @@ An accepted command MUST return the resulting Mission version or an explicit dur
 | `ADD_CONSTRAINT` | Constraint ID, text, severity | Appends a constraint; version advances. |
 | `REMOVE_CONSTRAINT` | Constraint ID | Removes an existing constraint; version advances. |
 | `SET_ROE` | Level, reason, optional capability bounds | Replaces the ROE revision; version advances. |
-| `ADD_PARTICIPANT` | Principal, role, optional scope | Adds or updates a participant according to conflict rules. |
-| `REMOVE_PARTICIPANT` | Principal subject | Removes the participant if authorized. |
+| `ADD_PARTICIPANT` | Principal, role, optional scope | Adds a participant, or replaces the declared role and scope for that subject; version advances. |
+| `REMOVE_PARTICIPANT` | Principal subject | Removes an existing participant if authorized; an unknown subject is rejected without a version change. |
 | `START` | Empty object | `DRAFT` → `ACTIVE`. |
 | `PAUSE` | Empty object | `ACTIVE` → `PAUSED`. |
 | `SUSPEND` | Suspension reason | `ACTIVE`/`PAUSED`/`AWAITING_APPROVAL` → `SUSPENDED`; durable work receives a pause signal. |

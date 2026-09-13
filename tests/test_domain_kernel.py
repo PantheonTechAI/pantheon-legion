@@ -82,6 +82,62 @@ class DomainKernelTests(unittest.TestCase):
         self.assertEqual(self.kernel.get_mission(self.mission.id).version, 3)
         self.assertTrue(any(e.result == "REJECTED" for e in self.kernel.audit_events(self.mission.id)))
 
+    def test_participant_commands_update_the_projection_and_reject_unknown_removal(self):
+        added = self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=1,
+            idempotency_key="add-observer",
+            command_type="ADD_PARTICIPANT",
+            payload={"participant": {
+                "principal": {"type": "HUMAN", "subject": "observer"},
+                "role": "OBSERVER", "scope": "read-only",
+            }},
+        )
+        self.assertEqual(added.status, "ACCEPTED")
+        participant = self.kernel.get_mission(self.mission.id).participants[0]
+        self.assertEqual((participant.principal.subject, participant.role, participant.scope),
+                         ("observer", "OBSERVER", "read-only"))
+        updated = self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=2,
+            idempotency_key="promote-observer",
+            command_type="ADD_PARTICIPANT",
+            payload={"participant": {
+                "principal": {"type": "HUMAN", "subject": "observer"},
+                "role": "APPROVER",
+            }},
+        )
+        self.assertEqual(updated.status, "ACCEPTED")
+        participants = self.kernel.get_mission(self.mission.id).participants
+        self.assertEqual(len(participants), 1)
+        self.assertEqual((participants[0].role, participants[0].scope), ("APPROVER", None))
+        removed = self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=3,
+            idempotency_key="remove-observer",
+            command_type="REMOVE_PARTICIPANT",
+            payload={"subject": "observer"},
+        )
+        self.assertEqual(removed.status, "ACCEPTED")
+        self.assertEqual(self.kernel.get_mission(self.mission.id).participants, [])
+        missing = self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=4,
+            idempotency_key="remove-missing",
+            command_type="REMOVE_PARTICIPANT",
+            payload={"subject": "observer"},
+        )
+        self.assertEqual(missing.error_code, "PARTICIPANT_NOT_FOUND")
+        self.assertEqual(self.kernel.get_mission(self.mission.id).version, 4)
+        self.assertEqual(
+            [event.event_type for event in self.kernel.timeline(self.mission.id)][-4:],
+            ["PARTICIPANT_ADDED", "PARTICIPANT_UPDATED", "PARTICIPANT_REMOVED", "COMMAND_REJECTED"],
+        )
+
     def test_unauthorized_principal_fails_closed(self):
         self.start()
         result = self.kernel.submit_command(
