@@ -61,7 +61,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
 
         restarted = self.create_service()
         self.assertEqual(restarted.get_mission(actor=self.owner, mission_id=mission_id).body['version'], 3)
-        self.assertEqual(len(restarted.get_timeline(actor=self.owner, mission_id=mission_id).body['events']), 4)
+        self.assertEqual(len(restarted.get_timeline(actor=self.owner, mission_id=mission_id).body['events']), 6)
         with self.assertRaises(WorkerKilled):
             restarted.execute_action(
                 mission_id=mission_id,
@@ -89,8 +89,21 @@ class PersistentAquilaServiceTests(unittest.TestCase):
             event for event in recovered.kernel.timeline(mission_id)
             if event.event_type == 'AUTHORIZATION_EVALUATED'
         ]
-        self.assertEqual(len(authorization_events), 2)
-        self.assertTrue(all(event.result == 'ALLOW' for event in authorization_events))
+        execution_authorizations = [
+            event for event in authorization_events
+            if event.data['operation'] == 'EXECUTE_ACTION'
+        ]
+        command_authorizations = [
+            event for event in authorization_events
+            if event.data['operation'] == 'SUBMIT_COMMAND'
+        ]
+        self.assertEqual(len(execution_authorizations), 2)
+        self.assertEqual(len(command_authorizations), 2)
+        self.assertTrue(all(event.result == 'ALLOW' for event in execution_authorizations))
+        self.assertEqual(
+            {(event.result, event.data['reason']) for event in command_authorizations},
+            {('ALLOW', 'AUTHORIZED'), ('DENY', 'APPROVAL_REQUIRED')},
+        )
         self.assertTrue(all(event.data['decision_id'] for event in authorization_events))
         recovered.close()
 
