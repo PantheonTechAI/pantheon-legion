@@ -9,13 +9,17 @@ from .scout import (
     ScoutRequest,
     ScoutResult,
 )
+from .conformance import ConformanceCheck, ScoutRuntimeConformance, ScoutRuntimeConformanceReport
 
 __all__ = [
     "CognitionRuntimeAdapter",
+    "ConformanceCheck",
     "InMemoryScoutRuntime",
     "MissionContext",
     "ReadOnlyScoutError",
     "ScoutEvidence",
     "ScoutRequest",
     "ScoutResult",
+    "ScoutRuntimeConformance",
+    "ScoutRuntimeConformanceReport",
 ]
