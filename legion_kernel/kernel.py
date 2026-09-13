@@ -364,6 +364,11 @@ class LegionKernel:
             mission.status = MissionStatus.ACTIVE
         elif command_type == "CANCEL":
             mission.status = MissionStatus.CANCELLED
+            for approval in self.approvals.values():
+                if approval.mission_id == mission.id:
+                    self._expire_approval_if_needed(
+                        mission, approval, invalidation_reason="MISSION_CANCELLED"
+                    )
         elif command_type == "COMPLETE":
             mission.status = MissionStatus.COMPLETED
         elif command_type == "REQUEST_ACTION":
@@ -681,8 +686,17 @@ class LegionKernel:
                 raise AuthorizationError(error_code)
         return approval
 
-    def _expire_approval_if_needed(self, mission: Mission, approval: Approval) -> bool:
-        if not approval.expires_at or self.clock() < approval.expires_at:
+    def _expire_approval_if_needed(
+        self,
+        mission: Mission,
+        approval: Approval,
+        *,
+        invalidation_reason: str | None = None,
+    ) -> bool:
+        if (
+            invalidation_reason is None
+            and (not approval.expires_at or self.clock() < approval.expires_at)
+        ):
             return False
         if approval.status not in {"PENDING", "APPROVED"}:
             return approval.status == "EXPIRED"
@@ -693,7 +707,10 @@ class LegionKernel:
             actor=Principal(PrincipalType.SYSTEM, "approval-expiry"),
             result="SUCCESS",
             approval_id=approval.id,
-            data={"expires_at": approval.expires_at},
+            data={
+                "expires_at": approval.expires_at,
+                "invalidation_reason": invalidation_reason or "EXPIRY",
+            },
         )
         return True
 

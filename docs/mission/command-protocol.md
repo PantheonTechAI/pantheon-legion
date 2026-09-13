@@ -72,7 +72,7 @@ An accepted command MUST return the resulting Mission version or an explicit dur
 | `SUSPEND` | Suspension reason | `ACTIVE`/`PAUSED`/`AWAITING_APPROVAL` → `SUSPENDED`; durable work receives a pause signal. |
 | `RESUME` | Empty object | `PAUSED`/`SUSPENDED`/authorized `FAILED` → `ACTIVE`. |
 | `REQUEST_ACTION` | Action ID, capability, arguments, side-effect class | Creates a bounded action request; may enter `AWAITING_APPROVAL`. |
-| `CANCEL` | Empty object | Any non-terminal state → `CANCELLED`. |
+| `CANCEL` | Empty object | Any non-terminal state → `CANCELLED`; pending and approved Approvals expire. |
 | `COMPLETE` | Empty object | `ACTIVE` → `COMPLETED` when completion authority is satisfied. |
 
 The payload is interpreted according to `command_type`; unknown fields MUST be rejected. A command MUST NOT encode executable code or an unbounded capability request as a substitute for a declared ToolCapability.

@@ -231,6 +231,32 @@ class DomainKernelTests(unittest.TestCase):
         self.assertEqual(self.kernel.approvals[requested.approval_id].status, "EXPIRED")
         self.assertEqual(self.kernel.timeline(self.mission.id)[-1].event_type, "APPROVAL_EXPIRED")
 
+    def test_cancellation_expires_active_approvals(self):
+        self.start()
+        requested = self.request_mutation()
+        approval = self.kernel.decide_approval(
+            approval_id=requested.approval_id,
+            approver=self.approver,
+            expected_mission_version=3,
+            decision="APPROVE",
+            reason="Approved before cancellation.",
+        )
+        cancelled = self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=3,
+            idempotency_key="cancel",
+            command_type="CANCEL",
+            payload={},
+        )
+        self.assertEqual(cancelled.status, "ACCEPTED")
+        self.assertEqual(self.kernel.approvals[approval.id].status, "EXPIRED")
+        expiry_events = [
+            event for event in self.kernel.timeline(self.mission.id)
+            if event.event_type == "APPROVAL_EXPIRED"
+        ]
+        self.assertEqual(expiry_events[-1].data["invalidation_reason"], "MISSION_CANCELLED")
+
     def test_audit_reconstructs_accepted_and_rejected_changes(self):
         self.start()
         self.kernel.submit_command(
