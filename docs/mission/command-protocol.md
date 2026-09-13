@@ -137,3 +137,8 @@ Every accepted command produces an authoritative event with:
 - resulting status and durable execution reference, if any.
 
 Rejections SHOULD produce an audit event even though they do not advance Mission version. This preserves attempted actions, conflicts, and denied authority without treating them as state changes.
+
+Every durable action attempt records an `AUTHORIZATION_EVALUATED` event before its
+execution gate runs. The event includes the policy decision ID, policy version,
+operation, reason, and evaluation time. A denied attempt is followed by an
+`EXECUTION_REJECTED` event; neither event advances the Mission version.
