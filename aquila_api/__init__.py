@@ -3,6 +3,7 @@
 from .service import ApiResponse, AquilaService
 from .persistent import PersistentAquilaService
 from .auth import AuthenticationError, AuthentikConfig, AuthentikPrincipalMapper, BearerAuthenticator
+from .wsgi import AquilaWSGIApp
 
 __all__ = [
     "ApiResponse",
@@ -12,4 +13,5 @@ __all__ = [
     "AuthentikConfig",
     "AuthentikPrincipalMapper",
     "BearerAuthenticator",
+    "AquilaWSGIApp",
 ]
