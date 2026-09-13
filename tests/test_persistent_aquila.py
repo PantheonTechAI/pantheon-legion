@@ -2,8 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from aquila_api import PersistentAquilaService
-from legion_kernel import AuthorizationError, Principal, PrincipalType, WorkerKilled
+from aquila_api import DelegationGrant, PersistentAquilaService
+from legion_kernel import AuthorizationError, Principal, PrincipalType, RoeLevel, WorkerKilled
 from legion_runtime import ExecutionState
 
 
@@ -20,6 +20,17 @@ class PersistentAquilaServiceTests(unittest.TestCase):
 
     def create_service(self):
         return PersistentAquilaService(self.database)
+
+    def execution_grant(self, mission_id):
+        return DelegationGrant(
+            grant_id='worker-execution-grant',
+            issuer=self.owner,
+            subject=self.worker,
+            mission_id=mission_id,
+            allowed_operations=frozenset({'EXECUTE_ACTION'}),
+            roe_ceiling=RoeLevel.REVIEW,
+            expires_at='9999-01-01T00:00:00Z',
+        )
 
     def test_mission_approval_and_audit_survive_service_restart(self):
         service = self.create_service()
@@ -56,6 +67,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
                 mission_id=mission_id,
                 action_id='33333333-3333-4333-8333-333333333333',
                 worker=self.worker,
+                delegation=self.execution_grant(mission_id),
                 fail_after_side_effect=True,
             )
         execution_id = restarted.action_executions['33333333-3333-4333-8333-333333333333']
@@ -67,6 +79,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
             mission_id=mission_id,
             action_id='33333333-3333-4333-8333-333333333333',
             worker=self.worker,
+            delegation=self.execution_grant(mission_id),
         ), 'RECOVERED')
         self.assertEqual(recovered.kernel.side_effects['33333333-3333-4333-8333-333333333333'], 1)
         recovered_execution = recovered.execution.query(execution_id)
@@ -102,6 +115,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
                 mission_id=mission_id,
                 action_id='44444444-4444-4444-8444-444444444444',
                 worker=self.worker,
+                delegation=self.execution_grant(mission_id),
                 fail_after_side_effect=True,
             )
         cancelled = service.cancel_mission(actor=self.owner, mission_id=mission_id, body={
@@ -119,6 +133,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
                 mission_id=mission_id,
                 action_id='44444444-4444-4444-8444-444444444444',
                 worker=self.worker,
+                delegation=self.execution_grant(mission_id),
             )
         restarted.close()
 

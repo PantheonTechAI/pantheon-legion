@@ -1,7 +1,7 @@
 import unittest
 
-from aquila_api import AquilaService
-from legion_kernel import AuthorizationError, LegionKernel, Principal, PrincipalType
+from aquila_api import AquilaService, DelegationGrant
+from legion_kernel import AuthorizationError, LegionKernel, Principal, PrincipalType, RoeLevel
 
 
 class AquilaServiceTests(unittest.TestCase):
@@ -15,6 +15,7 @@ class AquilaServiceTests(unittest.TestCase):
         self.operator = Principal(PrincipalType.HUMAN, "operator", frozenset({"OPERATOR"}))
         self.approver = Principal(PrincipalType.HUMAN, "approver", frozenset({"APPROVER"}))
         self.observer = Principal(PrincipalType.HUMAN, "observer", frozenset({"OBSERVER"}))
+        self.worker = Principal(PrincipalType.WORKLOAD, "worker", frozenset({"MISSION_WORKER"}))
         created = self.service.create_mission(
             actor=self.owner,
             body={
@@ -197,6 +198,51 @@ class AquilaServiceTests(unittest.TestCase):
             )
         self.assertEqual(self.service.action_executions, {})
         self.assertEqual(self.service.execution.records, {})
+
+    def test_workload_execution_requires_a_bounded_delegation(self):
+        self.command(self.owner, 1, "start", "START", {})
+        requested = self.command(
+            self.owner,
+            2,
+            "read-action",
+            "REQUEST_ACTION",
+            {
+                "action_id": "66666666-6666-4666-8666-666666666666",
+                "capability": "test.read",
+                "arguments": {},
+                "target": "resource",
+                "side_effect_class": "READ",
+            },
+        )
+        self.assertEqual(requested.status_code, 200)
+        with self.assertRaisesRegex(AuthorizationError, "DELEGATION_REQUIRED"):
+            self.service.execute_action(
+                mission_id=self.mission_id,
+                action_id="66666666-6666-4666-8666-666666666666",
+                worker=self.worker,
+            )
+        self.assertEqual(self.service.action_executions, {})
+        self.assertEqual(self.service.kernel.side_effects, {})
+        self.assertEqual(self.service.kernel.timeline(self.mission_id)[-1].data["error_code"], "DELEGATION_REQUIRED")
+
+        grant = DelegationGrant(
+            grant_id="worker-read-grant",
+            issuer=self.owner,
+            subject=self.worker,
+            mission_id=self.mission_id,
+            allowed_operations=frozenset({"EXECUTE_ACTION"}),
+            roe_ceiling=RoeLevel.REVIEW,
+            expires_at="9999-01-01T00:00:00Z",
+        )
+        self.assertEqual(
+            self.service.execute_action(
+                mission_id=self.mission_id,
+                action_id="66666666-6666-4666-8666-666666666666",
+                worker=self.worker,
+                delegation=grant,
+            ),
+            "EXECUTED",
+        )
 
 
 if __name__ == "__main__":

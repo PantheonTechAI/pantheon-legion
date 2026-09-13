@@ -510,18 +510,36 @@ class LegionKernel:
         action = mission.actions[action_id]
         error_code = self._execution_state_error(mission, worker)
         if error_code:
-            self._record(
-                mission,
-                event_type="EXECUTION_REJECTED",
-                actor=worker,
-                result="REJECTED",
-                command_id=action.command_id,
-                data={"action_id": action_id, "error_code": error_code},
+            self.reject_action_execution(
+                mission_id=mission_id,
+                action_id=action_id,
+                worker=worker,
+                error_code=error_code,
             )
             raise AuthorizationError(error_code)
         if self.side_effects.get(action_id):
             return None
         return self._approval_for_execution(mission, action, worker)
+
+    def reject_action_execution(
+        self,
+        *,
+        mission_id: str,
+        action_id: str,
+        worker: Principal,
+        error_code: str,
+    ) -> None:
+        """Record a fail-closed execution-gate denial without changing Mission state."""
+        mission = self._mission(mission_id)
+        action = mission.actions[action_id]
+        self._record(
+            mission,
+            event_type="EXECUTION_REJECTED",
+            actor=worker,
+            result="REJECTED",
+            command_id=action.command_id,
+            data={"action_id": action_id, "error_code": error_code},
+        )
 
     def timeline(self, mission_id: str) -> list[AuditEvent]:
         return deepcopy(self.audit[mission_id])
@@ -600,13 +618,11 @@ class LegionKernel:
             elif self._capability_denied(mission.roe, action):
                 error_code = "ROE_DENIED"
             if error_code:
-                self._record(
-                    mission,
-                    event_type="EXECUTION_REJECTED",
-                    actor=worker,
-                    result="REJECTED",
-                    command_id=action.command_id,
-                    data={"action_id": action.id, "error_code": error_code},
+                self.reject_action_execution(
+                    mission_id=mission.id,
+                    action_id=action.id,
+                    worker=worker,
+                    error_code=error_code,
                 )
                 raise AuthorizationError(error_code)
         return approval
