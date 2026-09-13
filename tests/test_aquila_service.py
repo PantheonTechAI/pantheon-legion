@@ -125,6 +125,16 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(rejected.body["code"], "INVALID_COMMAND_PAYLOAD")
         self.assertEqual(rejected.body["current_version"], 1)
 
+    def test_command_submission_rejects_client_identity_fields(self):
+        rejected = self.service.submit_command(
+            actor=self.owner, mission_id=self.mission_id,
+            body={"expected_version": 1, "idempotency_key": "spoof", "command_type": "START",
+                  "payload": {}, "requested_by": {"type": "HUMAN", "subject": "other"}},
+        )
+        self.assertEqual(rejected.status_code, 422)
+        self.assertEqual(rejected.body["code"], "INVALID_COMMAND_SUBMISSION")
+        self.assertEqual(self.service.kernel.get_mission(self.mission_id).version, 1)
+
 
     def test_schema_invalid_constraint_payload_is_rejected_without_a_version_change(self):
         rejected = self.command(self.owner, 1, "invalid-constraint", "ADD_CONSTRAINT", {"constraint": {"id": "invalid", "text": "invalid id"}})
