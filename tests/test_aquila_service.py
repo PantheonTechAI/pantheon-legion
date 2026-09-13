@@ -119,6 +119,12 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 422)
         self.assertEqual(rejected.body["code"], "INVALID_COMMAND_PAYLOAD")
 
+    def test_schema_invalid_roe_payload_is_rejected_without_a_version_change(self):
+        rejected = self.command(self.owner, 1, "duplicate-capability", "SET_ROE", {"level": "REVIEW", "reason": "duplicate", "allowed_capabilities": ["test.read", "test.read"]})
+        self.assertEqual(rejected.status_code, 422)
+        self.assertEqual(rejected.body["code"], "INVALID_COMMAND_PAYLOAD")
+        self.assertEqual(rejected.body["current_version"], 1)
+
     def test_approval_request_and_decision_are_openapi_shaped(self):
         self.command(self.owner, 1, "start", "START", {})
         requested = self.command(

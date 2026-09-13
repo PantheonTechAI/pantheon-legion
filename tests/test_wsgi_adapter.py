@@ -109,6 +109,17 @@ class WsgiAdapterTests(unittest.TestCase):
         self.assertEqual(body["code"], "INVALID_COMMAND_PAYLOAD")
         self.assertEqual(body["current_version"], 1)
 
+    def test_schema_invalid_nested_participant_payload_is_rejected(self):
+        _, _, created = self.request("POST", "/missions", self.create_body())
+        status, _, body = self.request(
+            "POST", f"/missions/{created['id']}/commands",
+            {"expected_version": 1, "idempotency_key": "invalid-participant", "command_type": "ADD_PARTICIPANT",
+             "payload": {"participant": {"principal": {"type": "ROBOT", "subject": "observer"}, "role": "OBSERVER"}}},
+        )
+        self.assertEqual(status, 422)
+        self.assertEqual(body["code"], "INVALID_COMMAND_PAYLOAD")
+        self.assertEqual(body["current_version"], 1)
+
     def test_invalid_json_is_rejected(self):
         environ = {
             "REQUEST_METHOD": "POST",

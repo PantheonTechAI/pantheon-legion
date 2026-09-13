@@ -45,7 +45,7 @@ class DomainKernelTests(unittest.TestCase):
             idempotency_key="request-mutation",
             command_type="REQUEST_ACTION",
             payload={
-                "action_id": "action-1",
+                "action_id": "11111111-1111-4111-8111-111111111111",
                 "capability": "test.bounded_mutation",
                 "arguments": {"target": "resource"},
                 "target": "resource",
@@ -122,6 +122,26 @@ class DomainKernelTests(unittest.TestCase):
         self.assertEqual(self.kernel.get_mission(self.mission.id).version, 1)
         self.assertEqual(self.kernel.timeline(self.mission.id)[-1].data["error_code"], "INVALID_COMMAND_PAYLOAD")
 
+    def test_schema_constrained_payloads_are_auditable_rejections(self):
+        invalid_payloads = (
+            ("SET_ROE", {"level": "UNSAFE", "reason": "invalid enum"}),
+            ("SET_ROE", {"level": "REVIEW", "reason": "duplicate", "allowed_capabilities": ["test.read", "test.read"]}),
+            ("ADD_PARTICIPANT", {"participant": {"principal": {"type": "HUMAN", "subject": "observer"}, "role": "OBSERVER", "unexpected": True}}),
+            ("ADD_PARTICIPANT", {"participant": {"principal": {"type": "HUMAN", "subject": ""}, "role": "OBSERVER"}}),
+            ("REQUEST_ACTION", {"action_id": "not-a-uuid", "capability": "test.read", "arguments": {}}),
+            ("REQUEST_ACTION", {"action_id": "11111111-1111-4111-8111-111111111111", "capability": "x" * 201, "arguments": []}),
+            ("REQUEST_ACTION", {"action_id": "11111111-1111-4111-8111-111111111111", "capability": "test.read", "arguments": {}, "side_effect_class": "INVALID"}),
+        )
+        for index, (command_type, payload) in enumerate(invalid_payloads):
+            with self.subTest(command_type=command_type, index=index):
+                rejected = self.kernel.submit_command(
+                    mission_id=self.mission.id, actor=self.user_a, expected_version=1,
+                    idempotency_key=f"invalid-{index}", command_type=command_type, payload=payload,
+                )
+                self.assertEqual(rejected.error_code, "INVALID_COMMAND_PAYLOAD")
+                self.assertEqual(self.kernel.get_mission(self.mission.id).version, 1)
+                self.assertEqual(self.kernel.timeline(self.mission.id)[-1].data["error_code"], "INVALID_COMMAND_PAYLOAD")
+
     def test_participant_commands_update_the_projection_and_reject_unknown_removal(self):
         added = self.kernel.submit_command(
             mission_id=self.mission.id,
@@ -194,7 +214,7 @@ class DomainKernelTests(unittest.TestCase):
         with self.assertRaises(AuthorizationError) as error:
             self.kernel.execute_action(
                 mission_id=self.mission.id,
-                action_id="action-1",
+                action_id="11111111-1111-4111-8111-111111111111",
                 worker=self.observer,
             )
         self.assertEqual(str(error.exception), "FORBIDDEN")
@@ -223,7 +243,7 @@ class DomainKernelTests(unittest.TestCase):
         with self.assertRaises(AuthorizationError) as error:
             self.kernel.execute_action(
                 mission_id=self.mission.id,
-                action_id="action-1",
+                action_id="11111111-1111-4111-8111-111111111111",
                 worker=self.worker,
             )
         self.assertEqual(str(error.exception), "APPROVAL_STALE")
@@ -242,20 +262,20 @@ class DomainKernelTests(unittest.TestCase):
         with self.assertRaises(WorkerKilled):
             self.kernel.execute_action(
                 mission_id=self.mission.id,
-                action_id="action-1",
+                action_id="11111111-1111-4111-8111-111111111111",
                 worker=self.worker,
                 fail_after_side_effect=True,
             )
-        self.assertEqual(self.kernel.side_effects["action-1"], 1)
+        self.assertEqual(self.kernel.side_effects["11111111-1111-4111-8111-111111111111"], 1)
         self.assertEqual(
             self.kernel.execute_action(
                 mission_id=self.mission.id,
-                action_id="action-1",
+                action_id="11111111-1111-4111-8111-111111111111",
                 worker=self.worker,
             ),
             "RECOVERED",
         )
-        self.assertEqual(self.kernel.side_effects["action-1"], 1)
+        self.assertEqual(self.kernel.side_effects["11111111-1111-4111-8111-111111111111"], 1)
 
     def test_paused_mission_rejects_execution_before_side_effect(self):
         self.start()
@@ -266,7 +286,7 @@ class DomainKernelTests(unittest.TestCase):
             idempotency_key="request-read",
             command_type="REQUEST_ACTION",
             payload={
-                "action_id": "read-action",
+                "action_id": "22222222-2222-4222-8222-222222222222",
                 "capability": "test.read",
                 "arguments": {},
                 "target": "resource",
@@ -285,7 +305,7 @@ class DomainKernelTests(unittest.TestCase):
         with self.assertRaisesRegex(AuthorizationError, "MISSION_PAUSED"):
             self.kernel.execute_action(
                 mission_id=self.mission.id,
-                action_id="read-action",
+                action_id="22222222-2222-4222-8222-222222222222",
                 worker=self.worker,
             )
         self.assertEqual(self.kernel.side_effects, {})
@@ -305,7 +325,7 @@ class DomainKernelTests(unittest.TestCase):
         with self.assertRaisesRegex(AuthorizationError, "APPROVAL_STALE"):
             self.kernel.execute_action(
                 mission_id=self.mission.id,
-                action_id="action-1",
+                action_id="11111111-1111-4111-8111-111111111111",
                 worker=self.worker,
             )
         self.assertEqual(self.kernel.side_effects, {})
