@@ -96,6 +96,18 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(rejected.body["code"], "UNKNOWN_COMMAND_TYPE")
         self.assertEqual(rejected.body["current_version"], 1)
 
+    def test_missing_constraint_removal_is_rejected_without_a_version_change(self):
+        rejected = self.command(
+            self.owner,
+            1,
+            "remove-missing-constraint",
+            "REMOVE_CONSTRAINT",
+            {"constraint_id": "missing"},
+        )
+        self.assertEqual(rejected.status_code, 422)
+        self.assertEqual(rejected.body["code"], "CONSTRAINT_NOT_FOUND")
+        self.assertEqual(rejected.body["current_version"], 1)
+
     def test_approval_request_and_decision_are_openapi_shaped(self):
         self.command(self.owner, 1, "start", "START", {})
         requested = self.command(

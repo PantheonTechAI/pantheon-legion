@@ -97,6 +97,21 @@ class DomainKernelTests(unittest.TestCase):
         self.assertEqual((event.event_type, event.result), ("COMMAND_REJECTED", "REJECTED"))
         self.assertEqual(event.data["error_code"], "UNKNOWN_COMMAND_TYPE")
 
+    def test_missing_constraint_removal_is_auditable_and_does_not_advance_the_mission(self):
+        rejected = self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=1,
+            idempotency_key="remove-missing-constraint",
+            command_type="REMOVE_CONSTRAINT",
+            payload={"constraint_id": "missing"},
+        )
+        self.assertEqual(rejected.error_code, "CONSTRAINT_NOT_FOUND")
+        self.assertEqual(self.kernel.get_mission(self.mission.id).version, 1)
+        event = self.kernel.timeline(self.mission.id)[-1]
+        self.assertEqual((event.event_type, event.data["error_code"]),
+                         ("COMMAND_REJECTED", "CONSTRAINT_NOT_FOUND"))
+
     def test_participant_commands_update_the_projection_and_reject_unknown_removal(self):
         added = self.kernel.submit_command(
             mission_id=self.mission.id,
