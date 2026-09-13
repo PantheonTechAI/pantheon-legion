@@ -118,7 +118,9 @@ The API MUST expose stable machine-readable codes. At minimum:
 | `APPROVAL_REQUIRED` | Action is valid but needs Approval. | May create a pending Approval request; no execution. |
 | `APPROVAL_STALE` | Approval no longer matches current Mission/policy context. | No execution. |
 | `IDEMPOTENCY_KEY_REUSE` | Key was used for a different command. | None. |
-| `MISSION_TERMINAL` | Mission is complete or cancelled. | None. |
+| `MISSION_TERMINAL` | Mission is completed, cancelled, or failed. | None. |
+| `MISSION_PAUSED` | Mission execution is paused. | No execution. |
+| `MISSION_SUSPENDED` | Mission execution is suspended by a control-plane or safety condition. | No execution. |
 | `CAPABILITY_DENIED` | Requested capability is not declared or allowed. | None. |
 | `POLICY_UNAVAILABLE` | Required policy context cannot be evaluated. | Fail closed. |
 
