@@ -23,7 +23,7 @@ from legion_kernel import (
 )
 from legion_runtime import DurableExecutionAdapter, ExecutionState, InMemoryDurableExecutionAdapter
 
-from .authorization import AuthorizationEngine, AuthorizationRequest, Decision
+from .authorization import AuthorizationEngine, AuthorizationRequest, Decision, DelegationGrant
 
 
 @dataclass(frozen=True)
@@ -181,11 +181,37 @@ class AquilaService:
         mission_id: str,
         action_id: str,
         worker: Principal,
+        delegation: DelegationGrant | None = None,
         fail_after_side_effect: bool = False,
     ) -> str:
         """Run an accepted action through the durable execution boundary."""
         mission = self.kernel.get_mission(mission_id)
         action = mission.actions[action_id]
+        approval_present = bool(self.kernel.side_effects.get(action_id)) or any(
+            approval.action.id == action_id and approval.status == "APPROVED"
+            for approval in self.kernel.approvals.values()
+        )
+        decision = self.authorization.decide(
+            AuthorizationRequest(
+                principal=worker,
+                mission_id=mission_id,
+                operation="EXECUTE_ACTION",
+                roe_level=mission.roe.level,
+                mission_status=mission.status,
+                side_effect_class=action.side_effect_class,
+                capability=action.capability,
+                approval_present=approval_present,
+                delegation=delegation,
+            )
+        )
+        if decision.decision == Decision.DENY:
+            self.kernel.reject_action_execution(
+                mission_id=mission_id,
+                action_id=action_id,
+                worker=worker,
+                error_code=decision.reason,
+            )
+            raise AuthorizationError(decision.reason)
         self.kernel.validate_action_execution(
             mission_id=mission_id,
             action_id=action_id,

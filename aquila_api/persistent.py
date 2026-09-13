@@ -10,6 +10,7 @@ from legion_kernel.kernel import Action, Approval, PrincipalType
 from legion_store import SQLiteMissionStore
 from legion_runtime import InMemoryDurableExecutionAdapter
 
+from .authorization import DelegationGrant
 from .service import ApiResponse, AquilaService, _principal_payload
 
 
@@ -87,6 +88,7 @@ class PersistentAquilaService(AquilaService):
         mission_id: str,
         action_id: str,
         worker: Principal,
+        delegation: DelegationGrant | None = None,
         fail_after_side_effect: bool = False,
     ) -> str:
         mission = self.kernel.missions[mission_id]
@@ -97,6 +99,7 @@ class PersistentAquilaService(AquilaService):
                 mission_id=mission_id,
                 action_id=action_id,
                 worker=worker,
+                delegation=delegation,
                 fail_after_side_effect=fail_after_side_effect,
             )
         finally:
