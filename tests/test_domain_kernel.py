@@ -161,6 +161,59 @@ class DomainKernelTests(unittest.TestCase):
         )
         self.assertEqual(self.kernel.side_effects["action-1"], 1)
 
+    def test_paused_mission_rejects_execution_before_side_effect(self):
+        self.start()
+        requested = self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=2,
+            idempotency_key="request-read",
+            command_type="REQUEST_ACTION",
+            payload={
+                "action_id": "read-action",
+                "capability": "test.read",
+                "arguments": {},
+                "target": "resource",
+                "side_effect_class": "READ",
+            },
+        )
+        self.assertEqual(requested.status, "ACCEPTED")
+        self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=3,
+            idempotency_key="pause",
+            command_type="PAUSE",
+            payload={},
+        )
+        with self.assertRaisesRegex(AuthorizationError, "MISSION_PAUSED"):
+            self.kernel.execute_action(
+                mission_id=self.mission.id,
+                action_id="read-action",
+                worker=self.worker,
+            )
+        self.assertEqual(self.kernel.side_effects, {})
+        self.assertEqual(self.kernel.timeline(self.mission.id)[-1].event_type, "EXECUTION_REJECTED")
+
+    def test_expired_approval_rejects_execution_before_side_effect(self):
+        self.start()
+        requested = self.request_mutation()
+        approval = self.kernel.decide_approval(
+            approval_id=requested.approval_id,
+            approver=self.approver,
+            expected_mission_version=3,
+            decision="APPROVE",
+            reason="Approval that will expire.",
+        )
+        self.kernel.approvals[approval.id].expires_at = "2000-01-01T00:00:00Z"
+        with self.assertRaisesRegex(AuthorizationError, "APPROVAL_STALE"):
+            self.kernel.execute_action(
+                mission_id=self.mission.id,
+                action_id="action-1",
+                worker=self.worker,
+            )
+        self.assertEqual(self.kernel.side_effects, {})
+
     def test_audit_reconstructs_accepted_and_rejected_changes(self):
         self.start()
         self.kernel.submit_command(

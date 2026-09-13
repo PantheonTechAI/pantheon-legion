@@ -186,6 +186,11 @@ class AquilaService:
         """Run an accepted action through the durable execution boundary."""
         mission = self.kernel.get_mission(mission_id)
         action = mission.actions[action_id]
+        self.kernel.validate_action_execution(
+            mission_id=mission_id,
+            action_id=action_id,
+            worker=worker,
+        )
         execution_id = self.action_executions.get(action_id)
         if execution_id is None:
             record = self.execution.start(

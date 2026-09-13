@@ -114,7 +114,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
 
         restarted = self.create_service()
         self.assertEqual(restarted.execution.query(execution_id).state, ExecutionState.CANCELLED)
-        with self.assertRaisesRegex(AuthorizationError, 'EXECUTION_CANCELLED'):
+        with self.assertRaisesRegex(AuthorizationError, 'MISSION_TERMINAL'):
             restarted.execute_action(
                 mission_id=mission_id,
                 action_id='44444444-4444-4444-8444-444444444444',

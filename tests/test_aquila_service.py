@@ -1,7 +1,7 @@
 import unittest
 
 from aquila_api import AquilaService
-from legion_kernel import LegionKernel, Principal, PrincipalType
+from legion_kernel import AuthorizationError, LegionKernel, Principal, PrincipalType
 
 
 class AquilaServiceTests(unittest.TestCase):
@@ -171,6 +171,32 @@ class AquilaServiceTests(unittest.TestCase):
             },
         )
         self.assertEqual(requested.status_code, 202)
+
+    def test_paused_mission_does_not_start_a_durable_execution(self):
+        self.command(self.owner, 1, "start", "START", {})
+        requested = self.command(
+            self.owner,
+            2,
+            "read-action",
+            "REQUEST_ACTION",
+            {
+                "action_id": "55555555-5555-4555-8555-555555555555",
+                "capability": "test.read",
+                "arguments": {},
+                "target": "resource",
+                "side_effect_class": "READ",
+            },
+        )
+        self.assertEqual(requested.status_code, 200)
+        self.command(self.owner, 3, "pause", "PAUSE", {})
+        with self.assertRaisesRegex(AuthorizationError, "MISSION_PAUSED"):
+            self.service.execute_action(
+                mission_id=self.mission_id,
+                action_id="55555555-5555-4555-8555-555555555555",
+                worker=self.owner,
+            )
+        self.assertEqual(self.service.action_executions, {})
+        self.assertEqual(self.service.execution.records, {})
 
 
 if __name__ == "__main__":

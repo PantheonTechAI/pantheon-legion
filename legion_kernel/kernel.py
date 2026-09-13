@@ -453,8 +453,11 @@ class LegionKernel:
     ) -> str:
         mission = self._mission(mission_id)
         action = mission.actions[action_id]
-        if not worker.has_any_role("MISSION_WORKER", "OPERATOR"):
-            raise AuthorizationError("FORBIDDEN")
+        approval = self.validate_action_execution(
+            mission_id=mission_id,
+            action_id=action_id,
+            worker=worker,
+        )
 
         if self.side_effects.get(action_id):
             self._record(
@@ -466,18 +469,7 @@ class LegionKernel:
             )
             return "RECOVERED"
 
-        approval = next(
-            (item for item in self.approvals.values() if item.action.id == action_id), None
-        )
         if approval:
-            if approval.status != "APPROVED":
-                raise AuthorizationError("APPROVAL_STALE")
-            if mission.version != approval.mission_version:
-                raise AuthorizationError("APPROVAL_STALE")
-            if mission.roe.revision != approval.roe_revision:
-                raise AuthorizationError("ROE_DENIED")
-            if self._capability_denied(mission.roe, action):
-                raise AuthorizationError("ROE_DENIED")
             approval.status = "CONSUMED"
             approval.consumed_at = self.clock()
 
@@ -505,6 +497,31 @@ class LegionKernel:
             data={"action_id": action_id},
         )
         return "EXECUTED"
+
+    def validate_action_execution(
+        self,
+        *,
+        mission_id: str,
+        action_id: str,
+        worker: Principal,
+    ) -> Approval | None:
+        """Fail closed before a durable worker starts or resumes an action."""
+        mission = self._mission(mission_id)
+        action = mission.actions[action_id]
+        error_code = self._execution_state_error(mission, worker)
+        if error_code:
+            self._record(
+                mission,
+                event_type="EXECUTION_REJECTED",
+                actor=worker,
+                result="REJECTED",
+                command_id=action.command_id,
+                data={"action_id": action_id, "error_code": error_code},
+            )
+            raise AuthorizationError(error_code)
+        if self.side_effects.get(action_id):
+            return None
+        return self._approval_for_execution(mission, action, worker)
 
     def timeline(self, mission_id: str) -> list[AuditEvent]:
         return deepcopy(self.audit[mission_id])
@@ -547,6 +564,52 @@ class LegionKernel:
         if command_type in allowed and mission.status not in allowed[command_type]:
             return "INVALID_STATE_TRANSITION"
         return None
+
+    @staticmethod
+    def _execution_state_error(mission: Mission, worker: Principal) -> str | None:
+        if not worker.has_any_role("MISSION_WORKER", "OPERATOR"):
+            return "FORBIDDEN"
+        if mission.status in {
+            MissionStatus.COMPLETED,
+            MissionStatus.CANCELLED,
+            MissionStatus.FAILED,
+        }:
+            return "MISSION_TERMINAL"
+        if mission.status == MissionStatus.PAUSED:
+            return "MISSION_PAUSED"
+        if mission.status == MissionStatus.SUSPENDED:
+            return "MISSION_SUSPENDED"
+        return None
+
+    def _approval_for_execution(
+        self, mission: Mission, action: Action, worker: Principal
+    ) -> Approval | None:
+        approval = next(
+            (item for item in self.approvals.values() if item.action.id == action.id), None
+        )
+        if approval:
+            error_code = None
+            if approval.status != "APPROVED":
+                error_code = "APPROVAL_STALE"
+            elif approval.expires_at and self.clock() >= approval.expires_at:
+                error_code = "APPROVAL_STALE"
+            elif mission.version != approval.mission_version:
+                error_code = "APPROVAL_STALE"
+            elif mission.roe.revision != approval.roe_revision:
+                error_code = "ROE_DENIED"
+            elif self._capability_denied(mission.roe, action):
+                error_code = "ROE_DENIED"
+            if error_code:
+                self._record(
+                    mission,
+                    event_type="EXECUTION_REJECTED",
+                    actor=worker,
+                    result="REJECTED",
+                    command_id=action.command_id,
+                    data={"action_id": action.id, "error_code": error_code},
+                )
+                raise AuthorizationError(error_code)
+        return approval
 
     @staticmethod
     def _make_action(
