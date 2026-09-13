@@ -112,6 +112,7 @@ The API MUST expose stable machine-readable codes. At minimum:
 |---|---|---|
 | `VERSION_CONFLICT` | `expected_version` is not current. | None. |
 | `UNKNOWN_COMMAND_TYPE` | Command type is not part of the supported Mission protocol. | None. |
+| `INVALID_COMMAND_PAYLOAD` | Payload omits a required field or includes an unsupported field. | None. |
 | `CONSTRAINT_NOT_FOUND` | Constraint ID is not part of the Mission. | None. |
 | `UNAUTHENTICATED` | Actor identity is missing or invalid. | None. |
 | `FORBIDDEN` | Actor is authenticated but lacks authority. | None. |

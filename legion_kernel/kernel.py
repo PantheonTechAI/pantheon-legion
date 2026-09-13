@@ -299,6 +299,16 @@ class LegionKernel:
             self._remember(idempotency_key_ref, fingerprint, result)
             return result
 
+        payload_error = self._payload_error(command_type, payload)
+        if payload_error:
+            result = self._reject(
+                mission, actor, payload_error,
+                "Command payload does not match the Mission protocol.", correlation_id,
+                command_id=command_id,
+            )
+            self._remember(idempotency_key_ref, fingerprint, result)
+            return result
+
         authorization_error = self._authorize_command(mission, actor, command_type)
         if authorization_error:
             result = self._reject(
@@ -762,6 +772,27 @@ class LegionKernel:
             role=role,
             scope=scope,
         )
+
+    @staticmethod
+    def _payload_error(command_type: str, payload: Any) -> str | None:
+        if not isinstance(payload, dict):
+            return "INVALID_COMMAND_PAYLOAD"
+        fields = {
+            "UPDATE_OBJECTIVE": ({"objective"}, {"objective"}),
+            "ADD_CONSTRAINT": ({"constraint"}, {"constraint"}),
+            "REMOVE_CONSTRAINT": ({"constraint_id"}, {"constraint_id"}),
+            "SET_ROE": ({"level", "reason"}, {"level", "reason", "allowed_capabilities", "denied_capabilities"}),
+            "ADD_PARTICIPANT": ({"participant"}, {"participant"}),
+            "REMOVE_PARTICIPANT": ({"subject"}, {"subject"}),
+            "SUSPEND": ({"reason"}, {"reason"}),
+            "REQUEST_ACTION": ({"action_id", "capability", "arguments"}, {"action_id", "capability", "arguments", "target", "side_effect_class"}),
+        }
+        required, allowed = fields.get(command_type, (set(), set()))
+        if set(payload) - allowed:
+            return "INVALID_COMMAND_PAYLOAD"
+        if not required.issubset(payload):
+            return "SUSPENSION_REASON_REQUIRED" if command_type == "SUSPEND" else "INVALID_COMMAND_PAYLOAD"
+        return None
 
     def _authorize_command(self, mission: Mission, actor: Principal, command_type: str) -> str | None:
         if actor.type == PrincipalType.HUMAN and actor.has_any_role("MISSION_OWNER", "OPERATOR"):
