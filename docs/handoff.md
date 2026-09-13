@@ -1,4 +1,4 @@
-# Pantheon Legion M1 Progress Checkpoint
+# Pantheon Legion M1 New-Session Handoff
 
 Last updated: 2026-09-13
 
@@ -6,9 +6,9 @@ Last updated: 2026-09-13
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged PR #29 (`c870a5b`).
+- `main` includes merged PR #31 (`ce37a72`).
 - No implementation pull request is active at this checkpoint.
-- The full standard-library test suite passes: **56 tests**.
+- The full standard-library test suite passes: **60 tests**.
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
 
@@ -48,6 +48,9 @@ The repository now has a framework-neutral Mission control plane with:
 - Protocol alignment and fail-closed command handling: `SUSPEND` has its
   canonical schema payload, unknown commands are rejected, and removal of an
   absent constraint or participant does not create a version-advancing no-op.
+- Command payload hardening: the kernel rejects unsupported fields and missing
+  required top-level payload fields before mutation; the same behavior is
+  covered through the Aquila service and WSGI adapter.
 
 Recent merged implementation slices:
 
@@ -69,6 +72,60 @@ Recent merged implementation slices:
 | #27 | Canonical `SUSPEND` command schema alignment |
 | #28 | Fail-closed unknown command rejection |
 | #29 | Fail-closed missing constraint removal |
+| #30 | Refresh M1 progress documentation |
+| #31 | Strict top-level command payload validation |
+
+## New-session quick start
+
+Start from the repository root and establish these facts before changing code:
+
+```sh
+git switch main
+git pull --ff-only origin main
+git status --short --branch
+/usr/bin/python3 -m unittest discover -s tests -v
+/usr/bin/python3 -m tests.acceptance.runner
+```
+
+Expected baseline: a clean `main`, **60 passing tests**, and seven passing M1
+scenarios. Work one bounded feature branch at a time, open a PR, and wait for
+its merge before starting the next implementation slice.
+
+Use `env -u GH_TOKEN` for GitHub CLI commands: the ambient token is invalid in
+the development environment.
+
+## Architecture map
+
+| Area | Primary files | Responsibility |
+|---|---|---|
+| Mission invariants | `legion_kernel/kernel.py` | Aggregate state, optimistic versioning, command idempotency, Approvals, ROE, audit facts, and fail-closed validation. |
+| API/control plane | `aquila_api/service.py` | HTTP-shaped operations, authorization decisions, Mission projection, and durable execution coordination. |
+| Persistent composition | `aquila_api/persistent.py`, `legion_store/sqlite.py` | SQLite snapshots, audit/idempotency persistence, restart recovery, and persisted execution state. |
+| Authorization | `aquila_api/authorization.py` | Deterministic MVP policy, policy decisions, and bounded workload delegation. |
+| Runtime | `legion_runtime/durable.py` | Provider-neutral durable execution lifecycle and recovery model. |
+| HTTP edge | `aquila_api/wsgi.py`, `aquila_api/auth.py` | WSGI routes plus Authentik/OIDC principal mapping. |
+| Contracts | `schemas/`, `api/openapi.yaml`, `docs/mission/` | Canonical resource/command contracts and normative semantics. |
+| Quality gate | `tests/acceptance/runner.py`, `tests/acceptance/m1-acceptance.yaml` | Dependency-free executable M1 catalog and evidence report. |
+
+## Implementation decisions to preserve
+
+- The Mission kernel is authoritative. UI, workers, adapters, and future
+  cognition runtimes submit commands or explicit system transitions; they do
+  not edit Mission snapshots.
+- Audit events are append-only and may share a Mission version. State-changing
+  commands advance the version exactly once; rejected, duplicate, authorization,
+  and execution-gate events do not.
+- Authorization is re-evaluated at command, Approval-decision, and execution
+  boundaries. Policy allow/deny events are durable and reconstructable.
+- Participant records are a durable projection only. They do not grant runtime
+  authority; authenticated roles and policy remain the authorization source.
+- `CANCEL` has an empty canonical command payload. The convenience cancel
+  endpoint requires a human reason, but passes the canonical empty payload to
+  the kernel. Do not reintroduce an endpoint-only field into the command
+  payload without updating the schema and command contract together.
+- The current dependency-free payload validator enforces command type, payload
+  object shape, required top-level fields, and no unknown top-level fields. It
+  is intentionally not a complete JSON Schema implementation.
 
 ## Progress evaluation
 
@@ -96,9 +153,10 @@ Other known boundaries, deliberately not started here:
   source. Aquila continues to derive authority from authenticated identity and
   policy; any participant-membership authorization model needs an explicit
   policy contract before it is introduced.
-- The schemas express more strict payload requirements than the runtime
-  currently validates. Full server-side schema validation, including unknown
-  payload-field rejection, is the next worthwhile protocol-hardening area.
+- The schemas express stricter type, enum, length, UUID/date-time, and nested
+  object requirements than the current runtime validator. The next payload
+  hardening slice should extend validation through those constraints without
+  weakening the new required/unknown-field checks.
 - Authorization audit events cover commands, Approval decisions, and execution
   attempts. Broader audit expansion should be driven by an explicit
   event-volume and retention policy rather than making reads or all policy
@@ -106,17 +164,15 @@ Other known boundaries, deliberately not started here:
 
 ## Recommended next slice
 
-Add server-side command payload validation that enforces the canonical schema's
-required fields and rejects unknown fields before a command can mutate Mission
-state. Keep it dependency-free or introduce a deliberately selected validation
-dependency, and cover both direct kernel and WSGI entry points.
+Extend dependency-free command validation to enforce the canonical schema's
+types, enums, UUIDs, bounded strings, and nested payload objects. Start with
+`REQUEST_ACTION`, `SET_ROE`, and `ADD_PARTICIPANT`; preserve stable error codes,
+kernel/API/WSGI coverage, audit rejection facts, and no-version-change behavior.
 
 ## Workflow notes
 
-- Create each feature branch from the latest merged `main`.
-- Push the branch, open a PR, and wait for merge before the next implementation
-  slice.
-- Run the full suite before committing:
-  `/usr/bin/python3 -m unittest discover -s tests -v`.
-- GitHub commands should use `env -u GH_TOKEN` because the ambient `GH_TOKEN`
-  is invalid.
+- Create each feature branch from the latest merged `main`; do not overlap
+  implementation slices.
+- Run the full suite, the acceptance runner, and `git diff --check` before a
+  commit.
+- Push the branch, open a PR, and wait for merge before the next slice.
