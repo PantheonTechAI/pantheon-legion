@@ -204,6 +204,16 @@ class AquilaService:
                 delegation=delegation,
             )
         )
+        self.kernel.record_execution_authorization(
+            mission_id=mission_id,
+            action_id=action_id,
+            worker=worker,
+            decision_id=decision.decision_id,
+            decision=decision.decision.value,
+            reason=decision.reason,
+            policy_version=decision.policy_version,
+            evaluated_at=decision.evaluated_at,
+        )
         if decision.decision == Decision.DENY:
             self.kernel.reject_action_execution(
                 mission_id=mission_id,

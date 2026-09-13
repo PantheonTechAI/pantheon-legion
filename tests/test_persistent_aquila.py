@@ -85,6 +85,13 @@ class PersistentAquilaServiceTests(unittest.TestCase):
         recovered_execution = recovered.execution.query(execution_id)
         self.assertEqual(recovered_execution.state, ExecutionState.COMPLETED)
         self.assertEqual(recovered_execution.attempt, 2)
+        authorization_events = [
+            event for event in recovered.kernel.timeline(mission_id)
+            if event.event_type == 'AUTHORIZATION_EVALUATED'
+        ]
+        self.assertEqual(len(authorization_events), 2)
+        self.assertTrue(all(event.result == 'ALLOW' for event in authorization_events))
+        self.assertTrue(all(event.data['decision_id'] for event in authorization_events))
         recovered.close()
 
     def test_cancelled_execution_remains_cancelled_after_restart(self):

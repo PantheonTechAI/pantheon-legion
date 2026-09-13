@@ -223,7 +223,13 @@ class AquilaServiceTests(unittest.TestCase):
             )
         self.assertEqual(self.service.action_executions, {})
         self.assertEqual(self.service.kernel.side_effects, {})
-        self.assertEqual(self.service.kernel.timeline(self.mission_id)[-1].data["error_code"], "DELEGATION_REQUIRED")
+        events = self.service.kernel.timeline(self.mission_id)
+        self.assertEqual(events[-2].event_type, "AUTHORIZATION_EVALUATED")
+        self.assertEqual(events[-2].result, "DENY")
+        self.assertEqual(events[-2].data["reason"], "DELEGATION_REQUIRED")
+        self.assertEqual(events[-2].data["policy_version"], "mvp-1")
+        self.assertTrue(events[-2].data["decision_id"])
+        self.assertEqual(events[-1].data["error_code"], "DELEGATION_REQUIRED")
 
         grant = DelegationGrant(
             grant_id="worker-read-grant",

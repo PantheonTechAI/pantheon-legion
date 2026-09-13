@@ -541,6 +541,37 @@ class LegionKernel:
             data={"action_id": action_id, "error_code": error_code},
         )
 
+    def record_execution_authorization(
+        self,
+        *,
+        mission_id: str,
+        action_id: str,
+        worker: Principal,
+        decision_id: str,
+        decision: str,
+        reason: str,
+        policy_version: str,
+        evaluated_at: str,
+    ) -> None:
+        """Append the policy evaluation that preceded a durable action attempt."""
+        mission = self._mission(mission_id)
+        action = mission.actions[action_id]
+        self._record(
+            mission,
+            event_type="AUTHORIZATION_EVALUATED",
+            actor=worker,
+            result=decision,
+            command_id=action.command_id,
+            data={
+                "action_id": action_id,
+                "decision_id": decision_id,
+                "reason": reason,
+                "policy_version": policy_version,
+                "evaluated_at": evaluated_at,
+                "operation": "EXECUTE_ACTION",
+            },
+        )
+
     def timeline(self, mission_id: str) -> list[AuditEvent]:
         return deepcopy(self.audit[mission_id])
 
