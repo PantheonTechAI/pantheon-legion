@@ -19,7 +19,9 @@ from legion_kernel import (
     Principal,
     PrincipalType,
     RoeLevel,
+    WorkerKilled,
 )
+from legion_runtime import DurableExecutionAdapter, ExecutionState, InMemoryDurableExecutionAdapter
 
 from .authorization import AuthorizationEngine, AuthorizationRequest, Decision
 
@@ -38,9 +40,12 @@ class AquilaService:
         self,
         kernel: LegionKernel | None = None,
         authorization: AuthorizationEngine | None = None,
+        execution: DurableExecutionAdapter | None = None,
     ) -> None:
         self.kernel = kernel or LegionKernel()
         self.authorization = authorization or AuthorizationEngine()
+        self.execution = execution or InMemoryDurableExecutionAdapter()
+        self.action_executions: dict[str, str] = {}
 
     def create_mission(self, *, actor: Principal, body: dict[str, Any]) -> ApiResponse:
         try:
@@ -148,6 +153,12 @@ class AquilaService:
                 requested_by=self._principal_from_body(body.get("requested_by"), actor),
                 correlation_id=correlation_id,
             )
+            if result.status == "ACCEPTED" and command_type in {"PAUSE", "RESUME", "CANCEL"}:
+                self._signal_mission_executions(
+                    mission_id,
+                    "CANCEL" if command_type == "CANCEL" else command_type,
+                    str(body["payload"].get("reason", command_type.lower())),
+                )
         except KeyError:
             return self._error(404, "NOT_FOUND")
         except (ValueError, TypeError) as exc:
@@ -163,6 +174,54 @@ class AquilaService:
             return self._error(422, result.error_code or "INVALID_REQUEST", current_version=result.mission_version)
         status_code = 202 if result.status == "AWAITING_APPROVAL" else 200
         return ApiResponse(status_code, self._command_payload(result), {})
+
+    def execute_action(
+        self,
+        *,
+        mission_id: str,
+        action_id: str,
+        worker: Principal,
+        fail_after_side_effect: bool = False,
+    ) -> str:
+        """Run an accepted action through the durable execution boundary."""
+        mission = self.kernel.get_mission(mission_id)
+        action = mission.actions[action_id]
+        execution_id = self.action_executions.get(action_id)
+        if execution_id is None:
+            record = self.execution.start(
+                mission_id=mission_id,
+                command_id=action.command_id,
+                idempotency_key=f"action:{action_id}",
+                input={
+                    "action_id": action.id,
+                    "capability": action.capability,
+                    "arguments": action.arguments,
+                    "target": action.target,
+                    "side_effect_class": action.side_effect_class,
+                },
+            )
+            execution_id = record.execution_id
+            self.action_executions[action_id] = execution_id
+        else:
+            record = self.execution.query(execution_id)
+
+        if record.state == ExecutionState.CANCELLED:
+            raise AuthorizationError("EXECUTION_CANCELLED")
+        if record.state == ExecutionState.FAILED:
+            self.execution.recover(execution_id)
+
+        try:
+            outcome = self.kernel.execute_action(
+                mission_id=mission_id,
+                action_id=action_id,
+                worker=worker,
+                fail_after_side_effect=fail_after_side_effect,
+            )
+        except WorkerKilled:
+            self.execution.fail(execution_id, "worker killed after external side effect")
+            raise
+        self.execution.complete(execution_id, {"outcome": outcome})
+        return outcome
 
     def decide_approval(
         self,
@@ -278,6 +337,19 @@ class AquilaService:
         if response.status_code not in {200, 202}:
             return response
         return self.get_mission(actor=actor, mission_id=mission_id)
+
+    def _signal_mission_executions(self, mission_id: str, command: str, reason: str) -> None:
+        for execution_id in tuple(self.action_executions.values()):
+            record = self.execution.query(execution_id)
+            if record.mission_id != mission_id:
+                continue
+            try:
+                if command == "CANCEL":
+                    self.execution.cancel(execution_id, reason)
+                else:
+                    self.execution.signal(execution_id, command)
+            except ValueError:
+                continue
 
     @staticmethod
     def _require_fields(body: dict[str, Any], *names: str) -> None:

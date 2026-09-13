@@ -95,6 +95,7 @@ class RulesOfEngagement:
 @dataclass
 class Action:
     id: str
+    command_id: str
     capability: str
     arguments: dict[str, Any]
     target: str | None
@@ -353,7 +354,7 @@ class LegionKernel:
         elif command_type == "COMPLETE":
             mission.status = MissionStatus.COMPLETED
         elif command_type == "REQUEST_ACTION":
-            action = self._make_action(payload, requested_by)
+            action = self._make_action(payload, requested_by, command_id)
             if self._capability_denied(mission.roe, action):
                 result = self._reject(
                     mission,
@@ -548,9 +549,12 @@ class LegionKernel:
         return None
 
     @staticmethod
-    def _make_action(payload: dict[str, Any], requested_by: Principal) -> Action:
+    def _make_action(
+        payload: dict[str, Any], requested_by: Principal, command_id: str
+    ) -> Action:
         return Action(
             id=str(payload["action_id"]),
+            command_id=command_id,
             capability=str(payload["capability"]),
             arguments=dict(payload.get("arguments", {})),
             target=payload.get("target"),

@@ -61,6 +61,10 @@ class DurableExecutionAdapter(Protocol):
 
     def recover(self, execution_id: str) -> ExecutionRecord: ...
 
+    def complete(self, execution_id: str, result: dict[str, Any]) -> ExecutionRecord: ...
+
+    def fail(self, execution_id: str, reason: str) -> ExecutionRecord: ...
+
 
 class InMemoryDurableExecutionAdapter:
     """Deterministic reference provider for contract and failure-injection tests."""
