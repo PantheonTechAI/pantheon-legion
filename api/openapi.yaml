@@ -146,13 +146,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MissionCommand'
+                $ref: '#/components/schemas/MissionCommandResult'
         '202':
           description: Command accepted for durable asynchronous processing.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MissionCommand'
+                $ref: '#/components/schemas/MissionCommandResult'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -295,7 +295,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MissionCommand'
+                $ref: '#/components/schemas/MissionCommandResult'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -369,6 +369,30 @@ components:
       $ref: '../schemas/mission-command.schema.json'
     Approval:
       $ref: '../schemas/approval.schema.json'
+    MissionCommandResult:
+      type: object
+      additionalProperties: false
+      required: [command_id, mission_id, status, mission_version]
+      properties:
+        command_id:
+          type: string
+          format: uuid
+        mission_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [SUBMITTED, ACCEPTED, APPLIED, AWAITING_APPROVAL, REJECTED, NOOP]
+        mission_version:
+          type: integer
+          minimum: 1
+        approval_id:
+          type: [string, 'null']
+          format: uuid
+        error_code:
+          type: [string, 'null']
+        message:
+          type: [string, 'null']
     RulesOfEngagement:
       $ref: '../schemas/rules-of-engagement.schema.json'
     AuditEvent:
