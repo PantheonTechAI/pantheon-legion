@@ -6,11 +6,9 @@ Last updated: 2026-09-13
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged PR #34 (`8a32088`).
-- No implementation pull request is active at this checkpoint.
-- The full standard-library test suite passes: **65 tests**.
-- The canonical M1 acceptance runner passes all seven catalog scenarios and
-  emits inspectable scenario-level evidence.
+- `main` includes merged PR #35 (`9b52683`).
+- Implementation PR #36 (`9707492`) is open: it validates the client command-submission envelope and derives requester identity from authentication.
+- `main` has **65 passing tests**; PR #36 has **66 passing tests**. The canonical M1 acceptance runner passes all seven catalog scenarios on both.
 
 ## Delivered M1 control substrate
 
@@ -90,9 +88,10 @@ git status --short --branch
 /usr/bin/python3 -m tests.acceptance.runner
 ```
 
-Expected baseline: a clean `main`, **65 passing tests**, and seven passing M1
-scenarios. Work one bounded feature branch at a time, open a PR, and wait for
-its merge before starting the next implementation slice.
+Expected merged baseline: a clean `main`, **65 passing tests**, and seven passing M1
+scenarios. Before PR #36 merges, work from `pr/36-validate-command-submissions`
+and expect **66 passing tests**. Do not begin the next implementation slice until
+that PR merges.
 
 Use `env -u GH_TOKEN` for GitHub CLI commands: the ambient token is invalid in
 the development environment.
@@ -126,9 +125,9 @@ the development environment.
   endpoint requires a human reason, but passes the canonical empty payload to
   the kernel. Do not reintroduce an endpoint-only field into the command
   payload without updating the schema and command contract together.
-- The dependency-free payload validator fully covers the canonical constraints
-  for every current Mission command payload. It intentionally does not validate
-  the complete persisted `MissionCommand` resource envelope at the HTTP edge.
+- On open PR #36, `CommandSubmission` is the explicit HTTP request contract:
+  client-owned version, idempotency key, command type, and payload are validated
+  before authorization; actor and requester identity are derived from authentication.
 
 ## Progress evaluation
 
@@ -156,12 +155,9 @@ Other known boundaries, deliberately not started here:
   source. Aquila continues to derive authority from authenticated identity and
   policy; any participant-membership authorization model needs an explicit
   policy contract before it is introduced.
-- The persisted `MissionCommand` schema includes server-generated envelope
-  fields such as command ID, Mission ID, requested/actor principals, status,
-  and outcome. The HTTP command-submission request accepts a smaller client
-  shape, so it must not be blindly validated against the persisted-resource
-  schema. A separate submission schema or explicit request contract is needed
-  before envelope-level validation is added.
+- Open PR #36 resolves the command-submission boundary with the `CommandSubmission`
+  OpenAPI schema and runtime validation. The persisted `MissionCommand` schema
+  remains a server-enriched resource contract and is not an HTTP input schema.
 - Authorization audit events cover commands, Approval decisions, and execution
   attempts. Broader audit expansion should be driven by an explicit
   event-volume and retention policy rather than making reads or all policy
@@ -169,12 +165,10 @@ Other known boundaries, deliberately not started here:
 
 ## Recommended next slice
 
-Define a dedicated HTTP command-submission contract, separate from the
-persisted `MissionCommand` resource schema. Validate client-owned envelope
-fields at the Aquila/WSGI boundary while preserving server-owned IDs, status,
-principal facts, and outcome generation in the control plane. Cover valid and
-invalid submissions through kernel/API/WSGI tests without weakening payload
-rejection, audit, idempotency, or version semantics.
+After PR #36 merges, refresh this handoff with the 66-test baseline and decide
+whether persisted `MissionCommand` resource-envelope validation is needed for
+internal persistence/import paths. Do not expose or accept server-generated IDs,
+status, principal facts, or outcome fields at the HTTP command-submission edge.
 
 ## Workflow notes
 
