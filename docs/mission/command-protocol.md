@@ -111,6 +111,7 @@ The API MUST expose stable machine-readable codes. At minimum:
 | Code | Meaning | State change |
 |---|---|---|
 | `VERSION_CONFLICT` | `expected_version` is not current. | None. |
+| `UNKNOWN_COMMAND_TYPE` | Command type is not part of the supported Mission protocol. | None. |
 | `UNAUTHENTICATED` | Actor identity is missing or invalid. | None. |
 | `FORBIDDEN` | Actor is authenticated but lacks authority. | None. |
 | `DELEGATION_INVALID` | Delegation is missing, expired, revoked, or too broad. | None. |

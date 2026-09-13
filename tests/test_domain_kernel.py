@@ -82,6 +82,21 @@ class DomainKernelTests(unittest.TestCase):
         self.assertEqual(self.kernel.get_mission(self.mission.id).version, 3)
         self.assertTrue(any(e.result == "REJECTED" for e in self.kernel.audit_events(self.mission.id)))
 
+    def test_unknown_command_type_is_auditable_and_does_not_advance_the_mission(self):
+        rejected = self.kernel.submit_command(
+            mission_id=self.mission.id,
+            actor=self.user_a,
+            expected_version=1,
+            idempotency_key="unsupported-command",
+            command_type="DELETE_MISSION",
+            payload={},
+        )
+        self.assertEqual(rejected.error_code, "UNKNOWN_COMMAND_TYPE")
+        self.assertEqual(self.kernel.get_mission(self.mission.id).version, 1)
+        event = self.kernel.timeline(self.mission.id)[-1]
+        self.assertEqual((event.event_type, event.result), ("COMMAND_REJECTED", "REJECTED"))
+        self.assertEqual(event.data["error_code"], "UNKNOWN_COMMAND_TYPE")
+
     def test_participant_commands_update_the_projection_and_reject_unknown_removal(self):
         added = self.kernel.submit_command(
             mission_id=self.mission.id,

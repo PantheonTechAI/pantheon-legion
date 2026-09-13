@@ -58,6 +58,12 @@ ROE_ORDER = {
     RoeLevel.BOUNDED_AUTONOMOUS: 3,
 }
 
+COMMAND_TYPES = frozenset({
+    "UPDATE_OBJECTIVE", "ADD_CONSTRAINT", "REMOVE_CONSTRAINT", "SET_ROE",
+    "ADD_PARTICIPANT", "REMOVE_PARTICIPANT", "START", "PAUSE", "SUSPEND",
+    "RESUME", "REQUEST_ACTION", "CANCEL", "COMPLETE",
+})
+
 
 @dataclass(frozen=True)
 class Principal:
@@ -275,6 +281,18 @@ class LegionKernel:
                 actor,
                 "VERSION_CONFLICT",
                 f"Mission version {mission.version} is current; command expected {expected_version}.",
+                correlation_id,
+                command_id=command_id,
+            )
+            self._remember(idempotency_key_ref, fingerprint, result)
+            return result
+
+        if command_type not in COMMAND_TYPES:
+            result = self._reject(
+                mission,
+                actor,
+                "UNKNOWN_COMMAND_TYPE",
+                "Command type is not supported by this Mission protocol.",
                 correlation_id,
                 command_id=command_id,
             )

@@ -90,6 +90,12 @@ class AquilaServiceTests(unittest.TestCase):
             "scope": "production",
         }])
 
+    def test_unknown_command_type_is_rejected_without_a_version_change(self):
+        rejected = self.command(self.owner, 1, "unsupported", "DELETE_MISSION", {})
+        self.assertEqual(rejected.status_code, 422)
+        self.assertEqual(rejected.body["code"], "UNKNOWN_COMMAND_TYPE")
+        self.assertEqual(rejected.body["current_version"], 1)
+
     def test_approval_request_and_decision_are_openapi_shaped(self):
         self.command(self.owner, 1, "start", "START", {})
         requested = self.command(
