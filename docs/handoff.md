@@ -6,9 +6,9 @@ Last updated: 2026-09-13
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged PR #34 (`8a32088`).
+- `main` includes merged PR #36 (`70f224b`).
 - No implementation pull request is active at this checkpoint.
-- The full standard-library test suite passes: **65 tests**.
+- The full standard-library test suite passes: **66 tests**.
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
 
@@ -52,6 +52,9 @@ The repository now has a framework-neutral Mission control plane with:
   canonical object shape, required and unknown fields, types, enums, UUIDs,
   bounded strings, and nested payload constraints before mutation; kernel,
   Aquila service, and WSGI behavior are covered.
+- Command submission hardening: the HTTP edge accepts the dedicated
+  `CommandSubmission` envelope only, rejects client-supplied identity facts,
+  and derives both actor and requester from authenticated identity.
 
 Recent merged implementation slices:
 
@@ -77,6 +80,7 @@ Recent merged implementation slices:
 | #31 | Strict top-level command payload validation |
 | #33 | Strict payload validation for ROE, participants, and actions |
 | #34 | Strict validation for the remaining command payloads |
+| #36 | Dedicated CommandSubmission envelope and authenticated requester derivation |
 
 ## New-session quick start
 
@@ -90,7 +94,7 @@ git status --short --branch
 /usr/bin/python3 -m tests.acceptance.runner
 ```
 
-Expected baseline: a clean `main`, **65 passing tests**, and seven passing M1
+Expected baseline: a clean `main`, **66 passing tests**, and seven passing M1
 scenarios. Work one bounded feature branch at a time, open a PR, and wait for
 its merge before starting the next implementation slice.
 
@@ -126,9 +130,10 @@ the development environment.
   endpoint requires a human reason, but passes the canonical empty payload to
   the kernel. Do not reintroduce an endpoint-only field into the command
   payload without updating the schema and command contract together.
-- The dependency-free payload validator fully covers the canonical constraints
-  for every current Mission command payload. It intentionally does not validate
-  the complete persisted `MissionCommand` resource envelope at the HTTP edge.
+- `CommandSubmission` is the explicit HTTP request contract: expected version,
+  idempotency key, command type, and payload are validated before authorization;
+  actor and requester identity are derived from authentication. The persisted
+  `MissionCommand` schema remains server-enriched and is not an HTTP input.
 
 ## Progress evaluation
 
@@ -158,10 +163,11 @@ Other known boundaries, deliberately not started here:
   policy contract before it is introduced.
 - The persisted `MissionCommand` schema includes server-generated envelope
   fields such as command ID, Mission ID, requested/actor principals, status,
-  and outcome. The HTTP command-submission request accepts a smaller client
-  shape, so it must not be blindly validated against the persisted-resource
-  schema. A separate submission schema or explicit request contract is needed
-  before envelope-level validation is added.
+  and outcome. No current persistence or import path accepts that resource
+  envelope: SQLite persists Mission snapshots, audit facts, and idempotency
+  results. Do not introduce an unused resource-envelope validator until a
+  replay, import, or command-resource persistence boundary is explicitly
+  designed.
 - Authorization audit events cover commands, Approval decisions, and execution
   attempts. Broader audit expansion should be driven by an explicit
   event-volume and retention policy rather than making reads or all policy
@@ -169,12 +175,11 @@ Other known boundaries, deliberately not started here:
 
 ## Recommended next slice
 
-Define a dedicated HTTP command-submission contract, separate from the
-persisted `MissionCommand` resource schema. Validate client-owned envelope
-fields at the Aquila/WSGI boundary while preserving server-owned IDs, status,
-principal facts, and outcome generation in the control plane. Cover valid and
-invalid submissions through kernel/API/WSGI tests without weakening payload
-rejection, audit, idempotency, or version semantics.
+Choose the next M1 capability deliberately. The CommandSubmission boundary is
+complete; persisted `MissionCommand` envelope validation is not needed until a
+replay, import, or command-resource persistence interface exists. Any such
+future slice must define its authority, replay/idempotency semantics, and
+server-generated-field rules before adding a validator.
 
 ## Workflow notes
 
