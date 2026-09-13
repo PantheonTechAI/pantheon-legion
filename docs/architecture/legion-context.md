@@ -7,6 +7,10 @@ Version: 0.1
 
 This document establishes the boundary conditions for the first Legion implementation cycle. It is a compact context map, not a deployment specification. The durable contracts are intentionally independent of Temporal, a cognition framework, a UI technology, or a particular model provider.
 
+The current Legion–Tabula review, target platform design, integration contracts,
+and remediation order are recorded in
+[Legion–Tabula platform architecture and remediation plan](legion-tabula-platform-plan.md).
+
 ## System context
 
 ```text

@@ -236,15 +236,19 @@ Other known boundaries, deliberately not started here:
 
 ## Next-session plan
 
-1. Start from current `main` and run the quick-start verification commands
+1. Before selecting another implementation slice, read the
+   [Legion–Tabula platform architecture and remediation plan](architecture/legion-tabula-platform-plan.md).
+   It records the required correction order: durable delegation and atomic
+   authority persistence precede any Tabula MCP client or provider integration.
+2. Start from current `main` and run the quick-start verification commands
    (expect 86 tests and seven scenarios) before selecting the next slice.
-2. If continuing cognition, select a concrete model-provider deployment and
+3. If continuing cognition, select a concrete model-provider deployment and
    secret-management approach. Bind it behind `ModelProviderScoutResponder`,
    enforce the contract timeout in the transport, and add provider-specific
    integration tests without exposing command or Fabrica authority. Do not put
    credentials or raw model content in audit facts, environment reads inside
    cognition, or the LangGraph graph.
-3. Alternatively, choose one separately scoped capability: persistent/vector
+4. Alternatively, choose one separately scoped capability: persistent/vector
    Tabula retrieval, Action-bound mutating Fabrica execution, a production
    durable-workflow provider, or a persisted `MissionCommand` import/replay
    boundary. Each changes a distinct authority surface and requires its own
