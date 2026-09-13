@@ -153,10 +153,12 @@ class AquilaService:
                 requested_by=self._principal_from_body(body.get("requested_by"), actor),
                 correlation_id=correlation_id,
             )
-            if result.status == "ACCEPTED" and command_type in {"PAUSE", "RESUME", "CANCEL"}:
+            if result.status == "ACCEPTED" and command_type in {"PAUSE", "SUSPEND", "RESUME", "CANCEL"}:
                 self._signal_mission_executions(
                     mission_id,
-                    "CANCEL" if command_type == "CANCEL" else command_type,
+                    "CANCEL" if command_type == "CANCEL" else (
+                        "PAUSE" if command_type == "SUSPEND" else command_type
+                    ),
                     str(body["payload"].get("reason", command_type.lower())),
                 )
         except KeyError:

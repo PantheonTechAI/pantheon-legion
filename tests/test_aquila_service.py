@@ -199,6 +199,57 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(self.service.action_executions, {})
         self.assertEqual(self.service.execution.records, {})
 
+    def test_suspend_stops_execution_until_an_operator_resumes(self):
+        self.command(self.owner, 1, "start", "START", {})
+        requested = self.command(
+            self.owner,
+            2,
+            "read-action",
+            "REQUEST_ACTION",
+            {
+                "action_id": "77777777-7777-4777-8777-777777777777",
+                "capability": "test.read",
+                "arguments": {},
+                "target": "resource",
+                "side_effect_class": "READ",
+            },
+        )
+        self.assertEqual(requested.status_code, 200)
+        suspended = self.command(
+            self.operator,
+            3,
+            "suspend",
+            "SUSPEND",
+            {"reason": "Safety review."},
+        )
+        self.assertEqual(suspended.status_code, 200)
+        self.assertEqual(suspended.body["mission_version"], 4)
+        self.assertEqual(self.service.kernel.timeline(self.mission_id)[-1].data["reason"], "Safety review.")
+        with self.assertRaisesRegex(AuthorizationError, "MISSION_SUSPENDED"):
+            self.service.execute_action(
+                mission_id=self.mission_id,
+                action_id="77777777-7777-4777-8777-777777777777",
+                worker=self.owner,
+            )
+        resumed = self.command(self.operator, 4, "resume", "RESUME", {})
+        self.assertEqual(resumed.status_code, 200)
+        self.assertEqual(resumed.body["mission_version"], 5)
+        self.assertEqual(
+            self.service.execute_action(
+                mission_id=self.mission_id,
+                action_id="77777777-7777-4777-8777-777777777777",
+                worker=self.owner,
+            ),
+            "EXECUTED",
+        )
+
+    def test_suspend_requires_a_reason(self):
+        self.command(self.owner, 1, "start", "START", {})
+        rejected = self.command(self.operator, 2, "suspend", "SUSPEND", {})
+        self.assertEqual(rejected.status_code, 422)
+        self.assertEqual(rejected.body["code"], "SUSPENSION_REASON_REQUIRED")
+        self.assertEqual(self.service.get_mission(actor=self.owner, mission_id=self.mission_id).body["status"], "ACTIVE")
+
     def test_workload_execution_requires_a_bounded_delegation(self):
         self.command(self.owner, 1, "start", "START", {})
         requested = self.command(

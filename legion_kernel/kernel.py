@@ -347,6 +347,19 @@ class LegionKernel:
             mission.status = MissionStatus.ACTIVE
         elif command_type == "PAUSE":
             mission.status = MissionStatus.PAUSED
+        elif command_type == "SUSPEND":
+            if not isinstance(payload.get("reason"), str) or not payload["reason"].strip():
+                result = self._reject(
+                    mission,
+                    actor,
+                    "SUSPENSION_REASON_REQUIRED",
+                    "Suspending a Mission requires a reason.",
+                    correlation_id,
+                    command_id=command_id,
+                )
+                self._remember(idempotency_key_ref, fingerprint, result)
+                return result
+            mission.status = MissionStatus.SUSPENDED
         elif command_type == "RESUME":
             mission.status = MissionStatus.ACTIVE
         elif command_type == "CANCEL":
@@ -386,6 +399,9 @@ class LegionKernel:
 
         mission.version += 1
         mission.updated_at = self.clock()
+        event_data = {"command_type": command_type, "requested_by": requested_by.subject}
+        if command_type == "SUSPEND":
+            event_data["reason"] = payload["reason"].strip()
         self._record(
             mission,
             event_type=event_type,
@@ -393,7 +409,7 @@ class LegionKernel:
             result="SUCCESS",
             command_id=command_id,
             correlation_id=correlation_id,
-            data={"command_type": command_type, "requested_by": requested_by.subject},
+            data=event_data,
         )
         result = CommandResult(
             command_id=command_id,
@@ -598,6 +614,11 @@ class LegionKernel:
         allowed = {
             "START": {MissionStatus.DRAFT},
             "PAUSE": {MissionStatus.ACTIVE},
+            "SUSPEND": {
+                MissionStatus.ACTIVE,
+                MissionStatus.PAUSED,
+                MissionStatus.AWAITING_APPROVAL,
+            },
             "RESUME": {MissionStatus.PAUSED, MissionStatus.SUSPENDED, MissionStatus.FAILED},
             "CANCEL": {
                 MissionStatus.DRAFT,
