@@ -6,9 +6,9 @@ Last updated: 2026-09-13
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged PR #31 (`ce37a72`).
+- `main` includes merged PR #34 (`8a32088`).
 - No implementation pull request is active at this checkpoint.
-- The full standard-library test suite passes: **60 tests**.
+- The full standard-library test suite passes: **65 tests**.
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
 
@@ -48,9 +48,10 @@ The repository now has a framework-neutral Mission control plane with:
 - Protocol alignment and fail-closed command handling: `SUSPEND` has its
   canonical schema payload, unknown commands are rejected, and removal of an
   absent constraint or participant does not create a version-advancing no-op.
-- Command payload hardening: the kernel rejects unsupported fields and missing
-  required top-level payload fields before mutation; the same behavior is
-  covered through the Aquila service and WSGI adapter.
+- Command payload hardening: every Mission command payload now enforces its
+  canonical object shape, required and unknown fields, types, enums, UUIDs,
+  bounded strings, and nested payload constraints before mutation; kernel,
+  Aquila service, and WSGI behavior are covered.
 
 Recent merged implementation slices:
 
@@ -74,6 +75,8 @@ Recent merged implementation slices:
 | #29 | Fail-closed missing constraint removal |
 | #30 | Refresh M1 progress documentation |
 | #31 | Strict top-level command payload validation |
+| #33 | Strict payload validation for ROE, participants, and actions |
+| #34 | Strict validation for the remaining command payloads |
 
 ## New-session quick start
 
@@ -87,7 +90,7 @@ git status --short --branch
 /usr/bin/python3 -m tests.acceptance.runner
 ```
 
-Expected baseline: a clean `main`, **60 passing tests**, and seven passing M1
+Expected baseline: a clean `main`, **65 passing tests**, and seven passing M1
 scenarios. Work one bounded feature branch at a time, open a PR, and wait for
 its merge before starting the next implementation slice.
 
@@ -123,9 +126,9 @@ the development environment.
   endpoint requires a human reason, but passes the canonical empty payload to
   the kernel. Do not reintroduce an endpoint-only field into the command
   payload without updating the schema and command contract together.
-- The current dependency-free payload validator enforces command type, payload
-  object shape, required top-level fields, and no unknown top-level fields. It
-  is intentionally not a complete JSON Schema implementation.
+- The dependency-free payload validator fully covers the canonical constraints
+  for every current Mission command payload. It intentionally does not validate
+  the complete persisted `MissionCommand` resource envelope at the HTTP edge.
 
 ## Progress evaluation
 
@@ -153,10 +156,12 @@ Other known boundaries, deliberately not started here:
   source. Aquila continues to derive authority from authenticated identity and
   policy; any participant-membership authorization model needs an explicit
   policy contract before it is introduced.
-- The schemas express stricter type, enum, length, UUID/date-time, and nested
-  object requirements than the current runtime validator. The next payload
-  hardening slice should extend validation through those constraints without
-  weakening the new required/unknown-field checks.
+- The persisted `MissionCommand` schema includes server-generated envelope
+  fields such as command ID, Mission ID, requested/actor principals, status,
+  and outcome. The HTTP command-submission request accepts a smaller client
+  shape, so it must not be blindly validated against the persisted-resource
+  schema. A separate submission schema or explicit request contract is needed
+  before envelope-level validation is added.
 - Authorization audit events cover commands, Approval decisions, and execution
   attempts. Broader audit expansion should be driven by an explicit
   event-volume and retention policy rather than making reads or all policy
@@ -164,10 +169,12 @@ Other known boundaries, deliberately not started here:
 
 ## Recommended next slice
 
-Extend dependency-free command validation to enforce the canonical schema's
-types, enums, UUIDs, bounded strings, and nested payload objects. Start with
-`REQUEST_ACTION`, `SET_ROE`, and `ADD_PARTICIPANT`; preserve stable error codes,
-kernel/API/WSGI coverage, audit rejection facts, and no-version-change behavior.
+Define a dedicated HTTP command-submission contract, separate from the
+persisted `MissionCommand` resource schema. Validate client-owned envelope
+fields at the Aquila/WSGI boundary while preserving server-owned IDs, status,
+principal facts, and outcome generation in the control plane. Cover valid and
+invalid submissions through kernel/API/WSGI tests without weakening payload
+rejection, audit, idempotency, or version semantics.
 
 ## Workflow notes
 
