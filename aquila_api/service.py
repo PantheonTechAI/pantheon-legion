@@ -292,7 +292,7 @@ class AquilaService:
             if approval.mission_id != mission_id:
                 return self._error(404, "NOT_FOUND")
             mission = self.kernel.get_mission(mission_id)
-            denied = self._authorize(
+            decision = self.authorization.decide(
                 AuthorizationRequest(
                     principal=actor,
                     mission_id=mission_id,
@@ -301,8 +301,19 @@ class AquilaService:
                     mission_status=mission.status,
                 )
             )
-            if denied:
-                return denied
+            self.kernel.record_approval_authorization(
+                mission_id=mission_id,
+                approval_id=approval.id,
+                actor=actor,
+                decision_id=decision.decision_id,
+                decision=decision.decision.value,
+                reason=decision.reason,
+                policy_version=decision.policy_version,
+                evaluated_at=decision.evaluated_at,
+            )
+            if decision.decision == Decision.DENY:
+                status = 409 if decision.reason == "MISSION_TERMINAL" else 403
+                return self._error(status, decision.reason)
             approval = self.kernel.decide_approval(
                 approval_id=str(body["approval_id"]),
                 approver=actor,

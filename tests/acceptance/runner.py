@@ -153,6 +153,13 @@ class M1AcceptanceRunner:
         requested = adapter.command(adapter.owner, mission_id, 2, "m1-004-action", "REQUEST_ACTION", action)
         approval_id = requested.body["approval_id"]
         assert adapter.service.decide_approval(actor=adapter.approver, mission_id=mission_id, body={"approval_id": approval_id, "expected_mission_version": 3, "decision": "APPROVE", "reason": "Approved."}).status_code == 200
+        assert any(
+            event.event_type == "AUTHORIZATION_EVALUATED"
+            and event.approval_id == approval_id
+            and event.result == "ALLOW"
+            and event.data["operation"] == "DECIDE_APPROVAL"
+            for event in adapter.service.kernel.timeline(mission_id)
+        )
         assert adapter.command(adapter.owner, mission_id, 3, "m1-004-roe", "SET_ROE", {"level": "OBSERVE", "reason": "Narrow authority."}).status_code == 200
         try:
             adapter.service.execute_action(mission_id=mission_id, action_id=action["action_id"], worker=adapter.worker, delegation=adapter.grant(mission_id))

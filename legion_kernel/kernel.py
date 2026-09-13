@@ -626,6 +626,35 @@ class LegionKernel:
             },
         )
 
+    def record_approval_authorization(
+        self,
+        *,
+        mission_id: str,
+        approval_id: str,
+        actor: Principal,
+        decision_id: str,
+        decision: str,
+        reason: str,
+        policy_version: str,
+        evaluated_at: str,
+    ) -> None:
+        """Append the policy evaluation that preceded an Approval decision."""
+        mission = self._mission(mission_id)
+        self._record(
+            mission,
+            event_type="AUTHORIZATION_EVALUATED",
+            actor=actor,
+            result=decision,
+            approval_id=approval_id,
+            data={
+                "decision_id": decision_id,
+                "reason": reason,
+                "policy_version": policy_version,
+                "evaluated_at": evaluated_at,
+                "operation": "DECIDE_APPROVAL",
+            },
+        )
+
     def timeline(self, mission_id: str) -> list[AuditEvent]:
         return deepcopy(self.audit[mission_id])
 

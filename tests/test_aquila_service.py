@@ -87,6 +87,21 @@ class AquilaServiceTests(unittest.TestCase):
             },
         )
         self.assertEqual(requested.status_code, 202)
+        denied = self.service.decide_approval(
+            actor=self.observer,
+            mission_id=self.mission_id,
+            body={
+                "approval_id": requested.body["approval_id"],
+                "expected_mission_version": 3,
+                "decision": "APPROVE",
+                "reason": "Unauthorized approval.",
+            },
+        )
+        self.assertEqual(denied.status_code, 403)
+        denied_authorization = self.service.kernel.timeline(self.mission_id)[-1]
+        self.assertEqual(denied_authorization.event_type, "AUTHORIZATION_EVALUATED")
+        self.assertEqual(denied_authorization.result, "DENY")
+        self.assertEqual(denied_authorization.data["operation"], "DECIDE_APPROVAL")
         approval = self.service.decide_approval(
             actor=self.approver,
             mission_id=self.mission_id,
@@ -100,6 +115,11 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(approval.status_code, 200)
         self.assertEqual(approval.body["status"], "APPROVED")
         self.assertEqual(approval.body["scope"]["capability"], "test.mutation")
+        authorization = self.service.kernel.timeline(self.mission_id)[-2]
+        self.assertEqual(authorization.event_type, "AUTHORIZATION_EVALUATED")
+        self.assertEqual(authorization.result, "ALLOW")
+        self.assertEqual(authorization.data["operation"], "DECIDE_APPROVAL")
+        self.assertTrue(authorization.data["decision_id"])
 
     def test_unauthorized_reader_and_command_are_denied(self):
         unknown = Principal(PrincipalType.HUMAN, "unknown", frozenset())

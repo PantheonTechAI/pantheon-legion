@@ -99,4 +99,4 @@ Approval is a control-plane decision, not a chat confirmation. A UI button, mode
 
 ## Audit and trace
 
-The authoritative audit trail records request, decision, revocation/expiry, execution claim, and final execution outcome as separate facts. A trace reference may link Approval evaluation to a runtime or tool trace, but a trace span cannot serve as the Approval itself.
+The authoritative audit trail records request, policy evaluation, decision, revocation/expiry, execution claim, and final execution outcome as separate facts. Every Approval decision is preceded by an `AUTHORIZATION_EVALUATED` event with the policy decision ID, outcome, reason, version, evaluation time, approver, and Approval identity. A trace reference may link Approval evaluation to a runtime or tool trace, but a trace span cannot serve as the Approval itself.
