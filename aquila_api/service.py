@@ -15,10 +15,13 @@ from uuid import UUID
 from legion_kernel import (
     AuthorizationError,
     LegionKernel,
+    MissionStatus,
     Principal,
     PrincipalType,
     RoeLevel,
 )
+
+from .authorization import AuthorizationEngine, AuthorizationRequest, Decision
 
 
 @dataclass(frozen=True)
@@ -31,8 +34,13 @@ class ApiResponse:
 class AquilaService:
     """OpenAPI operation adapter backed by a Mission kernel instance."""
 
-    def __init__(self, kernel: LegionKernel | None = None) -> None:
+    def __init__(
+        self,
+        kernel: LegionKernel | None = None,
+        authorization: AuthorizationEngine | None = None,
+    ) -> None:
         self.kernel = kernel or LegionKernel()
+        self.authorization = authorization or AuthorizationEngine()
 
     def create_mission(self, *, actor: Principal, body: dict[str, Any]) -> ApiResponse:
         try:
@@ -40,6 +48,17 @@ class AquilaService:
             self._validate_uuid(body["organization_id"])
             self._validate_uuid(body["workspace_id"])
             roe_level = RoeLevel(body.get("initial_roe_level", "OBSERVE"))
+            denied = self._authorize(
+                AuthorizationRequest(
+                    principal=actor,
+                    mission_id="CREATE",
+                    operation="CREATE_MISSION",
+                    roe_level=roe_level,
+                    mission_status=MissionStatus.DRAFT,
+                )
+            )
+            if denied:
+                return denied
             mission = self.kernel.create_mission(
                 actor=actor,
                 organization_id=body["organization_id"],
@@ -58,12 +77,21 @@ class AquilaService:
         )
 
     def get_mission(self, *, actor: Principal, mission_id: str) -> ApiResponse:
-        if not self._can_read(actor):
-            return self._error(403, "FORBIDDEN")
         try:
             mission = self.kernel.get_mission(mission_id)
         except KeyError:
             return self._error(404, "NOT_FOUND")
+        denied = self._authorize(
+            AuthorizationRequest(
+                principal=actor,
+                mission_id=mission_id,
+                operation="READ_MISSION",
+                roe_level=mission.roe.level,
+                mission_status=mission.status,
+            )
+        )
+        if denied:
+            return denied
         return ApiResponse(200, self._mission_payload(mission), {})
 
     def submit_command(
@@ -78,12 +106,44 @@ class AquilaService:
             self._require_fields(body, "expected_version", "idempotency_key", "command_type", "payload")
             if not isinstance(body["payload"], dict):
                 raise TypeError("payload must be an object")
+            mission = self.kernel.get_mission(mission_id)
+            command_type = str(body["command_type"])
+            requested_roe = mission.roe.level
+            if command_type == "SET_ROE":
+                requested_roe = RoeLevel(body["payload"]["level"])
+            operation = "EXECUTE_ACTION" if command_type == "REQUEST_ACTION" else (
+                "SET_ROE" if command_type == "SET_ROE" else "SUBMIT_COMMAND"
+            )
+            denied = self._authorize(
+                AuthorizationRequest(
+                    principal=actor,
+                    mission_id=mission_id,
+                    operation=operation,
+                    roe_level=requested_roe,
+                    mission_status=mission.status,
+                    side_effect_class=(
+                        str(body["payload"].get("side_effect_class", "READ"))
+                        if command_type == "REQUEST_ACTION"
+                        else "READ"
+                    ),
+                    capability=(
+                        str(body["payload"].get("capability"))
+                        if command_type == "REQUEST_ACTION"
+                        and body["payload"].get("capability") is not None
+                        else None
+                    ),
+                    approval_present=bool(body["payload"].get("approval_present", False)),
+                ),
+                soft_reasons={"APPROVAL_REQUIRED"} if command_type == "REQUEST_ACTION" else set(),
+            )
+            if denied:
+                return denied
             result = self.kernel.submit_command(
                 mission_id=mission_id,
                 actor=actor,
                 expected_version=int(body["expected_version"]),
                 idempotency_key=str(body["idempotency_key"]),
-                command_type=str(body["command_type"]),
+                command_type=command_type,
                 payload=body["payload"],
                 requested_by=self._principal_from_body(body.get("requested_by"), actor),
                 correlation_id=correlation_id,
@@ -113,6 +173,21 @@ class AquilaService:
     ) -> ApiResponse:
         try:
             self._require_fields(body, "approval_id", "expected_mission_version", "decision", "reason")
+            approval = self.kernel.approvals[str(body["approval_id"])]
+            if approval.mission_id != mission_id:
+                return self._error(404, "NOT_FOUND")
+            mission = self.kernel.get_mission(mission_id)
+            denied = self._authorize(
+                AuthorizationRequest(
+                    principal=actor,
+                    mission_id=mission_id,
+                    operation="DECIDE_APPROVAL",
+                    roe_level=mission.roe.level,
+                    mission_status=mission.status,
+                )
+            )
+            if denied:
+                return denied
             approval = self.kernel.decide_approval(
                 approval_id=str(body["approval_id"]),
                 approver=actor,
@@ -142,14 +217,24 @@ class AquilaService:
         limit: int = 50,
         after_sequence: int = 0,
     ) -> ApiResponse:
-        if not self._can_read(actor):
-            return self._error(403, "FORBIDDEN")
         if limit < 1 or limit > 200 or after_sequence < 0:
             return self._error(422, "INVALID_REQUEST")
         try:
+            mission = self.kernel.get_mission(mission_id)
             events = self.kernel.timeline(mission_id)
         except KeyError:
             return self._error(404, "NOT_FOUND")
+        denied = self._authorize(
+            AuthorizationRequest(
+                principal=actor,
+                mission_id=mission_id,
+                operation="READ_TIMELINE",
+                roe_level=mission.roe.level,
+                mission_status=mission.status,
+            )
+        )
+        if denied:
+            return denied
         selected = [event for event in events if event.sequence > after_sequence]
         page = selected[:limit]
         has_more = len(selected) > len(page)
@@ -175,22 +260,23 @@ class AquilaService:
     ) -> ApiResponse:
         try:
             self._require_fields(body, "expected_version", "idempotency_key", "reason")
-            result = self.kernel.submit_command(
-                mission_id=mission_id,
+            response = self.submit_command(
                 actor=actor,
-                expected_version=int(body["expected_version"]),
-                idempotency_key=str(body["idempotency_key"]),
-                command_type="CANCEL",
-                payload={"reason": body["reason"]},
+                mission_id=mission_id,
+                body={
+                    "expected_version": int(body["expected_version"]),
+                    "idempotency_key": str(body["idempotency_key"]),
+                    "command_type": "CANCEL",
+                    "payload": {"reason": body["reason"]},
+                },
                 correlation_id=correlation_id,
             )
         except KeyError:
             return self._error(404, "NOT_FOUND")
         except (ValueError, TypeError) as exc:
             return self._error(422, str(exc))
-        if result.error_code:
-            status = 409 if result.error_code in {"VERSION_CONFLICT", "MISSION_TERMINAL"} else 403
-            return self._error(status, result.error_code, current_version=result.mission_version)
+        if response.status_code not in {200, 202}:
+            return response
         return self.get_mission(actor=actor, mission_id=mission_id)
 
     @staticmethod
@@ -205,9 +291,17 @@ class AquilaService:
     def _validate_uuid(value: str) -> None:
         UUID(str(value))
 
-    @staticmethod
-    def _can_read(actor: Principal) -> bool:
-        return actor.has_any_role("MISSION_OWNER", "OPERATOR", "OBSERVER", "APPROVER", "MISSION_WORKER")
+    def _authorize(
+        self,
+        request: AuthorizationRequest,
+        *,
+        soft_reasons: set[str] | None = None,
+    ) -> ApiResponse | None:
+        decision = self.authorization.decide(request)
+        if decision.decision == Decision.ALLOW or decision.reason in (soft_reasons or set()):
+            return None
+        status = 409 if decision.reason == "MISSION_TERMINAL" else 403
+        return self._error(status, decision.reason)
 
     @staticmethod
     def _principal_from_body(value: Any, fallback: Principal) -> Principal:

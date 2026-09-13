@@ -72,6 +72,13 @@ class AuthorizationEngineTests(unittest.TestCase):
         allowed = self.engine.decide(AuthorizationRequest(**{**request.__dict__, "delegation": grant}))
         self.assertEqual(allowed.decision, Decision.ALLOW)
 
+        exceeded = self.engine.decide(
+            AuthorizationRequest(
+                **{**request.__dict__, "roe_level": RoeLevel.BOUNDED_AUTONOMOUS, "delegation": grant}
+            )
+        )
+        self.assertEqual(exceeded.reason, "DELEGATED_ROE_EXCEEDED")
+
     def test_expired_or_revoked_delegation_fails_closed(self):
         base = dict(
             grant_id="grant-1",
