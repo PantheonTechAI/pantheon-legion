@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, fields, is_dataclass
 from enum import Enum
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from legion_cognition import (
     CognitionRuntimeAdapter,
@@ -19,6 +19,7 @@ from legion_cognition import (
     ScoutRequest,
     ScoutResult,
 )
+from legion_fabrica import FabricaError, ToolExecutionAdapter, ToolInvocation, ToolResult
 from legion_kernel import (
     AuthorizationError,
     LegionKernel,
@@ -324,6 +325,97 @@ class AquilaService:
                 evidence=evidence,
             )
         )
+
+    def invoke_read_tool(
+        self,
+        *,
+        mission_id: str,
+        worker: Principal,
+        delegation: DelegationGrant | None,
+        fabrica: ToolExecutionAdapter,
+        capability: str,
+        arguments: dict[str, Any],
+        correlation_id: str | None = None,
+    ) -> ToolResult:
+        """Authorize, broker, and audit one declared read-only Fabrica tool."""
+        mission = self.kernel.get_mission(mission_id)
+        invocation_id = str(uuid4())
+        correlation_id = correlation_id or str(uuid4())
+        definition = fabrica.resolve(capability)
+        decision = self.authorization.decide(
+            AuthorizationRequest(
+                principal=worker,
+                mission_id=mission_id,
+                operation="READ_TOOL",
+                roe_level=mission.roe.level,
+                mission_status=mission.status,
+                capability=capability,
+                delegation=delegation,
+            )
+        )
+        reason = decision.reason
+        allowed = decision.decision == Decision.ALLOW
+        if definition.side_effect_class != "READ":
+            allowed, reason = False, "TOOL_ACTION_REQUIRED"
+        elif capability in mission.roe.denied_capabilities or (
+            mission.roe.allowed_capabilities and capability not in mission.roe.allowed_capabilities
+        ):
+            allowed, reason = False, "ROE_CAPABILITY_DENIED"
+        self.kernel.record_tool_authorization(
+            mission_id=mission_id,
+            actor=worker,
+            capability=capability,
+            invocation_id=invocation_id,
+            decision_id=decision.decision_id,
+            decision=Decision.ALLOW.value if allowed else Decision.DENY.value,
+            reason=reason,
+            policy_version=decision.policy_version,
+            evaluated_at=decision.evaluated_at,
+            correlation_id=correlation_id,
+        )
+        if not allowed:
+            self.kernel.record_tool_result(
+                mission_id=mission_id,
+                actor=worker,
+                capability=capability,
+                invocation_id=invocation_id,
+                correlation_id=correlation_id,
+                result="REJECTED",
+                data={"error_code": reason},
+            )
+            raise AuthorizationError(reason)
+        try:
+            result = fabrica.invoke(
+                ToolInvocation(
+                    invocation_id=invocation_id,
+                    mission_id=mission_id,
+                    capability=capability,
+                    arguments=arguments,
+                    authorization_id=decision.decision_id,
+                    correlation_id=correlation_id,
+                )
+            )
+        except FabricaError as exc:
+            self.kernel.record_tool_result(
+                mission_id=mission_id,
+                actor=worker,
+                capability=capability,
+                invocation_id=invocation_id,
+                correlation_id=correlation_id,
+                result="REJECTED",
+                data={"error_code": str(exc)},
+            )
+            raise
+        self.kernel.record_tool_result(
+            mission_id=mission_id,
+            actor=worker,
+            capability=capability,
+            invocation_id=invocation_id,
+            correlation_id=correlation_id,
+            result="SUCCESS",
+            data={"output": result.output},
+        )
+        return result
 
     def decide_approval(
         self,

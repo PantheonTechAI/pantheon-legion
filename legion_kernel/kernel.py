@@ -681,6 +681,65 @@ class LegionKernel:
             },
         )
 
+    def record_tool_authorization(
+        self,
+        *,
+        mission_id: str,
+        actor: Principal,
+        capability: str,
+        invocation_id: str,
+        decision_id: str,
+        decision: str,
+        reason: str,
+        policy_version: str,
+        evaluated_at: str,
+        correlation_id: str,
+    ) -> None:
+        """Append the Aquila decision that precedes a Fabrica tool call."""
+        mission = self._mission(mission_id)
+        self._record(
+            mission,
+            event_type="TOOL_AUTHORIZATION_EVALUATED",
+            actor=actor,
+            result=decision,
+            correlation_id=correlation_id,
+            data={
+                "capability": capability,
+                "invocation_id": invocation_id,
+                "decision_id": decision_id,
+                "reason": reason,
+                "policy_version": policy_version,
+                "evaluated_at": evaluated_at,
+                "operation": "READ_TOOL",
+            },
+        )
+
+    def record_tool_result(
+        self,
+        *,
+        mission_id: str,
+        actor: Principal,
+        capability: str,
+        invocation_id: str,
+        correlation_id: str,
+        result: str,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        """Append the correlated terminal result of a Fabrica tool call."""
+        mission = self._mission(mission_id)
+        self._record(
+            mission,
+            event_type="TOOL_EXECUTION_COMPLETED" if result == "SUCCESS" else "TOOL_EXECUTION_REJECTED",
+            actor=actor,
+            result=result,
+            correlation_id=correlation_id,
+            data={
+                "capability": capability,
+                "invocation_id": invocation_id,
+                **(data or {}),
+            },
+        )
+
     def record_command_authorization(
         self,
         *,
