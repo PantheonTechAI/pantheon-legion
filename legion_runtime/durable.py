@@ -116,16 +116,16 @@ class InMemoryDurableExecutionAdapter:
         payload: dict[str, Any] | None = None,
     ) -> ExecutionRecord:
         record = self._record(execution_id)
-        if record.state in {ExecutionState.CANCELLED, ExecutionState.COMPLETED}:
-            raise ValueError("EXECUTION_TERMINAL")
         transitions = {
-            "PAUSE": ExecutionState.PAUSED,
-            "RESUME": ExecutionState.RUNNING,
-            "WAIT": ExecutionState.WAITING,
+            "PAUSE": ({ExecutionState.RUNNING, ExecutionState.WAITING}, ExecutionState.PAUSED),
+            "RESUME": ({ExecutionState.PAUSED, ExecutionState.WAITING}, ExecutionState.RUNNING),
+            "WAIT": ({ExecutionState.RUNNING}, ExecutionState.WAITING),
         }
         if name not in transitions:
             raise ValueError("UNKNOWN_EXECUTION_SIGNAL")
-        record.state = transitions[name]
+        allowed_states, next_state = transitions[name]
+        self._require_transition(record, allowed_states)
+        record.state = next_state
         record.updated_at = _now()
         if payload:
             record.input.setdefault("signals", []).append({"name": name, "payload": deepcopy(payload)})
@@ -144,6 +144,8 @@ class InMemoryDurableExecutionAdapter:
         record = self._record(execution_id)
         if record.state in {ExecutionState.CANCELLED, ExecutionState.COMPLETED}:
             return deepcopy(record)
+        if record.state in {ExecutionState.PAUSED, ExecutionState.WAITING}:
+            return deepcopy(record)
         record.attempt += 1
         record.state = ExecutionState.RUNNING
         record.updated_at = _now()
@@ -153,8 +155,7 @@ class InMemoryDurableExecutionAdapter:
         record = self._record(execution_id)
         if record.state == ExecutionState.COMPLETED:
             return deepcopy(record)
-        if record.state == ExecutionState.CANCELLED:
-            raise ValueError("EXECUTION_CANCELLED")
+        self._require_transition(record, {ExecutionState.RUNNING})
         record.state = ExecutionState.COMPLETED
         record.result = deepcopy(result)
         record.updated_at = _now()
@@ -162,8 +163,7 @@ class InMemoryDurableExecutionAdapter:
 
     def fail(self, execution_id: str, reason: str) -> ExecutionRecord:
         record = self._record(execution_id)
-        if record.state in {ExecutionState.CANCELLED, ExecutionState.COMPLETED}:
-            raise ValueError("EXECUTION_TERMINAL")
+        self._require_transition(record, {ExecutionState.RUNNING})
         record.state = ExecutionState.FAILED
         record.failure = reason
         record.updated_at = _now()
@@ -197,3 +197,12 @@ class InMemoryDurableExecutionAdapter:
             return self.records[execution_id]
         except KeyError as exc:
             raise KeyError(f"Unknown execution {execution_id}") from exc
+
+    @staticmethod
+    def _require_transition(
+        record: ExecutionRecord, allowed_states: set[ExecutionState]
+    ) -> None:
+        if record.state in {ExecutionState.CANCELLED, ExecutionState.COMPLETED}:
+            raise ValueError("EXECUTION_TERMINAL")
+        if record.state not in allowed_states:
+            raise ValueError("INVALID_EXECUTION_TRANSITION")
