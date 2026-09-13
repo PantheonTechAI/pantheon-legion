@@ -100,7 +100,12 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertEqual(approval.body["status"], "APPROVED")
         self.assertEqual(approval.body["scope"]["capability"], "test.mutation")
 
-    def test_unauthorized_command_and_timeline_pagination(self):
+    def test_unauthorized_reader_and_command_are_denied(self):
+        unknown = Principal(PrincipalType.HUMAN, "unknown", frozenset())
+        denied_read = self.service.get_mission(actor=unknown, mission_id=self.mission_id)
+        self.assertEqual(denied_read.status_code, 403)
+        self.assertEqual(denied_read.body["code"], "READ_ROLE_REQUIRED")
+
         self.command(self.owner, 1, "start", "START", {})
         denied = self.command(
             self.observer,
@@ -110,7 +115,7 @@ class AquilaServiceTests(unittest.TestCase):
             {"level": "BOUNDED_AUTONOMOUS", "reason": "not allowed"},
         )
         self.assertEqual(denied.status_code, 403)
-        self.assertEqual(denied.body["code"], "FORBIDDEN")
+        self.assertEqual(denied.body["code"], "OPERATOR_ROLE_REQUIRED")
         timeline = self.service.get_timeline(
             actor=self.observer,
             mission_id=self.mission_id,
@@ -133,6 +138,39 @@ class AquilaServiceTests(unittest.TestCase):
         )
         self.assertEqual(cancelled.status_code, 200)
         self.assertEqual(cancelled.body["status"], "CANCELLED")
+
+    def test_authorization_engine_enforces_owner_only_autonomy_elevation(self):
+        self.command(self.owner, 1, "start", "START", {})
+        denied = self.command(
+            self.operator,
+            2,
+            "operator-roe",
+            "SET_ROE",
+            {"level": "BOUNDED_AUTONOMOUS", "reason": "operator cannot elevate autonomy"},
+        )
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.body["code"], "OWNER_REQUIRED_FOR_AUTONOMY")
+        self.assertEqual(
+            self.service.get_mission(actor=self.owner, mission_id=self.mission_id).body["version"],
+            2,
+        )
+
+    def test_authorization_engine_allows_pending_review_action_request(self):
+        self.command(self.owner, 1, "start", "START", {})
+        requested = self.command(
+            self.operator,
+            2,
+            "operator-action",
+            "REQUEST_ACTION",
+            {
+                "action_id": "44444444-4444-4444-8444-444444444444",
+                "capability": "test.mutation",
+                "arguments": {},
+                "target": "resource",
+                "side_effect_class": "MUTATION",
+            },
+        )
+        self.assertEqual(requested.status_code, 202)
 
 
 if __name__ == "__main__":

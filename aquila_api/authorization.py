@@ -64,6 +64,17 @@ class AuthorizationPolicy:
     )
     approver_roles: frozenset[str] = frozenset({"APPROVER", "MISSION_OWNER"})
     operator_roles: frozenset[str] = frozenset({"MISSION_OWNER", "OPERATOR"})
+    reader_roles: frozenset[str] = frozenset(
+        {"MISSION_OWNER", "OPERATOR", "OBSERVER", "APPROVER", "MISSION_WORKER"}
+    )
+
+
+ROE_ORDER = {
+    RoeLevel.OBSERVE: 0,
+    RoeLevel.RECOMMEND: 1,
+    RoeLevel.REVIEW: 2,
+    RoeLevel.BOUNDED_AUTONOMOUS: 3,
+}
 
 
 class AuthorizationEngine:
@@ -107,10 +118,16 @@ class AuthorizationEngine:
                 return "DELEGATION_EXPIRED"
             if request.operation not in grant.allowed_operations:
                 return "DELEGATED_OPERATION_DENIED"
-            if request.roe_level.value > grant.roe_ceiling.value:
+            if ROE_ORDER[request.roe_level] > ROE_ORDER[grant.roe_ceiling]:
                 return "DELEGATED_ROE_EXCEEDED"
 
         if request.operation in self.policy.read_operations:
+            if principal.type == PrincipalType.WORKLOAD:
+                return None
+            if principal.type != PrincipalType.HUMAN:
+                return "READ_ROLE_REQUIRED"
+            if not principal.has_any_role(*self.policy.reader_roles):
+                return "READ_ROLE_REQUIRED"
             return None
 
         if request.mission_status in {MissionStatus.CANCELLED, MissionStatus.COMPLETED}:
