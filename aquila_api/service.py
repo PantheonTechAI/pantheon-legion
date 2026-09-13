@@ -20,6 +20,7 @@ from legion_cognition import (
     ScoutResult,
 )
 from legion_fabrica import FabricaError, ToolExecutionAdapter, ToolInvocation, ToolResult
+from legion_tabula import KnowledgeScope, RetrievedKnowledge, TabulaRetrievalAdapter
 from legion_kernel import (
     AuthorizationError,
     LegionKernel,
@@ -324,6 +325,70 @@ class AquilaService:
                 granted_capabilities=granted_capabilities,
                 evidence=evidence,
             )
+        )
+
+    def retrieve_knowledge(
+        self,
+        *,
+        mission_id: str,
+        worker: Principal,
+        delegation: DelegationGrant | None,
+        tabula: TabulaRetrievalAdapter,
+        query: str,
+        limit: int = 10,
+    ) -> tuple[RetrievedKnowledge, ...]:
+        """Retrieve scoped Tabula context under a fresh workload authorization."""
+        mission = self.kernel.get_mission(mission_id)
+        decision = self.authorization.decide(
+            AuthorizationRequest(
+                principal=worker,
+                mission_id=mission_id,
+                operation="READ_KNOWLEDGE",
+                roe_level=mission.roe.level,
+                mission_status=mission.status,
+                delegation=delegation,
+            )
+        )
+        if decision.decision == Decision.DENY:
+            raise AuthorizationError(decision.reason)
+        return tabula.retrieve(scope=KnowledgeScope.from_mission(mission), query=query, limit=limit)
+
+    def run_tabula_scout(
+        self,
+        *,
+        mission_id: str,
+        scout: Principal,
+        delegation: DelegationGrant | None,
+        runtime: CognitionRuntimeAdapter,
+        tabula: TabulaRetrievalAdapter,
+        query: str,
+        granted_capabilities: frozenset[str],
+        limit: int = 10,
+    ) -> ScoutResult:
+        """Retrieve scoped evidence from Tabula, then run the read-only Scout."""
+        evidence = tuple(
+            ScoutEvidence(
+                source=item.source,
+                summary=item.summary,
+                observed_at=item.observed_at,
+            )
+            for item in self.retrieve_knowledge(
+                mission_id=mission_id,
+                worker=scout,
+                delegation=delegation,
+                tabula=tabula,
+                query=query,
+                limit=limit,
+            )
+        )
+        return self.run_scout(
+            mission_id=mission_id,
+            scout=scout,
+            delegation=delegation,
+            runtime=runtime,
+            query=query,
+            granted_capabilities=granted_capabilities,
+            evidence=evidence,
         )
 
     def invoke_read_tool(
