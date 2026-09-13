@@ -792,7 +792,98 @@ class LegionKernel:
             return "INVALID_COMMAND_PAYLOAD"
         if not required.issubset(payload):
             return "SUSPENSION_REASON_REQUIRED" if command_type == "SUSPEND" else "INVALID_COMMAND_PAYLOAD"
+        if command_type == "SET_ROE" and not LegionKernel._valid_roe_payload(payload):
+            return "INVALID_COMMAND_PAYLOAD"
+        if command_type == "ADD_PARTICIPANT" and not LegionKernel._valid_participant_payload(payload):
+            return "INVALID_COMMAND_PAYLOAD"
+        if command_type == "REQUEST_ACTION" and not LegionKernel._valid_action_payload(payload):
+            return "INVALID_COMMAND_PAYLOAD"
         return None
+
+    @staticmethod
+    def _valid_roe_payload(payload: dict[str, Any]) -> bool:
+        if not isinstance(payload["level"], str) or payload["level"] not in {level.value for level in RoeLevel}:
+            return False
+        if not LegionKernel._bounded_string(payload["reason"], minimum=1, maximum=5000):
+            return False
+        return all(
+            LegionKernel._valid_capability_list(payload.get(field))
+            for field in ("allowed_capabilities", "denied_capabilities")
+        )
+
+    @staticmethod
+    def _valid_participant_payload(payload: dict[str, Any]) -> bool:
+        participant = payload["participant"]
+        if not LegionKernel._object_has_only(
+            participant, required={"principal", "role"}, allowed={"principal", "role", "scope"}
+        ):
+            return False
+        principal = participant["principal"]
+        if not LegionKernel._object_has_only(
+            principal, required={"type", "subject"}, allowed={"type", "subject", "issuer"}
+        ):
+            return False
+        if not isinstance(principal["type"], str) or principal["type"] not in {kind.value for kind in PrincipalType}:
+            return False
+        if not LegionKernel._bounded_string(principal["subject"], minimum=1, maximum=512):
+            return False
+        if "issuer" in principal and not LegionKernel._bounded_string(
+            principal["issuer"], maximum=500
+        ):
+            return False
+        if not isinstance(participant["role"], str) or participant["role"] not in {
+            "OWNER", "OPERATOR", "OBSERVER", "APPROVER", "WORKLOAD", "EXTERNAL"
+        }:
+            return False
+        return "scope" not in participant or LegionKernel._bounded_string(
+            participant["scope"], maximum=2000
+        )
+
+    @staticmethod
+    def _valid_action_payload(payload: dict[str, Any]) -> bool:
+        if not LegionKernel._uuid_string(payload["action_id"]):
+            return False
+        if not LegionKernel._bounded_string(payload["capability"], minimum=1, maximum=200):
+            return False
+        if not isinstance(payload["arguments"], dict):
+            return False
+        if "target" in payload and not LegionKernel._bounded_string(payload["target"], maximum=1000):
+            return False
+        return "side_effect_class" not in payload or isinstance(payload["side_effect_class"], str) and payload["side_effect_class"] in {
+            "READ", "ANALYSIS", "MUTATION", "EXTERNAL_SIDE_EFFECT"
+        }
+
+    @staticmethod
+    def _valid_capability_list(value: Any) -> bool:
+        if value is None:
+            return True
+        return (
+            isinstance(value, list)
+            and all(LegionKernel._bounded_string(item, minimum=1, maximum=200) for item in value)
+            and len(value) == len(set(value))
+        )
+
+    @staticmethod
+    def _object_has_only(value: Any, *, required: set[str], allowed: set[str]) -> bool:
+        return (
+            isinstance(value, dict)
+            and required.issubset(value)
+            and not (set(value) - allowed)
+        )
+
+    @staticmethod
+    def _bounded_string(value: Any, *, minimum: int = 0, maximum: int) -> bool:
+        return isinstance(value, str) and minimum <= len(value) <= maximum
+
+    @staticmethod
+    def _uuid_string(value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        try:
+            UUID(value)
+        except ValueError:
+            return False
+        return True
 
     def _authorize_command(self, mission: Mission, actor: Principal, command_type: str) -> str | None:
         if actor.type == PrincipalType.HUMAN and actor.has_any_role("MISSION_OWNER", "OPERATOR"):
