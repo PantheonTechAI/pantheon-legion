@@ -32,12 +32,13 @@ class TabulaDisposableStackTests(unittest.TestCase):
         self.assertEqual(self.calls[0][0][1:3], ["-m", "tests.federation.isolation"])
         self.assertEqual(self.calls[1][0][:2], ["docker", "compose"])
         self.assertEqual(self.calls[1][1]["env"]["PANTHEON_STS_INTROSPECTION_URL"], "http://host.docker.internal:19080/v1/introspect")
-        self.assertIn("console-db", self.calls[2][0])
-        self.assertIn("INSERT INTO", self.calls[2][1]["input"])
+        self.assertEqual(self.calls[2][0][-3:], ["alembic", "upgrade", "head"])
+        self.assertIn("console-db", self.calls[3][0])
+        self.assertIn("INSERT INTO", self.calls[3][1]["input"])
         self.assertEqual(self.stack.mcp_endpoint, "http://127.0.0.1:18100/mcp")
         self.stack.cleanup()
-        self.assertEqual(self.calls[3][0][-2:], ["down", "--volumes"])
-        self.assertEqual(self.calls[3][1]["env"]["PANTHEON_STS_INTROSPECTION_URL"], "http://host.docker.internal:19080/v1/introspect")
+        self.assertEqual(self.calls[4][0][-3:], ["down", "--volumes", "--remove-orphans"])
+        self.assertEqual(self.calls[4][1]["env"]["PANTHEON_STS_INTROSPECTION_URL"], "http://host.docker.internal:19080/v1/introspect")
 
     def test_cleanup_before_start_is_a_noop(self):
         self.stack.cleanup()

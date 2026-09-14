@@ -25,30 +25,30 @@ class ConformanceResult:
 class FederatedConformanceRunner:
     """Exercise an injected real MCP transport with fresh fixture tokens."""
 
-    def __init__(self, issue_token: Callable[[dict[str, Any]], str], call_mcp: Callable[[str, dict[str, Any]], McpReply]) -> None:
+    def __init__(self, issue_token: Callable[[dict[str, Any]], str], call_mcp: Callable[[Callable[[], str], dict[str, Any]], McpReply]) -> None:
         self._issue_token = issue_token
         self._call_mcp = call_mcp
 
     def success(self, scenario_id: str, operation: str, tool: str, arguments: dict[str, Any]) -> ConformanceResult:
-        reply = self._call_mcp(self._issue_token(_claims(operation, arguments)), {"name": tool, "arguments": _mcp_arguments(arguments)})
+        reply = self._call_mcp(lambda: self._issue_token(_claims(operation, arguments)), {"name": tool, "arguments": _mcp_arguments(arguments)})
         body = reply.body or {}
         passed = reply.status_code == 200 and body.get("schema_version") == "1.0" and body.get("request_id") == arguments["request_id"] and body.get("correlation_id") == arguments["correlation_id"] and "tabula_audit_correlation_id" in body
-        return ConformanceResult(scenario_id, passed, "success response" if passed else f"unexpected reply: {reply.status_code}")
+        return ConformanceResult(scenario_id, passed, "success response" if passed else _unexpected(reply))
 
     def pre_tool_denial(self, scenario_id: str, token: str, tool: str, arguments: dict[str, Any]) -> ConformanceResult:
-        reply = self._call_mcp(token, {"name": tool, "arguments": _mcp_arguments(arguments)})
+        reply = self._call_mcp(lambda: token, {"name": tool, "arguments": _mcp_arguments(arguments)})
         passed = reply.status_code == 401 and reply.body is not None and "tabula_audit_correlation_id" not in reply.body
-        return ConformanceResult(scenario_id, passed, "generic pre-tool 401" if passed else f"unexpected reply: {reply.status_code}")
+        return ConformanceResult(scenario_id, passed, "generic pre-tool 401" if passed else _unexpected(reply))
 
     def post_auth_denial(self, scenario_id: str, operation: str, tool: str, arguments: dict[str, Any]) -> ConformanceResult:
-        reply = self._call_mcp(self._issue_token(_claims(operation, arguments)), {"name": tool, "arguments": _mcp_arguments(arguments)})
+        reply = self._call_mcp(lambda: self._issue_token(_claims(operation, arguments)), {"name": tool, "arguments": _mcp_arguments(arguments)})
         body = reply.body or {}
         passed = reply.status_code == 200 and body.get("code") == "AUTHORIZATION_DENIED" and body.get("retryable") is False and "tabula_audit_correlation_id" in body
-        return ConformanceResult(scenario_id, passed, "non-disclosing post-auth denial" if passed else f"unexpected reply: {reply.status_code}")
+        return ConformanceResult(scenario_id, passed, "non-disclosing post-auth denial" if passed else _unexpected(reply))
 
     def retry(self, scenario_id: str, operation: str, tool: str, arguments: dict[str, Any], retry_arguments: dict[str, Any]) -> ConformanceResult:
-        first = self._call_mcp(self._issue_token(_claims(operation, arguments)), {"name": tool, "arguments": _mcp_arguments(arguments)})
-        second = self._call_mcp(self._issue_token(_claims(operation, retry_arguments)), {"name": tool, "arguments": _mcp_arguments(retry_arguments)})
+        first = self._call_mcp(lambda: self._issue_token(_claims(operation, arguments)), {"name": tool, "arguments": _mcp_arguments(arguments)})
+        second = self._call_mcp(lambda: self._issue_token(_claims(operation, retry_arguments)), {"name": tool, "arguments": _mcp_arguments(retry_arguments)})
         first_body, second_body = first.body or {}, second.body or {}
         passed = (
             first.status_code == 200 and first_body.get("code") == "SERVICE_UNAVAILABLE" and first_body.get("retryable") is True
@@ -57,6 +57,13 @@ class FederatedConformanceRunner:
             and arguments["request_id"] != retry_arguments["request_id"]
         )
         return ConformanceResult(scenario_id, passed, "bounded retry" if passed else "retry contract failed")
+
+
+def _unexpected(reply: McpReply) -> str:
+    body = reply.body or {}
+    error = body.get("error") if isinstance(body.get("error"), dict) else {}
+    code = body.get("code") or error.get("code") or "unclassified"
+    return f"unexpected reply: {reply.status_code} {code}"
 
 
 def _mcp_arguments(arguments: dict[str, Any]) -> dict[str, Any]:

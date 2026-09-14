@@ -21,7 +21,7 @@ class FederatedConformanceRunnerTests(unittest.TestCase):
     def test_success_strips_fixture_tenant_fields_from_mcp_arguments(self):
         seen = {}
         def call(token, request):
-            seen.update(token=token, request=request)
+            seen.update(token=token(), request=request)
             args = request["arguments"]
             return McpReply(200, {"schema_version": "1.0", "request_id": args["request_id"], "correlation_id": args["correlation_id"], "tabula_audit_correlation_id": str(uuid4()), "results": []})
         result = FederatedConformanceRunner(self._issue, call).success("C1", "TABULA_CORPUS_READ", "legion_search_corpus", self.arguments)
@@ -30,15 +30,15 @@ class FederatedConformanceRunnerTests(unittest.TestCase):
         self.assertEqual(self.tokens[0]["organization_id"], self.arguments["organization_id"])
 
     def test_pre_tool_and_post_auth_denials_are_distinguished(self):
-        runner = FederatedConformanceRunner(self._issue, lambda token, request: McpReply(401, {"code": "UNAUTHENTICATED"}))
+        runner = FederatedConformanceRunner(self._issue, lambda token, request: (token(), McpReply)[1](401, {"code": "UNAUTHENTICATED"}))
         self.assertTrue(runner.pre_tool_denial("C2", "bad", "legion_search_corpus", self.arguments).passed)
-        runner = FederatedConformanceRunner(self._issue, lambda token, request: McpReply(200, {"code": "AUTHORIZATION_DENIED", "retryable": False, "tabula_audit_correlation_id": str(uuid4())}))
+        runner = FederatedConformanceRunner(self._issue, lambda token, request: (token(), McpReply)[1](200, {"code": "AUTHORIZATION_DENIED", "retryable": False, "tabula_audit_correlation_id": str(uuid4())}))
         self.assertTrue(runner.post_auth_denial("C3", "TABULA_CORPUS_READ", "legion_search_corpus", self.arguments).passed)
 
     def test_retry_requires_new_request_id_and_stable_correlation(self):
         retried = dict(self.arguments, request_id=str(uuid4()))
         replies = iter((McpReply(200, {"code": "SERVICE_UNAVAILABLE", "retryable": True}), McpReply(200, {"schema_version": "1.0"})))
-        result = FederatedConformanceRunner(self._issue, lambda token, request: next(replies)).retry("C4", "TABULA_CORPUS_READ", "legion_search_corpus", self.arguments, retried)
+        result = FederatedConformanceRunner(self._issue, lambda token, request: (token(), next(replies))[1]).retry("C4", "TABULA_CORPUS_READ", "legion_search_corpus", self.arguments, retried)
         self.assertTrue(result.passed)
         self.assertEqual(len(self.tokens), 2)
 
