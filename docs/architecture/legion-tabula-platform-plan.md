@@ -49,8 +49,8 @@ Aquila-issued workload grant.
 
 | Area | Present implementation | Important gap |
 |---|---|---|
-| Aquila | Mission kernel, OpenAPI-shaped service, WSGI adapter, OIDC claim mapper, and persisted revocable opaque delegation IDs | Atomic co-persistence of authority state and audit remains next. |
-| Mission persistence | SQLite snapshots, ordered audit records, idempotency, restart tests | A Mission update, audit records, approval projection, idempotency result, and execution snapshot commit in separate transactions. |
+| Aquila | Mission kernel, OpenAPI-shaped service, WSGI adapter, OIDC claim mapper, persisted revocable opaque delegation IDs, and atomic local authority persistence | Joint Legion–Tabula identity, scope, correlation, and compatibility contract remains next. |
+| Mission persistence | SQLite snapshots, ordered audit records, idempotency, restart tests, and atomic local authority commits | External delivery must use a transactional outbox when a non-transactional workflow or tool provider is introduced. |
 | Cognition | Read-only Scout contract and one-node LangGraph runtime | Model-provider seam currently sits in cognition, rather than an explicit model-fabric boundary. |
 | Tabula | In-memory `TabulaRetrievalAdapter` test double | No MCP client, service identity, Tabula-scope mapping, response contract, or cross-system correlation. |
 | Fabrica | In-memory declared read-tool broker | No MCP transport, sandbox, network/filesystem enforcement, or credential broker. |
@@ -93,10 +93,10 @@ Scout evidence shape.
 1. **Delegation remediation is complete.** PR #49 replaces caller-supplied
    service grants with Aquila-issued opaque IDs, durable recovery, revocation,
    and audit. Do not bypass it with a Tabula PAT or browser-held capability.
-2. **Aquila's durable record is not atomic.** A process failure may persist a
-   Mission state update without all corresponding audit, approval, idempotency,
-   or execution records. This violates the intended reconstructable authority
-   trail.
+2. **External delivery will require an outbox.** Local SQLite authority state
+   now commits atomically. A future non-transactional workflow or tool provider
+   must receive work through a transactionally written outbox rather than an
+   in-memory dispatch after commit.
 3. **Tabula scope cannot be inferred.** A Mission's organization/workspace
    scope and Tabula's domain/registry-kind scopes are distinct models. A local
    filter after a broad Tabula query is not an authorization model.
@@ -223,9 +223,10 @@ Required rules:
 ### Phase 0 — architecture decisions and inventory
 
 1. Adopt this target ownership model in Legion documentation.
-2. Create a joint Legion–Tabula ADR covering tenancy mapping, service/workload
-   identity, token exchange, correlation, data retention, audit ownership,
-   and version compatibility.
+2. Jointly review and accept [ADR-002](../adr/ADR-002-pantheon-federated-workload-authorization.md)
+   for reusable workload identity, token exchange/status, revocation, and
+   shared audit vocabulary; then accept [ADR-003](../adr/ADR-003-legion-tabula-authorized-read-contract.md)
+   for Tabula scope bindings, provenance, and contract compatibility.
 3. Create a supported-component inventory in Tabula Registry for Aquila,
    Praetorium, Tabula MCP, Fabrica, model fabric, schemas, capabilities, and
    agents. Publish only reviewed, active entities.
@@ -238,9 +239,10 @@ Required rules:
    revocable DelegationGrants. Workloads present an opaque grant ID; they do
    not construct grant content.
 2. **Completed in PR #49:** audit grant issue, use, denial, expiry, and revocation.
-3. Make each accepted operation's Mission snapshot, authoritative events,
-   approvals, idempotency outcome, and execution transition atomic, or use a
-   transactionally written outbox with replay.
+3. **Completed in PR #50:** each accepted operation's Mission snapshot,
+   authoritative events, approvals, idempotency outcome, execution projection,
+   and grant state commit atomically in SQLite. Future external delivery must
+   use a transactionally written outbox with replay.
 4. Add adversarial tests for forged grants, issuer mismatch, revoked grants,
    cross-Mission use, crash points, and concurrent service instances.
 
