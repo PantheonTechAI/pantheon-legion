@@ -24,26 +24,25 @@ and Registry workflows.
 
 ## Active implementation boundary
 
-PR #49, `Persist Aquila-issued delegation grants`, has merged. It replaces
-caller-provided service grants with owner-issued opaque IDs, durable SQLite
-recovery, revocation, and lifecycle/use audit facts. It has **89 passing
-tests** and all seven M1 acceptance scenarios passing on `main`.
+PR #50, `Atomically persist Aquila authority records`, has merged. It commits
+each accepted operation's Mission snapshot, authoritative audit events,
+approval/idempotency/execution projections, and grant state in one SQLite
+transaction. It has **92 passing tests** and all seven M1 acceptance scenarios
+passing on `main`.
 
-The only active implementation slice is **atomic authority persistence**:
-commit each accepted operation's Mission snapshot,
-authoritative events, approval/idempotency/execution projections, and grant
-state atomically or through a transactional outbox. Do not start a Tabula MCP
-client, Portal, Praetorium, Fabrica transport, or model-provider expansion
-before that slice merges and the joint Legion–Tabula identity/scope/correlation
-ADR is complete.
+The only active slice is the proposed joint Legion–Tabula ADR for identity,
+scope bindings, token exchange, correlation, provenance, audit ownership,
+retention, and compatibility. Do not start a Tabula MCP client, Portal,
+Praetorium, Fabrica transport, or model-provider expansion before that ADR is
+jointly accepted.
 
 ## Current state
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged [PR #49](https://github.com/PantheonTechAI/pantheon-legion/pull/49)
-  (`c612700`), `Persist Aquila-issued delegation grants`.
-- The full test suite passes: **89 tests** after installing
+- `main` includes merged [PR #50](https://github.com/PantheonTechAI/pantheon-legion/pull/50)
+  (`cf6cbca`), `Atomically persist Aquila authority records`.
+- The full test suite passes: **92 tests** after installing
   `requirements.txt` (which declares LangGraph).
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
@@ -59,6 +58,9 @@ The repository now has a framework-neutral Mission control plane with:
   dependency-free WSGI adapter.
 - SQLite-backed Mission persistence, command idempotency persistence, restart
   recovery, and persisted durable-execution state.
+- Atomic local persistence of each accepted authority record: Mission snapshot,
+  events, approvals, idempotency, execution state, side-effect projection, and
+  delegation state commit or roll back together.
 - A provider-neutral durable execution adapter with idempotent starts, valid
   state transitions, pause/resume/cancel signaling, recovery, and snapshots.
 - Execution-boundary controls: current Mission state, ROE, fresh Approval,
@@ -144,6 +146,7 @@ Recent merged implementation slices:
 | #44 | LangGraph implementation handoff checkpoint |
 | #45 | Audited, provider-neutral Scout model-provider contract |
 | #49 | Persisted Aquila-issued delegation grants |
+| #50 | Atomic Aquila authority persistence |
 
 ## New-session quick start
 
@@ -159,7 +162,7 @@ python3 -m venv /tmp/pantheon-legion-venv
 /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
 ```
 
-Expected merged-main baseline: a clean `main`, **89 passing tests**, and seven
+Expected merged-main baseline: a clean `main`, **92 passing tests**, and seven
 passing M1 scenarios. Work one bounded feature branch at a time, open a PR,
 and wait for its merge before starting the next implementation slice.
 
@@ -235,9 +238,9 @@ The first-cycle substrate is complete: the durable multi-user control plane,
 read-only Scout, Fabrica read-tool boundary, Tabula retrieval, and cognition
 conformance matrix serialize Mission changes, preserve recovery facts, fail
 closed at command and tool boundaries, and expose scenario-level evidence.
-PR #45 completes the provider-neutral model invocation contract and durable
-audit/persistence seam. No concrete model vendor, credential source, or
-provider configuration has been selected.
+PR #45 completes the provider-neutral model invocation contract, and PR #50
+closes the local atomic authority-persistence gap. No concrete model vendor,
+credential source, or provider configuration has been selected.
 
 Other known boundaries, deliberately not started here:
 
@@ -272,14 +275,12 @@ Other known boundaries, deliberately not started here:
 
 ## Next-session plan
 
-1. PR #49 is merged; do not recreate its delegation design in another component.
-2. Start from the latest merged `main` and run the quick-start verification
-   commands before selecting the atomic-persistence slice.
-3. Complete atomic authority persistence, including adversarial crash and
-   concurrent-service tests.
-4. Write the joint Legion–Tabula ADR for tenancy bindings, token exchange,
-   correlation, provenance, audit ownership, and version compatibility.
-5. Only then define Tabula's read-only MCP contract and build separate corpus
+1. PRs #49 and #50 are merged; do not recreate their delegation or local
+   atomic-persistence designs in another component.
+2. Jointly review and accept ADR-002 for tenancy bindings, token exchange,
+   correlation, provenance, audit ownership, retention, and version
+   compatibility.
+3. Only then define Tabula's read-only MCP contract and build separate corpus
    and Registry adapters. Keep Tabula's Console as the knowledge/governance UI
    and build Praetorium as Aquila's thin human-operations client.
 

@@ -61,6 +61,7 @@ How will the decision be tested or revisited?
 | ID | Title | Status |
 |---|---|---|
 | [ADR-001](./ADR-001-mission-root-object.md) | Mission as root operational object | Accepted for M0 |
+| [ADR-002](./ADR-002-legion-tabula-authorized-read-integration.md) | Authorized, correlated Legion–Tabula read integration | Proposed |
 
 ## Review checklist
 
