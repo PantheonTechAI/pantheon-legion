@@ -26,6 +26,9 @@ by the service that implements them.
 - Tabula performs mandatory STS introspection before it evaluates its own
   binding and resource policy. An inactive or malformed status response denies
   the request before a protected tool reads data.
+- The authorization assertion and an active introspection response both carry
+  the Organization and Workspace identifiers. Tabula compares them to the
+  referenced binding before allowing a protected read.
 - A `TabulaScopeBinding` is Tabula-owned. Aquila can reference it but cannot
   construct domains or Registry kinds outside the binding.
 - `request_id` changes on retry; `correlation_id` remains stable across the
