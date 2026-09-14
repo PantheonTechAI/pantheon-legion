@@ -1,6 +1,6 @@
 # ADR-002: Pantheon federated workload authorization
 
-- Status: Proposed
+- Status: Accepted for M1 platform integration
 - Date: 2026-09-14
 - Owners: Pantheon security platform, Legion platform, and Tabula platform
 - Deciders: Pantheon, Legion, and Tabula architecture groups

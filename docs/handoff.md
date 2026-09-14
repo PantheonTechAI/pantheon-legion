@@ -30,18 +30,20 @@ approval/idempotency/execution projections, and grant state in one SQLite
 transaction. It has **92 passing tests** and all seven M1 acceptance scenarios
 passing on `main`.
 
-The only active slice is a pair of proposed ADRs: ADR-002 defines Pantheon's
-reusable federated workload-security model; ADR-003 applies it to Legion–Tabula
-scope bindings, read contracts, provenance, and compatibility. Do not start a
-Tabula MCP client, Portal, Praetorium, Fabrica transport, or model-provider
-expansion before both ADRs are jointly accepted.
+ADRs 002 and 003 are accepted. They define Pantheon's reusable federated
+workload-security model and its Legion–Tabula application: Tabula-owned scope
+bindings, separate corpus/Registry contracts, provenance, and compatibility.
+The next work is the joint versioned Tabula read-contract specification and
+security-platform STS interface; do not start a Legion MCP client, Portal,
+Praetorium, Fabrica transport, or model-provider expansion before those
+contracts are published and tested.
 
 ## Current state
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged [PR #50](https://github.com/PantheonTechAI/pantheon-legion/pull/50)
-  (`cf6cbca`), `Atomically persist Aquila authority records`.
+- `main` includes merged [PR #51](https://github.com/PantheonTechAI/pantheon-legion/pull/51)
+  (`d82f4a3`), `Propose Legion Tabula authorized read ADR`.
 - The full test suite passes: **92 tests** after installing
   `requirements.txt` (which declares LangGraph).
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
@@ -147,6 +149,7 @@ Recent merged implementation slices:
 | #45 | Audited, provider-neutral Scout model-provider contract |
 | #49 | Persisted Aquila-issued delegation grants |
 | #50 | Atomic Aquila authority persistence |
+| #51 | Federated workload-security and Legion–Tabula read ADRs |
 
 ## New-session quick start
 
@@ -277,12 +280,12 @@ Other known boundaries, deliberately not started here:
 
 1. PRs #49 and #50 are merged; do not recreate their delegation or local
    atomic-persistence designs in another component.
-2. Jointly review and accept ADR-002 for federated workload authorization,
-   token status/revocation, resource-owner policy, and shared audit vocabulary.
-3. Then jointly review and accept ADR-003 for Tabula scope bindings and the
-   separate corpus and Registry read contracts.
-4. Only then implement Tabula's read-only MCP contract and build separate corpus
-   and Registry adapters. Keep Tabula's Console as the knowledge/governance UI
+2. Publish the joint STS authorization-assertion, delegated-token, and
+   introspection schemas required by ADR-002.
+3. Publish Tabula's `TabulaScopeBinding`, corpus, and Registry read schemas
+   required by ADR-003, then build and test the Tabula server contract.
+4. Only after those contracts are available, implement separate Legion corpus
+   and Registry clients. Keep Tabula's Console as the knowledge/governance UI
    and build Praetorium as Aquila's thin human-operations client.
 
 ## Workflow notes
