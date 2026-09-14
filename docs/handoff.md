@@ -1,6 +1,40 @@
 # Pantheon Legion M1 New-Session Handoff
 
-Last updated: 2026-09-13
+Last updated: 2026-09-14
+
+## North star — read before selecting work
+
+The authoritative target is the
+[Legion–Tabula platform architecture and remediation plan](architecture/legion-tabula-platform-plan.md),
+especially its **North star** and delivery sequence. The platform is a Portal
+that routes a shared-identity user into two independently owned applications:
+Praetorium for Legion operations and the existing Tabula Console for knowledge
+and Registry workflows.
+
+- Aquila alone owns Missions, ROE, Approvals, workload grants, execution
+  authorization, and Mission audit.
+- Tabula alone owns curated knowledge, patterns/ADR material, its data catalog,
+  Registry, governance, and Tabula audit.
+- Portal is navigation/read-model UX only; it is neither a third control plane
+  nor an iframe host.
+- Legion reaches Tabula only through an Aquila-authorized, correlated,
+  least-privilege MCP read. Corpus and Registry require separate clients.
+- A Tabula Registry result, model output, Scout, Portal session, or Tabula PAT
+  never grants Mission or tool-execution authority.
+
+## Active implementation boundary
+
+PR #49, `Persist Aquila-issued delegation grants`, is the current foundation
+slice. It replaces caller-provided service grants with owner-issued opaque IDs,
+durable SQLite recovery, revocation, and lifecycle/use audit facts. It has **89
+passing tests** and all seven M1 acceptance scenarios passing on its branch.
+
+After it merges, the only next implementation slice is **atomic authority
+persistence**: commit each accepted operation's Mission snapshot,
+authoritative events, approval/idempotency/execution projections, and grant
+state atomically or through a transactional outbox. Do not start a Tabula MCP
+client, Portal, Praetorium, Fabrica transport, or model-provider expansion
+before that slice and the joint Legion–Tabula identity/scope/correlation ADR.
 
 ## Current state
 
@@ -123,9 +157,10 @@ python3 -m venv /tmp/pantheon-legion-venv
 /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
 ```
 
-Expected baseline: a clean `main`, **86 passing tests**, and seven passing M1
-scenarios. Work one bounded feature branch at a time, open a PR, and wait for
-its merge before starting the next implementation slice.
+Expected merged-main baseline before PR #49: a clean `main`, **86 passing
+tests**, and seven passing M1 scenarios. PR #49 has 89 tests. Work one bounded
+feature branch at a time, open a PR, and wait for its merge before starting the
+next implementation slice.
 
 Use `env -u GH_TOKEN` for GitHub CLI commands: the ambient token is invalid in
 the development environment.
@@ -236,23 +271,16 @@ Other known boundaries, deliberately not started here:
 
 ## Next-session plan
 
-1. Before selecting another implementation slice, read the
-   [Legion–Tabula platform architecture and remediation plan](architecture/legion-tabula-platform-plan.md).
-   It records the required correction order: durable delegation and atomic
-   authority persistence precede any Tabula MCP client or provider integration.
-2. Start from current `main` and run the quick-start verification commands
-   (expect 86 tests and seven scenarios) before selecting the next slice.
-3. If continuing cognition, select a concrete model-provider deployment and
-   secret-management approach. Bind it behind `ModelProviderScoutResponder`,
-   enforce the contract timeout in the transport, and add provider-specific
-   integration tests without exposing command or Fabrica authority. Do not put
-   credentials or raw model content in audit facts, environment reads inside
-   cognition, or the LangGraph graph.
-4. Alternatively, choose one separately scoped capability: persistent/vector
-   Tabula retrieval, Action-bound mutating Fabrica execution, a production
-   durable-workflow provider, or a persisted `MissionCommand` import/replay
-   boundary. Each changes a distinct authority surface and requires its own
-   contract and acceptance coverage.
+1. Merge PR #49; do not recreate its delegation design in another component.
+2. Start from the latest merged `main` and run the quick-start verification
+   commands before selecting the atomic-persistence slice.
+3. Complete atomic authority persistence, including adversarial crash and
+   concurrent-service tests.
+4. Write the joint Legion–Tabula ADR for tenancy bindings, token exchange,
+   correlation, provenance, audit ownership, and version compatibility.
+5. Only then define Tabula's read-only MCP contract and build separate corpus
+   and Registry adapters. Keep Tabula's Console as the knowledge/governance UI
+   and build Praetorium as Aquila's thin human-operations client.
 
 ## Workflow notes
 
