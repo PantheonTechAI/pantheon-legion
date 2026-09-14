@@ -1,6 +1,6 @@
 # ADR-003: Legion–Tabula authorized read contract
 
-- Status: Proposed
+- Status: Accepted for M1 platform integration
 - Date: 2026-09-14
 - Owners: Legion platform and Tabula platform
 - Deciders: Legion and Tabula architecture groups
@@ -135,5 +135,5 @@ The first joint contract suite must prove:
 5. a Registry result cannot bypass Mission authorization or Fabrica for later
    execution.
 
-This ADR requires joint acceptance after ADR-002 and before MCP client or
-server implementation begins.
+This ADR is accepted after ADR-002. MCP client or server implementation must
+conform to both decisions.

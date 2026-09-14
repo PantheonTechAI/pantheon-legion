@@ -61,8 +61,8 @@ How will the decision be tested or revisited?
 | ID | Title | Status |
 |---|---|---|
 | [ADR-001](./ADR-001-mission-root-object.md) | Mission as root operational object | Accepted for M0 |
-| [ADR-002](./ADR-002-pantheon-federated-workload-authorization.md) | Pantheon federated workload authorization | Proposed |
-| [ADR-003](./ADR-003-legion-tabula-authorized-read-contract.md) | Legion–Tabula authorized read contract | Proposed |
+| [ADR-002](./ADR-002-pantheon-federated-workload-authorization.md) | Pantheon federated workload authorization | Accepted for M1 platform integration |
+| [ADR-003](./ADR-003-legion-tabula-authorized-read-contract.md) | Legion–Tabula authorized read contract | Accepted for M1 platform integration |
 
 ## Review checklist
 
