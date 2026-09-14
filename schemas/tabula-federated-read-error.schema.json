@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pantheon:tabula:schema:federated-read-error:v1",
+  "title": "Pantheon Tabula Federated Read Error",
+  "description": "The normalized error envelope returned by either dedicated federated Tabula read tool. It exposes no raw token, assertion, binding internals, or protected-resource existence details.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "correlation_id", "code", "retryable", "tabula_audit_correlation_id"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "request_id": {"type": "string", "format": "uuid"},
+    "correlation_id": {"type": "string", "format": "uuid"},
+    "code": {"type": "string", "enum": ["INVALID_REQUEST", "UNAUTHENTICATED", "AUTHORIZATION_DENIED", "DEADLINE_EXCEEDED", "SERVICE_UNAVAILABLE", "INTERNAL_ERROR"]},
+    "message": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "retryable": {"type": "boolean"},
+    "retry_after_ms": {"type": "integer", "minimum": 1, "maximum": 60000},
+    "tabula_audit_correlation_id": {"type": "string", "format": "uuid"}
+  },
+  "allOf": [
+    {"if": {"properties": {"retryable": {"const": true}}, "required": ["retryable"]}, "then": {"required": ["retry_after_ms"], "properties": {"code": {"const": "SERVICE_UNAVAILABLE"}}}},
+    {"if": {"properties": {"retryable": {"const": false}}, "required": ["retryable"]}, "then": {"not": {"required": ["retry_after_ms"]}}},
+    {"if": {"properties": {"code": {"const": "SERVICE_UNAVAILABLE"}}, "required": ["code"]}, "then": {"properties": {"retryable": {"const": true}}}}
+  ]
+}

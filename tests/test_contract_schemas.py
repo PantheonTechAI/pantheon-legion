@@ -31,6 +31,7 @@ class ContractSchemaTests(unittest.TestCase):
         binding = json.loads((schemas / "tabula-scope-binding.schema.json").read_text())
         corpus = json.loads((schemas / "tabula-corpus-read.schema.json").read_text())
         registry = json.loads((schemas / "tabula-registry-read.schema.json").read_text())
+        error = json.loads((schemas / "tabula-federated-read-error.schema.json").read_text())
 
         self.assertEqual(assertion["properties"]["issuer"]["const"], "aquila")
         self.assertEqual(assertion["properties"]["audience"]["const"], "pantheon-sts")
@@ -42,6 +43,12 @@ class ContractSchemaTests(unittest.TestCase):
         self.assertIn("workspace_id", active_introspection["required"])
         self.assertEqual(binding["properties"]["plane"]["enum"], ["CORPUS", "REGISTRY"])
         self.assertFalse(binding["additionalProperties"])
+        self.assertFalse(error["additionalProperties"])
+        self.assertIn("AUTHORIZATION_DENIED", error["properties"]["code"]["enum"])
+        self.assertNotIn("delegated_token", error["properties"])
+        retry_rule = error["allOf"][0]["then"]
+        self.assertIn("retry_after_ms", retry_rule["required"])
+        self.assertEqual(retry_rule["properties"]["code"]["const"], "SERVICE_UNAVAILABLE")
 
         for contract, intent in ((corpus, "SCOUT_EVIDENCE"), (registry, "SCOUT_DISCOVERY")):
             request = contract["$defs"]["request"]
