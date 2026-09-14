@@ -1,6 +1,6 @@
 import unittest
 
-from aquila_api import AquilaService, DelegationGrant
+from aquila_api import AquilaService
 from legion_cognition import (
     LangGraphScoutRuntime,
     MissionContext,
@@ -91,14 +91,14 @@ class ModelProviderScoutResponderTests(unittest.TestCase):
             'title': 'Provider audit mission', 'objective': 'Audit model provenance.',
         })
         mission_id = created.body['id']
-        delegation = DelegationGrant(
-            grant_id='scout-grant', issuer=owner, subject=scout, mission_id=mission_id,
+        delegation_id = service.issue_delegation(
+            issuer=owner, subject=scout, mission_id=mission_id,
             allowed_operations=frozenset({'READ_MISSION'}), roe_ceiling=RoeLevel.OBSERVE,
             expires_at='9999-01-01T00:00:00Z',
         )
         runtime = LangGraphScoutRuntime(ModelProviderScoutResponder(TimeoutThenResponseProvider()))
         result = service.run_scout(
-            mission_id=mission_id, scout=scout, delegation=delegation, runtime=runtime,
+            mission_id=mission_id, scout=scout, delegation_id=delegation_id, runtime=runtime,
             query='Bearer audit-query-secret', granted_capabilities=frozenset({'read.mission'}),
             evidence=(ScoutEvidence(
                 source='metrics://api', summary='token=audit-evidence-secret',
@@ -117,7 +117,7 @@ class ModelProviderScoutResponderTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ModelInvocationError, 'MODEL_TIMEOUT'):
             service.run_scout(
-                mission_id=mission_id, scout=scout, delegation=delegation,
+                mission_id=mission_id, scout=scout, delegation_id=delegation_id,
                 runtime=LangGraphScoutRuntime(ModelProviderScoutResponder(AlwaysTimeoutProvider())),
                 query='Timeout safely.', granted_capabilities=frozenset({'read.mission'}),
             )

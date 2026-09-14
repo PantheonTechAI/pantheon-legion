@@ -29,7 +29,11 @@ class DelegationGrant:
     allowed_operations: frozenset[str]
     roe_ceiling: RoeLevel
     expires_at: str
+    issued_at: str
     revoked: bool = False
+    revoked_at: str | None = None
+    revoked_by: Principal | None = None
+    revocation_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,7 @@ class AuthorizationRequest:
     capability: str | None = None
     approval_present: bool = False
     delegation: DelegationGrant | None = None
+    delegation_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -109,7 +114,7 @@ class AuthorizationEngine:
         if principal.type == PrincipalType.WORKLOAD:
             grant = request.delegation
             if grant is None:
-                return "DELEGATION_REQUIRED"
+                return "DELEGATION_INVALID" if request.delegation_id else "DELEGATION_REQUIRED"
             if grant.subject.subject != principal.subject or grant.mission_id != request.mission_id:
                 return "DELEGATION_SCOPE_MISMATCH"
             if grant.revoked:
@@ -130,8 +135,18 @@ class AuthorizationEngine:
                 return "READ_ROLE_REQUIRED"
             return None
 
+        if request.operation == "REVOKE_DELEGATION":
+            if principal.type != PrincipalType.HUMAN or not principal.has_any_role("MISSION_OWNER"):
+                return "MISSION_OWNER_REQUIRED"
+            return None
+
         if request.mission_status in {MissionStatus.CANCELLED, MissionStatus.COMPLETED}:
             return "MISSION_TERMINAL"
+
+        if request.operation == "ISSUE_DELEGATION":
+            if principal.type != PrincipalType.HUMAN or not principal.has_any_role("MISSION_OWNER"):
+                return "MISSION_OWNER_REQUIRED"
+            return None
 
         if request.operation == "DECIDE_APPROVAL":
             if not principal.has_any_role(*self.policy.approver_roles):

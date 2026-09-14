@@ -8,6 +8,7 @@ these methods without changing Mission semantics.
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
@@ -57,6 +58,102 @@ class AquilaService:
         self.authorization = authorization or AuthorizationEngine()
         self.execution = execution or InMemoryDurableExecutionAdapter()
         self.action_executions: dict[str, str] = {}
+        self.delegations: dict[str, DelegationGrant] = {}
+
+    def issue_delegation(
+        self,
+        *,
+        issuer: Principal,
+        subject: Principal,
+        mission_id: str,
+        allowed_operations: frozenset[str],
+        roe_ceiling: RoeLevel,
+        expires_at: str,
+    ) -> str:
+        """Issue one bounded workload grant under Mission-owner authority."""
+        mission = self.kernel.get_mission(mission_id)
+        if subject.type != PrincipalType.WORKLOAD:
+            raise ValueError("DELEGATION_SUBJECT_MUST_BE_WORKLOAD")
+        if not allowed_operations:
+            raise ValueError("DELEGATION_OPERATIONS_REQUIRED")
+        expires = _parse_timestamp(expires_at)
+        if expires <= _parse_timestamp(self.authorization.clock()):
+            raise ValueError("DELEGATION_EXPIRY_REQUIRED")
+        decision = self.authorization.decide(
+            AuthorizationRequest(
+                principal=issuer,
+                mission_id=mission_id,
+                operation="ISSUE_DELEGATION",
+                roe_level=mission.roe.level,
+                mission_status=mission.status,
+            )
+        )
+        if decision.decision == Decision.DENY:
+            self.kernel.record_delegation_event(
+                mission_id=mission_id, actor=issuer, event_type="DELEGATION_ISSUANCE_DENIED",
+                result="DENY", grant_id="unissued", data={"reason": decision.reason},
+            )
+            raise AuthorizationError(decision.reason)
+        grant = DelegationGrant(
+            grant_id=str(uuid4()), issuer=issuer, subject=subject, mission_id=mission_id,
+            allowed_operations=frozenset(allowed_operations), roe_ceiling=roe_ceiling,
+            expires_at=expires_at, issued_at=decision.evaluated_at,
+        )
+        self.delegations[grant.grant_id] = grant
+        self.kernel.record_delegation_event(
+            mission_id=mission_id, actor=issuer, event_type="DELEGATION_ISSUED", result="SUCCESS",
+            grant_id=grant.grant_id,
+            data={"subject": subject.subject, "operations": sorted(grant.allowed_operations),
+                  "roe_ceiling": roe_ceiling.value, "expires_at": expires_at,
+                  "decision_id": decision.decision_id, "policy_version": decision.policy_version},
+        )
+        return grant.grant_id
+
+    def revoke_delegation(
+        self, *, actor: Principal, mission_id: str, delegation_id: str, reason: str
+    ) -> None:
+        """Revoke an issued grant; future workload uses fail closed."""
+        mission = self.kernel.get_mission(mission_id)
+        grant = self.delegations.get(delegation_id)
+        if grant is None or grant.mission_id != mission_id:
+            raise AuthorizationError("DELEGATION_INVALID")
+        decision = self.authorization.decide(
+            AuthorizationRequest(principal=actor, mission_id=mission_id, operation="REVOKE_DELEGATION",
+                                 roe_level=mission.roe.level, mission_status=mission.status)
+        )
+        if decision.decision == Decision.DENY:
+            self.kernel.record_delegation_event(
+                mission_id=mission_id, actor=actor, event_type="DELEGATION_REVOCATION_DENIED",
+                result="DENY", grant_id=delegation_id, data={"reason": decision.reason},
+            )
+            raise AuthorizationError(decision.reason)
+        self.delegations[delegation_id] = DelegationGrant(
+            **{**grant.__dict__, "revoked": True, "revoked_at": decision.evaluated_at,
+               "revoked_by": actor, "revocation_reason": reason}
+        )
+        self.kernel.record_delegation_event(
+            mission_id=mission_id, actor=actor, event_type="DELEGATION_REVOKED", result="SUCCESS",
+            grant_id=delegation_id, data={"reason": reason, "decision_id": decision.decision_id,
+                                           "policy_version": decision.policy_version},
+        )
+
+    def _workload_decision(
+        self, *, principal: Principal, mission_id: str, operation: str, roe_level: RoeLevel,
+        mission_status: MissionStatus, delegation_id: str | None, **kwargs: Any,
+    ) -> Any:
+        grant = self.delegations.get(delegation_id) if delegation_id else None
+        decision = self.authorization.decide(
+            AuthorizationRequest(principal=principal, mission_id=mission_id, operation=operation,
+                                 roe_level=roe_level, mission_status=mission_status,
+                                 delegation=grant, delegation_id=delegation_id, **kwargs)
+        )
+        self.kernel.record_delegation_event(
+            mission_id=mission_id, actor=principal, event_type="DELEGATION_EVALUATED",
+            result=decision.decision.value, grant_id=delegation_id or "none",
+            data={"operation": operation, "reason": decision.reason,
+                  "decision_id": decision.decision_id, "policy_version": decision.policy_version},
+        )
+        return decision
 
     def create_mission(self, *, actor: Principal, body: dict[str, Any]) -> ApiResponse:
         try:
@@ -205,7 +302,7 @@ class AquilaService:
         mission_id: str,
         action_id: str,
         worker: Principal,
-        delegation: DelegationGrant | None = None,
+        delegation_id: str | None = None,
         fail_after_side_effect: bool = False,
     ) -> str:
         """Run an accepted action through the durable execution boundary."""
@@ -215,18 +312,11 @@ class AquilaService:
             approval.action.id == action_id and approval.status == "APPROVED"
             for approval in self.kernel.approvals.values()
         )
-        decision = self.authorization.decide(
-            AuthorizationRequest(
-                principal=worker,
-                mission_id=mission_id,
-                operation="EXECUTE_ACTION",
-                roe_level=mission.roe.level,
-                mission_status=mission.status,
-                side_effect_class=action.side_effect_class,
-                capability=action.capability,
-                approval_present=approval_present,
-                delegation=delegation,
-            )
+        decision = self._workload_decision(
+            principal=worker, mission_id=mission_id, operation="EXECUTE_ACTION",
+            roe_level=mission.roe.level, mission_status=mission.status, delegation_id=delegation_id,
+            side_effect_class=action.side_effect_class, capability=action.capability,
+            approval_present=approval_present,
         )
         self.kernel.record_execution_authorization(
             mission_id=mission_id,
@@ -237,6 +327,7 @@ class AquilaService:
             reason=decision.reason,
             policy_version=decision.policy_version,
             evaluated_at=decision.evaluated_at,
+            delegation_id=delegation_id,
         )
         if decision.decision == Decision.DENY:
             self.kernel.reject_action_execution(
@@ -293,7 +384,7 @@ class AquilaService:
         *,
         mission_id: str,
         scout: Principal,
-        delegation: DelegationGrant | None,
+        delegation_id: str | None = None,
         runtime: CognitionRuntimeAdapter,
         query: str,
         granted_capabilities: frozenset[str],
@@ -308,15 +399,9 @@ class AquilaService:
         never changes Mission state or gives the model authority.
         """
         mission = self.kernel.get_mission(mission_id)
-        decision = self.authorization.decide(
-            AuthorizationRequest(
-                principal=scout,
-                mission_id=mission_id,
-                operation="READ_MISSION",
-                roe_level=mission.roe.level,
-                mission_status=mission.status,
-                delegation=delegation,
-            )
+        decision = self._workload_decision(
+            principal=scout, mission_id=mission_id, operation="READ_MISSION",
+            roe_level=mission.roe.level, mission_status=mission.status, delegation_id=delegation_id,
         )
         if decision.decision == Decision.DENY:
             raise AuthorizationError(decision.reason)
@@ -378,22 +463,16 @@ class AquilaService:
         *,
         mission_id: str,
         worker: Principal,
-        delegation: DelegationGrant | None,
+        delegation_id: str | None = None,
         tabula: TabulaRetrievalAdapter,
         query: str,
         limit: int = 10,
     ) -> tuple[RetrievedKnowledge, ...]:
         """Retrieve scoped Tabula context under a fresh workload authorization."""
         mission = self.kernel.get_mission(mission_id)
-        decision = self.authorization.decide(
-            AuthorizationRequest(
-                principal=worker,
-                mission_id=mission_id,
-                operation="READ_KNOWLEDGE",
-                roe_level=mission.roe.level,
-                mission_status=mission.status,
-                delegation=delegation,
-            )
+        decision = self._workload_decision(
+            principal=worker, mission_id=mission_id, operation="READ_KNOWLEDGE",
+            roe_level=mission.roe.level, mission_status=mission.status, delegation_id=delegation_id,
         )
         if decision.decision == Decision.DENY:
             raise AuthorizationError(decision.reason)
@@ -404,7 +483,7 @@ class AquilaService:
         *,
         mission_id: str,
         scout: Principal,
-        delegation: DelegationGrant | None,
+        delegation_id: str | None = None,
         runtime: CognitionRuntimeAdapter,
         tabula: TabulaRetrievalAdapter,
         query: str,
@@ -421,7 +500,7 @@ class AquilaService:
             for item in self.retrieve_knowledge(
                 mission_id=mission_id,
                 worker=scout,
-                delegation=delegation,
+                delegation_id=delegation_id,
                 tabula=tabula,
                 query=query,
                 limit=limit,
@@ -430,7 +509,7 @@ class AquilaService:
         return self.run_scout(
             mission_id=mission_id,
             scout=scout,
-            delegation=delegation,
+            delegation_id=delegation_id,
             runtime=runtime,
             query=query,
             granted_capabilities=granted_capabilities,
@@ -442,7 +521,7 @@ class AquilaService:
         *,
         mission_id: str,
         worker: Principal,
-        delegation: DelegationGrant | None,
+        delegation_id: str | None = None,
         fabrica: ToolExecutionAdapter,
         capability: str,
         arguments: dict[str, Any],
@@ -453,16 +532,10 @@ class AquilaService:
         invocation_id = str(uuid4())
         correlation_id = correlation_id or str(uuid4())
         definition = fabrica.resolve(capability)
-        decision = self.authorization.decide(
-            AuthorizationRequest(
-                principal=worker,
-                mission_id=mission_id,
-                operation="READ_TOOL",
-                roe_level=mission.roe.level,
-                mission_status=mission.status,
-                capability=capability,
-                delegation=delegation,
-            )
+        decision = self._workload_decision(
+            principal=worker, mission_id=mission_id, operation="READ_TOOL",
+            roe_level=mission.roe.level, mission_status=mission.status, delegation_id=delegation_id,
+            capability=capability,
         )
         reason = decision.reason
         allowed = decision.decision == Decision.ALLOW
@@ -483,6 +556,7 @@ class AquilaService:
             policy_version=decision.policy_version,
             evaluated_at=decision.evaluated_at,
             correlation_id=correlation_id,
+            delegation_id=delegation_id,
         )
         if not allowed:
             self.kernel.record_tool_result(
@@ -869,3 +943,15 @@ def _encode(value: Any) -> Any:
     if is_dataclass(value):
         return {field.name: _encode(getattr(value, field.name)) for field in fields(value)}
     return value
+
+
+def _parse_timestamp(value: str) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError("DELEGATION_EXPIRY_REQUIRED")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("DELEGATION_EXPIRY_REQUIRED") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("DELEGATION_EXPIRY_REQUIRED")
+    return parsed.astimezone(timezone.utc)

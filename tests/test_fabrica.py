@@ -1,6 +1,6 @@
 import unittest
 
-from aquila_api import AquilaService, DelegationGrant
+from aquila_api import AquilaService
 from legion_fabrica import InMemoryFabrica, ToolDefinition, UnknownTool
 from legion_kernel import AuthorizationError, Principal, PrincipalType, RoeLevel
 
@@ -35,13 +35,9 @@ class FabricaTests(unittest.TestCase):
         )
 
     def grant(self):
-        return DelegationGrant(
-            grant_id="read-tool-grant",
-            issuer=self.owner,
-            subject=self.worker,
-            mission_id=self.mission_id,
-            allowed_operations=frozenset({"READ_TOOL"}),
-            roe_ceiling=RoeLevel.OBSERVE,
+        return self.service.issue_delegation(
+            issuer=self.owner, subject=self.worker, mission_id=self.mission_id,
+            allowed_operations=frozenset({"READ_TOOL"}), roe_ceiling=RoeLevel.OBSERVE,
             expires_at="9999-01-01T00:00:00Z",
         )
 
@@ -49,7 +45,7 @@ class FabricaTests(unittest.TestCase):
         result = self.service.invoke_read_tool(
             mission_id=self.mission_id,
             worker=self.worker,
-            delegation=self.grant(),
+            delegation_id=self.grant(),
             fabrica=self.fabrica,
             capability="metrics.read",
             arguments={"service": "api"},
@@ -72,7 +68,7 @@ class FabricaTests(unittest.TestCase):
             self.service.invoke_read_tool(
                 mission_id=self.mission_id,
                 worker=self.worker,
-                delegation=self.grant(),
+                delegation_id=self.grant(),
                 fabrica=self.fabrica,
                 capability="shell.execute",
                 arguments={},
@@ -91,7 +87,7 @@ class FabricaTests(unittest.TestCase):
             self.service.invoke_read_tool(
                 mission_id=self.mission_id,
                 worker=self.worker,
-                delegation=self.grant(),
+                delegation_id=self.grant(),
                 fabrica=self.fabrica,
                 capability="service.restart",
                 arguments={"service": "api"},
@@ -118,7 +114,7 @@ class FabricaTests(unittest.TestCase):
             self.service.invoke_read_tool(
                 mission_id=self.mission_id,
                 worker=self.worker,
-                delegation=self.grant(),
+                delegation_id=self.grant(),
                 fabrica=self.fabrica,
                 capability="metrics.read",
                 arguments={"service": "api"},
@@ -129,7 +125,7 @@ class FabricaTests(unittest.TestCase):
             self.service.invoke_read_tool(
                 mission_id=self.mission_id,
                 worker=self.worker,
-                delegation=None,
+                delegation_id=None,
                 fabrica=self.fabrica,
                 capability="metrics.read",
                 arguments={"service": "api"},
