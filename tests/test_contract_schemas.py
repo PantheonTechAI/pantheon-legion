@@ -45,6 +45,7 @@ class ContractSchemaTests(unittest.TestCase):
         self.assertFalse(binding["additionalProperties"])
         self.assertFalse(error["additionalProperties"])
         self.assertIn("AUTHORIZATION_DENIED", error["properties"]["code"]["enum"])
+        self.assertNotIn("UNAUTHENTICATED", error["properties"]["code"]["enum"])
         self.assertNotIn("delegated_token", error["properties"])
         retry_rule = error["allOf"][0]["then"]
         self.assertIn("retry_after_ms", retry_rule["required"])

@@ -1,7 +1,7 @@
 # Federated security and Tabula read-contract artifacts
 
 Status: Draft contract artifacts for ADR-002 and ADR-003<br>
-Contract revision: 1.1 (wire schemas: 1.0)
+Contract revision: 1.2 (wire schemas: 1.0)
 
 These schemas are the shared implementation boundary for the Pantheon STS,
 Aquila, and Tabula. They specify data shape only; transport authentication,
@@ -57,11 +57,17 @@ permitted in MCP arguments, tool results, errors, or Mission audit payloads.
 | `legion_search_corpus` | `TABULA_CORPUS_READ` | `tabula-corpus-read.schema.json` `$defs.request` | `$defs.response` in the same schema |
 | `legion_discover_registry` | `TABULA_REGISTRY_READ` | `tabula-registry-read.schema.json` `$defs.request` | `$defs.response` in the same schema |
 
-Before either tool evaluates a request, Tabula MUST introspect the opaque token
-with STS and resolve the exact active `TabulaScopeBinding`. The active token's
-Organization, Workspace, operation, binding ID, and binding version must match
-the protected operation and binding. Any mismatch, unavailable introspection,
-inactive binding, or malformed input is denied before a corpus or Registry read.
+Before either tool evaluates a request, Tabula's transport-authentication layer
+MUST introspect the opaque token with STS. A missing bearer, an inactive or
+malformed token, or unavailable/malformed STS introspection receives a generic
+HTTP 401 response before MCP tool dispatch. It does not receive this error
+envelope or a reason that distinguishes token, audience, or STS failure.
+
+After transport authentication succeeds, Tabula resolves the exact active
+`TabulaScopeBinding`. The active token's Organization, Workspace, operation,
+binding ID, and binding version must match the protected operation and binding.
+Any mismatch, inactive binding, or malformed input is denied before a corpus or
+Registry read.
 
 Each call has a 10-second end-to-end deadline, including mandatory STS
 introspection. A `DEADLINE_EXCEEDED` result makes no claim that a retry would
@@ -71,10 +77,11 @@ succeed. Aquila MAY retry only once, only when the error envelope says
 retry authorization denials, alter scope, or fall back to an existing
 user/PAT-oriented Tabula tool.
 
-Both dedicated tools return the shared federated-read error envelope for any
-failure. `AUTHORIZATION_DENIED` intentionally collapses binding, tenant,
-scope, lifecycle, and resource-existence distinctions. `SERVICE_UNAVAILABLE`
-is the only initially retryable code; it includes `retry_after_ms`.
+After transport authentication, both dedicated tools return the shared
+federated-read error envelope for any failure. `AUTHORIZATION_DENIED`
+intentionally collapses binding, tenant, scope, lifecycle, and
+resource-existence distinctions. `SERVICE_UNAVAILABLE` is the only initially
+retryable code; it includes `retry_after_ms`.
 
 ### MCP example
 
