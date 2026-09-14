@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pantheon:tabula:schema:scope-binding:v1",
+  "title": "Pantheon TabulaScopeBinding",
+  "description": "A Tabula-owned, jointly governed mapping from a Legion Organization and Workspace to narrow Tabula read scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "version", "organization_id", "workspace_id", "plane", "status", "policy_version", "approved_at", "effective_from"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "id": {"type": "string", "format": "uuid"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "organization_id": {"type": "string", "format": "uuid"},
+    "workspace_id": {"type": "string", "format": "uuid"},
+    "plane": {"type": "string", "enum": ["CORPUS", "REGISTRY"]},
+    "status": {"type": "string", "enum": ["DRAFT", "ACTIVE", "SUSPENDED", "RETIRED"]},
+    "allowed_domains": {"type": "array", "minItems": 1, "maxItems": 50, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"}},
+    "allowed_registry_kinds": {"type": "array", "minItems": 1, "maxItems": 50, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"}},
+    "policy_version": {"type": "string", "minLength": 1, "maxLength": 128},
+    "approved_at": {"type": "string", "format": "date-time"},
+    "effective_from": {"type": "string", "format": "date-time"},
+    "effective_until": {"type": ["string", "null"], "format": "date-time"}
+  },
+  "allOf": [
+    {"if": {"properties": {"plane": {"const": "CORPUS"}}, "required": ["plane"]}, "then": {"required": ["allowed_domains"], "properties": {"allowed_registry_kinds": false}}},
+    {"if": {"properties": {"plane": {"const": "REGISTRY"}}, "required": ["plane"]}, "then": {"required": ["allowed_registry_kinds"], "properties": {"allowed_domains": false}}}
+  ]
+}

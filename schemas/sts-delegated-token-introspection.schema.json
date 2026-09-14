@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pantheon:security:schema:delegated-token-introspection:v1",
+  "title": "Pantheon Delegated Token Introspection Response",
+  "description": "The fail-closed STS status response consumed by a target product. The request token is deliberately not modeled as an auditable contract payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "active", "evaluated_at"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "active": {"type": "boolean"},
+    "evaluated_at": {"type": "string", "format": "date-time"},
+    "denial_code": {"type": "string", "enum": ["TOKEN_UNKNOWN", "TOKEN_EXPIRED", "TOKEN_REVOKED", "TOKEN_REPLAYED", "TOKEN_AUDIENCE_MISMATCH", "TOKEN_OPERATION_MISMATCH", "BINDING_INACTIVE"]},
+    "token_id": {"type": "string", "format": "uuid"},
+    "subject_id": {"type": "string", "minLength": 1, "maxLength": 512},
+    "actor_id": {"const": "aquila"},
+    "mission_id": {"type": "string", "format": "uuid"},
+    "audience": {"const": "pantheon-tabula-mcp"},
+    "operation": {"type": "string", "enum": ["TABULA_CORPUS_READ", "TABULA_REGISTRY_READ"]},
+    "binding_id": {"type": "string", "format": "uuid"},
+    "binding_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "authorization_assertion_id": {"type": "string", "format": "uuid"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"active": {"const": true}}, "required": ["active"]},
+      "then": {"required": ["token_id", "subject_id", "actor_id", "mission_id", "audience", "operation", "binding_id", "binding_version", "expires_at", "authorization_assertion_id"], "not": {"required": ["denial_code"]}}
+    },
+    {
+      "if": {"properties": {"active": {"const": false}}, "required": ["active"]},
+      "then": {"required": ["denial_code"]}
+    }
+  ]
+}
