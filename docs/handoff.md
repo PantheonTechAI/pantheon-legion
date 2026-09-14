@@ -24,25 +24,26 @@ and Registry workflows.
 
 ## Active implementation boundary
 
-PR #49, `Persist Aquila-issued delegation grants`, is the current foundation
-slice. It replaces caller-provided service grants with owner-issued opaque IDs,
-durable SQLite recovery, revocation, and lifecycle/use audit facts. It has **89
-passing tests** and all seven M1 acceptance scenarios passing on its branch.
+PR #49, `Persist Aquila-issued delegation grants`, has merged. It replaces
+caller-provided service grants with owner-issued opaque IDs, durable SQLite
+recovery, revocation, and lifecycle/use audit facts. It has **89 passing
+tests** and all seven M1 acceptance scenarios passing on `main`.
 
-After it merges, the only next implementation slice is **atomic authority
-persistence**: commit each accepted operation's Mission snapshot,
+The only active implementation slice is **atomic authority persistence**:
+commit each accepted operation's Mission snapshot,
 authoritative events, approval/idempotency/execution projections, and grant
 state atomically or through a transactional outbox. Do not start a Tabula MCP
 client, Portal, Praetorium, Fabrica transport, or model-provider expansion
-before that slice and the joint Legion–Tabula identity/scope/correlation ADR.
+before that slice merges and the joint Legion–Tabula identity/scope/correlation
+ADR is complete.
 
 ## Current state
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged [PR #45](https://github.com/PantheonTechAI/pantheon-legion/pull/45)
-  (`cd104fb`), `feat: add audited Scout model provider contract`.
-- The full test suite passes: **86 tests** after installing
+- `main` includes merged [PR #49](https://github.com/PantheonTechAI/pantheon-legion/pull/49)
+  (`c612700`), `Persist Aquila-issued delegation grants`.
+- The full test suite passes: **89 tests** after installing
   `requirements.txt` (which declares LangGraph).
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
@@ -142,6 +143,7 @@ Recent merged implementation slices:
 | #43 | LangGraph Scout runtime with an injected model responder |
 | #44 | LangGraph implementation handoff checkpoint |
 | #45 | Audited, provider-neutral Scout model-provider contract |
+| #49 | Persisted Aquila-issued delegation grants |
 
 ## New-session quick start
 
@@ -157,10 +159,9 @@ python3 -m venv /tmp/pantheon-legion-venv
 /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
 ```
 
-Expected merged-main baseline before PR #49: a clean `main`, **86 passing
-tests**, and seven passing M1 scenarios. PR #49 has 89 tests. Work one bounded
-feature branch at a time, open a PR, and wait for its merge before starting the
-next implementation slice.
+Expected merged-main baseline: a clean `main`, **89 passing tests**, and seven
+passing M1 scenarios. Work one bounded feature branch at a time, open a PR,
+and wait for its merge before starting the next implementation slice.
 
 Use `env -u GH_TOKEN` for GitHub CLI commands: the ambient token is invalid in
 the development environment.
@@ -271,7 +272,7 @@ Other known boundaries, deliberately not started here:
 
 ## Next-session plan
 
-1. Merge PR #49; do not recreate its delegation design in another component.
+1. PR #49 is merged; do not recreate its delegation design in another component.
 2. Start from the latest merged `main` and run the quick-start verification
    commands before selecting the atomic-persistence slice.
 3. Complete atomic authority persistence, including adversarial crash and
