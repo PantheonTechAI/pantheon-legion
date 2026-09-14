@@ -18,6 +18,7 @@ class DisposableLiveConformanceTests(unittest.TestCase):
                 self.endpoint = endpoint
 
             def __call__(self, token, request):
+                token = token()
                 args = request["arguments"]
                 if token == "not-a-delegated-token":
                     return McpReply(401, {"code": "UNAUTHENTICATED"})

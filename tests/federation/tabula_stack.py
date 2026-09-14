@@ -42,6 +42,10 @@ class TabulaDisposableStack:
         self._compose_prefix = prefix
         self._environment = environment
         self.runner(compose, cwd=self.tabula_root, env=environment, check=True)
+        self.runner(
+            prefix + ["exec", "-T", "console", "alembic", "upgrade", "head"],
+            cwd=self.tabula_root, env=environment, check=True,
+        )
         values = _environment_values(self.env_file)
         seed = (self.tabula_root / "tests/federation/seed_scope_bindings.sql").read_text()
         self.runner(
@@ -57,7 +61,7 @@ class TabulaDisposableStack:
         """Remove only the project that this adapter successfully started."""
         if self._compose_prefix is None:
             return
-        self.runner(self._compose_prefix + ["down", "--volumes"], cwd=self.tabula_root, env=self._environment, check=True)
+        self.runner(self._compose_prefix + ["down", "--volumes", "--remove-orphans"], cwd=self.tabula_root, env=self._environment, check=True)
         self._compose_prefix = None
         self._environment = None
 
