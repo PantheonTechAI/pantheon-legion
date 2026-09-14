@@ -5,7 +5,7 @@
   "description": "The signed payload Aquila presents to the Pantheon STS. It is not a browser credential, DelegationGrant, or target-product token.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "assertion_id", "issuer", "audience", "subject_id", "actor_id", "mission_id", "target_product", "target_audience", "operation", "binding_id", "binding_version", "issued_at", "expires_at", "correlation_id"],
+  "required": ["schema_version", "assertion_id", "issuer", "audience", "subject_id", "actor_id", "mission_id", "organization_id", "workspace_id", "target_product", "target_audience", "operation", "binding_id", "binding_version", "issued_at", "expires_at", "correlation_id"],
   "properties": {
     "schema_version": {"const": "1.0"},
     "assertion_id": {"type": "string", "format": "uuid"},
@@ -14,6 +14,8 @@
     "subject_id": {"type": "string", "minLength": 1, "maxLength": 512},
     "actor_id": {"const": "aquila"},
     "mission_id": {"type": "string", "format": "uuid"},
+    "organization_id": {"type": "string", "format": "uuid"},
+    "workspace_id": {"type": "string", "format": "uuid"},
     "target_product": {"const": "TABULA"},
     "target_audience": {"const": "pantheon-tabula-mcp"},
     "operation": {"type": "string", "enum": ["TABULA_CORPUS_READ", "TABULA_REGISTRY_READ"]},

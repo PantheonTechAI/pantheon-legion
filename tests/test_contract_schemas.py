@@ -34,7 +34,12 @@ class ContractSchemaTests(unittest.TestCase):
 
         self.assertEqual(assertion["properties"]["issuer"]["const"], "aquila")
         self.assertEqual(assertion["properties"]["audience"]["const"], "pantheon-sts")
+        self.assertIn("organization_id", assertion["required"])
+        self.assertIn("workspace_id", assertion["required"])
         self.assertEqual(introspection["properties"]["active"]["type"], "boolean")
+        active_introspection = introspection["allOf"][0]["then"]
+        self.assertIn("organization_id", active_introspection["required"])
+        self.assertIn("workspace_id", active_introspection["required"])
         self.assertEqual(binding["properties"]["plane"]["enum"], ["CORPUS", "REGISTRY"])
         self.assertFalse(binding["additionalProperties"])
 
