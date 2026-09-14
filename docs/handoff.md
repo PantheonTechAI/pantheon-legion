@@ -30,9 +30,9 @@ approval/idempotency/execution projections, and grant state in one SQLite
 transaction. It has **92 passing tests** and all seven M1 acceptance scenarios
 passing on `main`.
 
-ADRs 002 and 003 are accepted. PR #53 publishes versioned schema artifacts for
-the Aquila-to-STS assertion, STS token introspection, Tabula scope binding, and
-separate corpus/Registry reads. The next work belongs to the STS and Tabula
+ADRs 002 and 003 are accepted. PR #53 has merged the versioned schema artifacts
+for the Aquila-to-STS assertion, STS token introspection, Tabula scope binding,
+and separate corpus/Registry reads. The next work belongs to the STS and Tabula
 owners: implement and jointly test those contracts. Do not start a Legion MCP
 client, Portal, Praetorium, Fabrica transport, or model-provider expansion
 before conforming target services are available.
@@ -41,8 +41,8 @@ before conforming target services are available.
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged [PR #51](https://github.com/PantheonTechAI/pantheon-legion/pull/51)
-  (`d82f4a3`), `Propose Legion Tabula authorized read ADR`.
+- `main` includes merged [PR #53](https://github.com/PantheonTechAI/pantheon-legion/pull/53)
+  (`0627083`), `Publish federated Tabula contract schemas`.
 - The full test suite passes: **93 tests** after installing
   `requirements.txt` (which declares LangGraph).
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
@@ -62,6 +62,8 @@ The repository now has a framework-neutral Mission control plane with:
 - Atomic local persistence of each accepted authority record: Mission snapshot,
   events, approvals, idempotency, execution state, side-effect projection, and
   delegation state commit or roll back together.
+- Versioned, machine-readable contracts for federated workload authorization,
+  STS token status, Tabula scope bindings, and separate corpus/Registry reads.
 - A provider-neutral durable execution adapter with idempotent starts, valid
   state transitions, pause/resume/cancel signaling, recovery, and snapshots.
 - Execution-boundary controls: current Mission state, ROE, fresh Approval,
@@ -280,7 +282,7 @@ Other known boundaries, deliberately not started here:
 
 1. PRs #49 and #50 are merged; do not recreate their delegation or local
    atomic-persistence designs in another component.
-2. PR #53 publishes the STS authorization-assertion/introspection and Tabula
+2. PR #53 merged the STS authorization-assertion/introspection and Tabula
    binding/read schemas required by ADRs 002 and 003.
 3. The security-platform and Tabula owners implement their contracts and add a
    joint suite for token revocation, binding denial, provenance, and
