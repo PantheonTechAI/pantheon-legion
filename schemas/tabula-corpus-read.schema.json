@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pantheon:tabula:schema:corpus-read:v1",
+  "title": "Pantheon Tabula Corpus Read Contract",
+  "description": "Versioned request and success-response shapes for an authorized curated-corpus read. Delegated tokens travel only in protected transport authorization, never in this payload.",
+  "$defs": {
+    "binding_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {"id": {"type": "string", "format": "uuid"}, "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}}
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "request_id", "correlation_id", "binding", "intent", "query", "limit"],
+      "properties": {
+        "schema_version": {"const": "1.0"},
+        "request_id": {"type": "string", "format": "uuid"},
+        "correlation_id": {"type": "string", "format": "uuid"},
+        "binding": {"$ref": "#/$defs/binding_reference"},
+        "intent": {"type": "string", "enum": ["SCOUT_EVIDENCE", "OPERATOR_CONTEXT"]},
+        "query": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 50}
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_id", "domain", "revision", "canonical_uri", "source", "recorded_at", "retrieved_at", "selection_explanation"],
+      "properties": {
+        "record_id": {"type": "string", "minLength": 1, "maxLength": 512},
+        "domain": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$"},
+        "revision": {"type": "string", "minLength": 1, "maxLength": 128},
+        "canonical_uri": {"type": "string", "format": "uri", "maxLength": 2048},
+        "source": {"type": "object", "additionalProperties": false, "required": ["citation"], "properties": {"citation": {"type": "string", "minLength": 1, "maxLength": 4000}, "uri": {"type": "string", "format": "uri", "maxLength": 2048}}},
+        "recorded_at": {"type": "string", "format": "date-time"},
+        "retrieved_at": {"type": "string", "format": "date-time"},
+        "selection_explanation": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "content": {"type": "string", "maxLength": 20000}
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "request_id", "correlation_id", "binding", "results", "tabula_audit_correlation_id"],
+      "properties": {
+        "schema_version": {"const": "1.0"},
+        "request_id": {"type": "string", "format": "uuid"},
+        "correlation_id": {"type": "string", "format": "uuid"},
+        "binding": {"$ref": "#/$defs/binding_reference"},
+        "results": {"type": "array", "maxItems": 50, "items": {"$ref": "#/$defs/record"}},
+        "tabula_audit_correlation_id": {"type": "string", "format": "uuid"}
+      }
+    }
+  }
+}

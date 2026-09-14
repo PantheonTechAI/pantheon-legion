@@ -248,8 +248,11 @@ Required rules:
 
 ### Phase 2 — define and implement Tabula's Legion read contract
 
-1. In Tabula, add a narrowly scoped, read-only MCP contract with the required
-   corpus and/or registry response fields and transport correlation.
+1. **Schema published in PR #53:** the versioned STS assertion/introspection,
+   Tabula scope-binding, corpus, and Registry artifacts are in Legion's
+   `schemas/` directory. In Tabula, implement a narrowly scoped, read-only MCP
+   contract with the required corpus and/or Registry response fields and
+   transport correlation.
 2. Define a server-enforced mapping from Legion-approved scope bindings to
    Tabula domains and registry kinds. Do not use a platform-admin PAT as the
    steady-state solution.

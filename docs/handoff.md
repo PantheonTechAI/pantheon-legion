@@ -30,13 +30,12 @@ approval/idempotency/execution projections, and grant state in one SQLite
 transaction. It has **92 passing tests** and all seven M1 acceptance scenarios
 passing on `main`.
 
-ADRs 002 and 003 are accepted. They define Pantheon's reusable federated
-workload-security model and its Legion–Tabula application: Tabula-owned scope
-bindings, separate corpus/Registry contracts, provenance, and compatibility.
-The next work is the joint versioned Tabula read-contract specification and
-security-platform STS interface; do not start a Legion MCP client, Portal,
-Praetorium, Fabrica transport, or model-provider expansion before those
-contracts are published and tested.
+ADRs 002 and 003 are accepted. PR #53 publishes versioned schema artifacts for
+the Aquila-to-STS assertion, STS token introspection, Tabula scope binding, and
+separate corpus/Registry reads. The next work belongs to the STS and Tabula
+owners: implement and jointly test those contracts. Do not start a Legion MCP
+client, Portal, Praetorium, Fabrica transport, or model-provider expansion
+before conforming target services are available.
 
 ## Current state
 
@@ -44,7 +43,7 @@ Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
 - `main` includes merged [PR #51](https://github.com/PantheonTechAI/pantheon-legion/pull/51)
   (`d82f4a3`), `Propose Legion Tabula authorized read ADR`.
-- The full test suite passes: **92 tests** after installing
+- The full test suite passes: **93 tests** after installing
   `requirements.txt` (which declares LangGraph).
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
@@ -150,6 +149,7 @@ Recent merged implementation slices:
 | #49 | Persisted Aquila-issued delegation grants |
 | #50 | Atomic Aquila authority persistence |
 | #51 | Federated workload-security and Legion–Tabula read ADRs |
+| #53 | Versioned STS and Tabula contract schemas |
 
 ## New-session quick start
 
@@ -165,7 +165,7 @@ python3 -m venv /tmp/pantheon-legion-venv
 /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
 ```
 
-Expected merged-main baseline: a clean `main`, **92 passing tests**, and seven
+Expected merged-main baseline: a clean `main`, **93 passing tests**, and seven
 passing M1 scenarios. Work one bounded feature branch at a time, open a PR,
 and wait for its merge before starting the next implementation slice.
 
@@ -280,11 +280,12 @@ Other known boundaries, deliberately not started here:
 
 1. PRs #49 and #50 are merged; do not recreate their delegation or local
    atomic-persistence designs in another component.
-2. Publish the joint STS authorization-assertion, delegated-token, and
-   introspection schemas required by ADR-002.
-3. Publish Tabula's `TabulaScopeBinding`, corpus, and Registry read schemas
-   required by ADR-003, then build and test the Tabula server contract.
-4. Only after those contracts are available, implement separate Legion corpus
+2. PR #53 publishes the STS authorization-assertion/introspection and Tabula
+   binding/read schemas required by ADRs 002 and 003.
+3. The security-platform and Tabula owners implement their contracts and add a
+   joint suite for token revocation, binding denial, provenance, and
+   correlation.
+4. Only after those conforming services are available, implement separate Legion corpus
    and Registry clients. Keep Tabula's Console as the knowledge/governance UI
    and build Praetorium as Aquila's thin human-operations client.
 
