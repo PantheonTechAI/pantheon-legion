@@ -1,12 +1,24 @@
 # Federated security and Tabula read-contract artifacts
 
-Status: Draft contract artifacts for ADR-002 and ADR-003<br>
+Status: Versioned shared contract for ADR-002 and ADR-003. Tabula's target-side
+implementation is merged; the STS issuer, shared conformance environment, and
+Aquila clients remain pending.<br>
 Contract revision: 1.2 (wire schemas: 1.0)
 
 These schemas are the shared implementation boundary for the Pantheon STS,
 Aquila, and Tabula. They specify data shape only; transport authentication,
 JWS signing, key distribution, token storage, and MCP tool wiring remain owned
 by the service that implements them.
+
+## Implementation checkpoint
+
+Legion PRs #53, #55, #56, and #57 publish the schemas and define the transport
+semantics. Tabula PRs #29–#33 implement the two protected tools, fail-closed STS
+introspection, exact active Organization/Workspace bindings, corpus provenance,
+and Registry discovery projection. This is **not** an end-to-end integration:
+there is no shared STS issuer/test fixture or Aquila client yet. The next
+approval gate is a cross-service conformance suite, not a PAT fallback or a
+browser-mediated call.
 
 | Artifact | Producer | Consumer | Purpose |
 |---|---|---|---|

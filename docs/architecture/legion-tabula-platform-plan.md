@@ -1,7 +1,9 @@
 # Legion–Tabula platform architecture and remediation plan
 
-Status: proposed<br>
-Date: 2026-09-13<br>
+Status: target architecture. The shared contract and Tabula's target-side
+federated-read implementation are now merged; STS issuance, joint conformance,
+and Aquila clients remain pending.<br>
+Date: 2026-09-14<br>
 Scope: architecture alignment; no production integration is implemented by this document.
 
 ## Purpose
@@ -18,9 +20,11 @@ is an independently operating knowledge and registry product with a usable web
 console and an authenticated MCP server. They should be integrated as separate
 bounded systems, not merged into one database, UI, or agent runtime.
 
-The first integration must not be an MCP client alone. The platform must first
-close Legion's delegation and transaction gaps, then define a versioned
-Legion–Tabula MCP contract for identity, scope, provenance, and correlation.
+The first integration must not be an MCP client alone. Legion's delegation and
+local transaction gaps are closed, the versioned identity/scope/provenance/
+correlation contract is published, and Tabula's protected read target is now
+implemented. A real STS and joint conformance suite still precede an Aquila MCP
+client.
 
 ## North star — the architecture to preserve
 
@@ -49,10 +53,10 @@ Aquila-issued workload grant.
 
 | Area | Present implementation | Important gap |
 |---|---|---|
-| Aquila | Mission kernel, OpenAPI-shaped service, WSGI adapter, OIDC claim mapper, persisted revocable opaque delegation IDs, and atomic local authority persistence | Joint Legion–Tabula identity, scope, correlation, and compatibility contract remains next. |
+| Aquila | Mission kernel, OpenAPI-shaped service, WSGI adapter, OIDC claim mapper, persisted revocable opaque delegation IDs, atomic local authority persistence, and the published federated contract/transport semantics | No STS issuer or two-client MCP adapter exists yet. |
 | Mission persistence | SQLite snapshots, ordered audit records, idempotency, restart tests, and atomic local authority commits | External delivery must use a transactional outbox when a non-transactional workflow or tool provider is introduced. |
 | Cognition | Read-only Scout contract and one-node LangGraph runtime | Model-provider seam currently sits in cognition, rather than an explicit model-fabric boundary. |
-| Tabula | In-memory `TabulaRetrievalAdapter` test double | No MCP client, service identity, Tabula-scope mapping, response contract, or cross-system correlation. |
+| Tabula | Legion retains an in-memory `TabulaRetrievalAdapter` test double; Tabula itself implements the dedicated protected corpus and Registry MCP tools, STS verifier, bindings, provenance, and audit correlation | No jointly tested STS issuer or Aquila client is available. |
 | Fabrica | In-memory declared read-tool broker | No MCP transport, sandbox, network/filesystem enforcement, or credential broker. |
 | Durable execution | In-memory provider-neutral adapter | No Temporal or other production workflow provider. |
 | Praetorium | Architecture concept only | No Legion human-operations UI exists. |
@@ -76,17 +80,17 @@ gates, validation, artifacts, relations, audit, and scoped access. RushDB is a
 derived projection for graph traversal and discovery, not a second registry
 write model.
 
-Tabula's MCP server is FastMCP over HTTP at `/mcp`; it requires a bearer PAT
-for every tool call. Its present authorization scopes are user/PAT and domain
-or registry-kind based (for example `domain:patterns:viewer` and
-`domain:registry:agent:viewer`). It does not presently accept or enforce a
-Legion Organization, Workspace, Mission, delegation ID, or Aquila correlation
-ID.
+Tabula's MCP server is FastMCP over HTTP at `/mcp`. Its ordinary tool surface
+uses a user/PAT and domain- or Registry-kind-scoped model (for example
+`domain:patterns:viewer` and `domain:registry:agent:viewer`). The two dedicated
+tools, `legion_search_corpus` and `legion_discover_registry`, instead accept an
+opaque STS-delegated token and require an exact active Tabula-owned
+Organization/Workspace binding, matching plane, version, lifecycle, and time
+window. A federated token gains no legacy PAT scopes.
 
-`search_knowledge` returns compact summaries (`id`, `name`, `domain`,
-`summary`, `status`, `tags`, and `revision`). It does not yet return the
-canonical source URI and observation timestamp required by Legion's current
-Scout evidence shape.
+The corpus tool returns compact cited provenance; the Registry tool returns only
+binding-allowed, validated artifact-backed discovery metadata. Both retain an
+audit-correlation reference. Neither is an Aquila client or an execution grant.
 
 ### Architecture mismatches and risks
 
@@ -248,24 +252,26 @@ Required rules:
 
 ### Phase 2 — define and implement Tabula's Legion read contract
 
-1. **Schema published in PR #53:** the versioned STS assertion/introspection,
-   Tabula scope-binding, corpus, and Registry artifacts are in Legion's
-   `schemas/` directory. In Tabula, implement a narrowly scoped, read-only MCP
-   contract with the required corpus and/or Registry response fields and
-   transport correlation.
-2. Define a server-enforced mapping from Legion-approved scope bindings to
-   Tabula domains and registry kinds. Do not use a platform-admin PAT as the
-   steady-state solution.
-3. Decide a workload identity approach: short-lived exchanged token is
-   preferred; a long-lived, least-privilege service identity is an interim
-   option only with rotation and audit.
-4. Add Tabula contract tests for token expiry/revocation, domain/kind denial,
-   active-only registry discovery, correlation, and response provenance.
+1. **Completed:** PR #53 published the schemas; PRs #55–#57 fixed tenant
+   claims, transport/retry semantics, and the authentication/error boundary.
+   Tabula PRs #29–#33 implement the dedicated read-only MCP tools, exact
+   Tabula-owned scope bindings, provenance, Registry projection, and focused
+   contract tests.
+2. **Completed in Tabula:** bindings resolve server-side to corpus domains or
+   Registry kinds. A platform-admin PAT is not the federated steady-state path.
+3. **Pending, security-platform owned:** implement the short-lived exchanged
+   token issuer, signed assertion validation, key distribution, revocation, and
+   deterministic introspection fixture. A long-lived service identity is not an
+   approved substitution.
+4. **Pending, joint:** prove the shared behavior against a real Tabula service:
+   token expiry/revocation, generic pre-tool 401s, binding/tenant denial,
+   active-only discovery, correlation, deadline/retry, and response provenance.
 
 ### Phase 3 — Legion MCP client adapters
 
-1. Implement `TabulaCorpusClient` and `TabulaRegistryClient` behind separate
-   Legion protocols; retain in-memory implementations only as test doubles.
+1. After Phase 2's joint conformance gate, implement `TabulaCorpusClient` and
+   `TabulaRegistryClient` behind separate Legion protocols; retain in-memory
+   implementations only as test doubles.
 2. Aquila obtains authorization and a durable grant before each MCP call.
 3. Validate Tabula responses before creating evidence or registry references.
 4. Append correlated Aquila authorization/result events; retain only approved
