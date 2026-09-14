@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from legion_kernel import AuthorizationError, LegionKernel, Principal, WorkerKilled
+from legion_kernel import AuthorizationError, LegionKernel, Principal, RoeLevel, WorkerKilled
 from legion_kernel.kernel import Action, Approval, PrincipalType
 from legion_store import SQLiteMissionStore
 from legion_runtime import InMemoryDurableExecutionAdapter
@@ -90,7 +90,7 @@ class PersistentAquilaService(AquilaService):
         mission_id: str,
         action_id: str,
         worker: Principal,
-        delegation: DelegationGrant | None = None,
+        delegation_id: str | None = None,
         fail_after_side_effect: bool = False,
     ) -> str:
         mission = self.kernel.missions[mission_id]
@@ -101,7 +101,7 @@ class PersistentAquilaService(AquilaService):
                 mission_id=mission_id,
                 action_id=action_id,
                 worker=worker,
-                delegation=delegation,
+                delegation_id=delegation_id,
                 fail_after_side_effect=fail_after_side_effect,
             )
         finally:
@@ -111,6 +111,30 @@ class PersistentAquilaService(AquilaService):
                 if approval.mission_id == mission_id:
                     self._persist_approval(approval.id)
             self._persist_execution_state()
+
+    def issue_delegation(self, **kwargs: Any) -> str:
+        mission_id = str(kwargs["mission_id"])
+        before_version = self.kernel.missions[mission_id].version
+        before_sequence = len(self.kernel.audit[mission_id])
+        try:
+            delegation_id = super().issue_delegation(**kwargs)
+        except Exception:
+            self._persist_operation(mission_id, before_version, before_sequence)
+            raise
+        self._persist_operation(mission_id, before_version, before_sequence)
+        self._persist_delegation(delegation_id)
+        return delegation_id
+
+    def revoke_delegation(self, **kwargs: Any) -> None:
+        mission_id = str(kwargs["mission_id"])
+        delegation_id = str(kwargs["delegation_id"])
+        before_version = self.kernel.missions[mission_id].version
+        before_sequence = len(self.kernel.audit[mission_id])
+        try:
+            super().revoke_delegation(**kwargs)
+        finally:
+            self._persist_operation(mission_id, before_version, before_sequence)
+        self._persist_delegation(delegation_id)
 
     def invoke_read_tool(self, **kwargs: Any) -> Any:
         """Persist the material authorization and result audit facts for a tool read."""
@@ -166,6 +190,8 @@ class PersistentAquilaService(AquilaService):
                 self.kernel.approvals[approval.id] = approval
             for action_id in self._list_side_effects(mission_id):
                 self.kernel.side_effects[action_id] = self._get_side_effect(action_id)
+            for delegation in self._list_delegations(mission_id):
+                self.delegations[delegation.grant_id] = delegation
 
     def _persist_operation(
         self,
@@ -205,6 +231,11 @@ class PersistentAquilaService(AquilaService):
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     payload TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS persistent_delegations (
+                    id TEXT PRIMARY KEY,
+                    mission_id TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                );
                 """
             )
 
@@ -219,6 +250,25 @@ class PersistentAquilaService(AquilaService):
                 """,
                 (approval.id, approval.mission_id, json.dumps(_approval_payload(approval), sort_keys=True)),
             )
+
+    def _persist_delegation(self, delegation_id: str) -> None:
+        delegation = self.delegations[delegation_id]
+        with self.store.connection:
+            self.store.connection.execute(
+                """
+                INSERT INTO persistent_delegations (id, mission_id, payload)
+                VALUES (?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET payload = excluded.payload
+                """,
+                (delegation.grant_id, delegation.mission_id,
+                 json.dumps(_delegation_payload(delegation), sort_keys=True)),
+            )
+
+    def _list_delegations(self, mission_id: str) -> list[DelegationGrant]:
+        rows = self.store.connection.execute(
+            "SELECT payload FROM persistent_delegations WHERE mission_id = ?", (mission_id,)
+        ).fetchall()
+        return [_delegation_from_payload(json.loads(row["payload"])) for row in rows]
 
     def _list_persisted_approvals(self, mission_id: str) -> list[Approval]:
         rows = self.store.connection.execute(
@@ -387,4 +437,37 @@ def _request_fingerprint(body: dict[str, Any], actor: Principal) -> str:
             "payload": body.get("payload"),
         },
         sort_keys=True,
+    )
+
+
+def _delegation_payload(grant: DelegationGrant) -> dict[str, Any]:
+    def principal(principal: Principal | None) -> dict[str, Any] | None:
+        if principal is None:
+            return None
+        return {"type": principal.type.value, "subject": principal.subject, "roles": sorted(principal.roles)}
+
+    return {
+        "grant_id": grant.grant_id, "issuer": principal(grant.issuer), "subject": principal(grant.subject),
+        "mission_id": grant.mission_id, "allowed_operations": sorted(grant.allowed_operations),
+        "roe_ceiling": grant.roe_ceiling.value, "expires_at": grant.expires_at, "issued_at": grant.issued_at,
+        "revoked": grant.revoked, "revoked_at": grant.revoked_at,
+        "revoked_by": principal(grant.revoked_by), "revocation_reason": grant.revocation_reason,
+    }
+
+
+def _delegation_from_payload(payload: dict[str, Any]) -> DelegationGrant:
+    def principal(value: dict[str, Any] | None) -> Principal | None:
+        if value is None:
+            return None
+        return Principal(PrincipalType(value["type"]), value["subject"], frozenset(value.get("roles", [])))
+
+    issuer = principal(payload["issuer"])
+    subject = principal(payload["subject"])
+    assert issuer is not None and subject is not None
+    return DelegationGrant(
+        grant_id=payload["grant_id"], issuer=issuer, subject=subject, mission_id=payload["mission_id"],
+        allowed_operations=frozenset(payload["allowed_operations"]), roe_ceiling=RoeLevel(payload["roe_ceiling"]),
+        expires_at=payload["expires_at"], issued_at=payload["issued_at"], revoked=payload["revoked"],
+        revoked_at=payload.get("revoked_at"), revoked_by=principal(payload.get("revoked_by")),
+        revocation_reason=payload.get("revocation_reason"),
     )

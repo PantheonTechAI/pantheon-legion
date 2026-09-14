@@ -661,6 +661,7 @@ class LegionKernel:
         reason: str,
         policy_version: str,
         evaluated_at: str,
+        delegation_id: str | None = None,
     ) -> None:
         """Append the policy evaluation that preceded a durable action attempt."""
         mission = self._mission(mission_id)
@@ -678,6 +679,7 @@ class LegionKernel:
                 "policy_version": policy_version,
                 "evaluated_at": evaluated_at,
                 "operation": "EXECUTE_ACTION",
+                "delegation_id": delegation_id,
             },
         )
 
@@ -694,6 +696,7 @@ class LegionKernel:
         policy_version: str,
         evaluated_at: str,
         correlation_id: str,
+        delegation_id: str | None = None,
     ) -> None:
         """Append the Aquila decision that precedes a Fabrica tool call."""
         mission = self._mission(mission_id)
@@ -711,6 +714,7 @@ class LegionKernel:
                 "policy_version": policy_version,
                 "evaluated_at": evaluated_at,
                 "operation": "READ_TOOL",
+                "delegation_id": delegation_id,
             },
         )
 
@@ -759,6 +763,26 @@ class LegionKernel:
             result=result,
             correlation_id=correlation_id,
             data={"invocation_id": invocation_id, **data},
+        )
+
+    def record_delegation_event(
+        self,
+        *,
+        mission_id: str,
+        actor: Principal,
+        event_type: str,
+        result: str,
+        grant_id: str,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        """Append a lifecycle or use fact for an Aquila-owned delegation."""
+        mission = self._mission(mission_id)
+        self._record(
+            mission,
+            event_type=event_type,
+            actor=actor,
+            result=result,
+            data={"grant_id": grant_id, **(data or {})},
         )
 
     def record_command_authorization(

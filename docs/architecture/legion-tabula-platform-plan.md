@@ -22,13 +22,34 @@ The first integration must not be an MCP client alone. The platform must first
 close Legion's delegation and transaction gaps, then define a versioned
 Legion–Tabula MCP contract for identity, scope, provenance, and correlation.
 
+## North star — the architecture to preserve
+
+Pantheon is a portal with two independently owned applications, not a new
+shared control plane. A person enters through the Portal, then works in either
+Praetorium (Legion) or the existing Tabula Console. The Portal provides common
+identity, navigation, deep links, and owner-supplied read summaries only.
+
+**Aquila is the sole Mission authority.** It owns Mission state, ROE,
+Approvals, durable workload grants, execution authorization, and the
+authoritative Mission audit. **Tabula is the sole knowledge and registry
+authority.** It owns curated corpus content, its data catalog, ADR/pattern
+material, governed Registry entities, lifecycle, and its own audit. **Fabrica
+is the execution boundary** and **model fabric is an inference capability**;
+neither becomes a source of Mission authority.
+
+The only sanctioned Legion–Tabula machine path is an Aquila-authorized,
+correlated, least-privilege MCP read through separate corpus and registry
+clients. A Tabula discovery result is never executable authority. A model,
+Scout, browser, Portal, or Tabula PAT never becomes a substitute for an
+Aquila-issued workload grant.
+
 ## Verified current state
 
 ### Legion
 
 | Area | Present implementation | Important gap |
 |---|---|---|
-| Aquila | Mission kernel, OpenAPI-shaped service, WSGI adapter, OIDC claim mapper | Workload grants are caller-supplied values; no durable issuer-verified grant registry exists. |
+| Aquila | Mission kernel, OpenAPI-shaped service, WSGI adapter, OIDC claim mapper | PR #49 adds Aquila-issued, persisted, revocable opaque delegation IDs. Atomic co-persistence of authority state and audit remains next. |
 | Mission persistence | SQLite snapshots, ordered audit records, idempotency, restart tests | A Mission update, audit records, approval projection, idempotency result, and execution snapshot commit in separate transactions. |
 | Cognition | Read-only Scout contract and one-node LangGraph runtime | Model-provider seam currently sits in cognition, rather than an explicit model-fabric boundary. |
 | Tabula | In-memory `TabulaRetrievalAdapter` test double | No MCP client, service identity, Tabula-scope mapping, response contract, or cross-system correlation. |
@@ -69,10 +90,10 @@ Scout evidence shape.
 
 ### Architecture mismatches and risks
 
-1. **Forged delegation is currently possible.** A caller can construct a
-   `DelegationGrant`; Aquila checks the supplied fields but does not validate a
-   durable grant, issuer authority, or signature. No external integration is
-   safe until this is corrected.
+1. **Delegation remediation is in progress.** PR #49 replaces caller-supplied
+   service grants with Aquila-issued opaque IDs, durable recovery, revocation,
+   and audit. Do not start an external integration until it is merged; do not
+   bypass it with a Tabula PAT or browser-held capability.
 2. **Aquila's durable record is not atomic.** A process failure may persist a
    Mission state update without all corresponding audit, approval, idempotency,
    or execution records. This violates the intended reconstructable authority
@@ -214,10 +235,10 @@ Required rules:
 
 ### Phase 1 — repair Legion control-plane foundations
 
-1. Implement Aquila-issued, persisted, issuer-authorized, revocable
-   DelegationGrants. Workloads present a grant ID or signed bounded capability;
-   they do not construct grant content.
-2. Audit grant issue, use, denial, expiry, and revocation.
+1. **In PR #49:** implement Aquila-issued, persisted, issuer-authorized,
+   revocable DelegationGrants. Workloads present an opaque grant ID; they do
+   not construct grant content.
+2. **In PR #49:** audit grant issue, use, denial, expiry, and revocation.
 3. Make each accepted operation's Mission snapshot, authoritative events,
    approvals, idempotency outcome, and execution transition atomic, or use a
    transactionally written outbox with replay.

@@ -1,6 +1,6 @@
 import unittest
 
-from aquila_api import AquilaService, DelegationGrant
+from aquila_api import AquilaService
 from legion_kernel import AuthorizationError, LegionKernel, Principal, PrincipalType, RoeLevel
 
 
@@ -377,13 +377,9 @@ class AquilaServiceTests(unittest.TestCase):
         self.assertTrue(events[-2].data["decision_id"])
         self.assertEqual(events[-1].data["error_code"], "DELEGATION_REQUIRED")
 
-        grant = DelegationGrant(
-            grant_id="worker-read-grant",
-            issuer=self.owner,
-            subject=self.worker,
-            mission_id=self.mission_id,
-            allowed_operations=frozenset({"EXECUTE_ACTION"}),
-            roe_ceiling=RoeLevel.REVIEW,
+        grant_id = self.service.issue_delegation(
+            issuer=self.owner, subject=self.worker, mission_id=self.mission_id,
+            allowed_operations=frozenset({"EXECUTE_ACTION"}), roe_ceiling=RoeLevel.REVIEW,
             expires_at="9999-01-01T00:00:00Z",
         )
         self.assertEqual(
@@ -391,7 +387,7 @@ class AquilaServiceTests(unittest.TestCase):
                 mission_id=self.mission_id,
                 action_id="66666666-6666-4666-8666-666666666666",
                 worker=self.worker,
-                delegation=grant,
+                delegation_id=grant_id,
             ),
             "EXECUTED",
         )

@@ -68,6 +68,7 @@ class AuthorizationEngineTests(unittest.TestCase):
             allowed_operations=frozenset({"EXECUTE_ACTION"}),
             roe_ceiling=RoeLevel.REVIEW,
             expires_at="9999-01-01T00:00:00Z",
+            issued_at="2026-09-13T00:00:00Z",
         )
         allowed = self.engine.decide(AuthorizationRequest(**{**request.__dict__, "delegation": grant}))
         self.assertEqual(allowed.decision, Decision.ALLOW)
@@ -88,6 +89,7 @@ class AuthorizationEngineTests(unittest.TestCase):
             allowed_operations=frozenset({"READ_MISSION"}),
             roe_ceiling=RoeLevel.OBSERVE,
             expires_at="2000-01-01T00:00:00Z",
+            issued_at="1999-01-01T00:00:00Z",
         )
         request = self.request(self.worker, "READ_MISSION", delegation=DelegationGrant(**base))
         self.assertEqual(self.engine.decide(request).reason, "DELEGATION_EXPIRED")
@@ -99,3 +101,7 @@ class AuthorizationEngineTests(unittest.TestCase):
             self.request(self.owner, "SUBMIT_COMMAND", mission_status=MissionStatus.CANCELLED, side_effect_class="READ")
         )
         self.assertEqual(decision.reason, "MISSION_TERMINAL")
+        revocation = self.engine.decide(
+            self.request(self.owner, "REVOKE_DELEGATION", mission_status=MissionStatus.CANCELLED)
+        )
+        self.assertEqual(revocation.decision, Decision.ALLOW)

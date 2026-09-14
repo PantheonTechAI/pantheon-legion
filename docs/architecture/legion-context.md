@@ -10,41 +10,30 @@ This document establishes the boundary conditions for the first Legion implement
 The current Legion–Tabula review, target platform design, integration contracts,
 and remediation order are recorded in
 [Legion–Tabula platform architecture and remediation plan](legion-tabula-platform-plan.md).
+That document's **North star** is authoritative when this older M0 context and
+an implementation convenience conflict.
 
 ## System context
 
 ```text
-  Developers / Operators / Events / Applications / External Agents
-                               │
-                               ▼
-                    PRAETORIUM — human operations
-                               │ commands, views, approvals
-                               ▼
-                      AQUILA — trust and control
-             identity • authorization • ROE • registry • audit
-                               │
-          ┌────────────────────┼─────────────────────┐
-          ▼                    ▼                     ▼
-   Durable execution        TABULA              package registry
-   (Temporal first)         knowledge            OCI / Sigstore
-          │                    │
-          └──────────────┬─────┘
-                         ▼
-               Cognition runtime adapter
-          LangGraph / PydanticAI / MS Agent Framework
-                         │
-                   Cohorts / Task Forces
-                         │
-                         ▼
-                  FABRICA — execution
-             MCP • sandbox • browser • Git • APIs
-                         │
-                         ▼
-                    Model fabric
-                         │
-                         ▼
-                       CASTRA
-              development • test • prod • customer
+             Pantheon Portal — identity, navigation, deep links
+                              │
+                 ┌────────────┴────────────┐
+                 ▼                         ▼
+      Praetorium — Legion UI          Tabula Console
+      Missions, Approvals,            corpus, patterns/ADRs,
+      timelines, execution            catalog, Registry, review
+                 │                         │
+                 ▼                         ▼
+      Aquila — Mission authority       Tabula MCP server
+      ROE, grants, audit, gate          corpus + Registry reads
+                 │                         ▲
+                 ├── authorized, correlated MCP read ─┘
+                 ▼
+        durable execution → Fabrica → model fabric
+
+  The Portal does not own state or broker privileged calls. Tabula Registry
+  discovery does not grant Aquila or Fabrica execution authority.
 ```
 
 ## Boundary principles

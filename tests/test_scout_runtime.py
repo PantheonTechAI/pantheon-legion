@@ -1,6 +1,6 @@
 import unittest
 
-from aquila_api import AquilaService, DelegationGrant
+from aquila_api import AquilaService
 from legion_cognition import InMemoryScoutRuntime, ReadOnlyScoutError, ScoutEvidence
 from legion_kernel import AuthorizationError, Principal, PrincipalType, RoeLevel
 
@@ -26,13 +26,9 @@ class ScoutRuntimeTests(unittest.TestCase):
         self.mission_id = created.body["id"]
 
     def grant(self, *, operations=frozenset({"READ_MISSION"})):
-        return DelegationGrant(
-            grant_id="scout-read-grant",
-            issuer=self.owner,
-            subject=self.scout,
-            mission_id=self.mission_id,
-            allowed_operations=operations,
-            roe_ceiling=RoeLevel.OBSERVE,
+        return self.service.issue_delegation(
+            issuer=self.owner, subject=self.scout, mission_id=self.mission_id,
+            allowed_operations=operations, roe_ceiling=RoeLevel.OBSERVE,
             expires_at="9999-01-01T00:00:00Z",
         )
 
@@ -43,7 +39,7 @@ class ScoutRuntimeTests(unittest.TestCase):
         result = self.service.run_scout(
             mission_id=self.mission_id,
             scout=self.scout,
-            delegation=self.grant(),
+            delegation_id=self.grant(),
             runtime=InMemoryScoutRuntime(),
             query="Find relevant observations.",
             granted_capabilities=frozenset({"read.mission", "read.evidence"}),
@@ -65,17 +61,16 @@ class ScoutRuntimeTests(unittest.TestCase):
             self.service.get_mission(actor=self.owner, mission_id=self.mission_id).body,
             before,
         )
-        self.assertEqual(
-            self.service.get_timeline(actor=self.owner, mission_id=self.mission_id).body,
-            timeline_before,
-        )
+        events = self.service.get_timeline(actor=self.owner, mission_id=self.mission_id).body["events"]
+        self.assertGreater(len(events), len(timeline_before["events"]))
+        self.assertEqual(events[-1]["event_type"], "DELEGATION_EVALUATED")
 
     def test_scout_requires_bounded_workload_delegation(self):
         with self.assertRaisesRegex(AuthorizationError, "DELEGATION_REQUIRED"):
             self.service.run_scout(
                 mission_id=self.mission_id,
                 scout=self.scout,
-                delegation=None,
+            delegation_id=None,
                 runtime=InMemoryScoutRuntime(),
                 query="Collect observations.",
                 granted_capabilities=frozenset({"read.mission"}),
@@ -85,7 +80,7 @@ class ScoutRuntimeTests(unittest.TestCase):
             self.service.run_scout(
                 mission_id=self.mission_id,
                 scout=self.scout,
-                delegation=self.grant(operations=frozenset({"EXECUTE_ACTION"})),
+                delegation_id=self.grant(operations=frozenset({"EXECUTE_ACTION"})),
                 runtime=InMemoryScoutRuntime(),
                 query="Collect observations.",
                 granted_capabilities=frozenset({"read.mission"}),
@@ -96,7 +91,7 @@ class ScoutRuntimeTests(unittest.TestCase):
             self.service.run_scout(
                 mission_id=self.mission_id,
                 scout=self.scout,
-                delegation=self.grant(),
+                delegation_id=self.grant(),
                 runtime=InMemoryScoutRuntime(),
                 query="Collect observations.",
                 granted_capabilities=frozenset({"read.mission", "write.production"}),

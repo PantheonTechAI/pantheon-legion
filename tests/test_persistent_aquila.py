@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from aquila_api import DelegationGrant, PersistentAquilaService
+from aquila_api import PersistentAquilaService
 from legion_cognition import (
     LangGraphScoutRuntime,
     ModelInvocationResponse,
@@ -36,14 +36,10 @@ class PersistentAquilaServiceTests(unittest.TestCase):
     def create_service(self):
         return PersistentAquilaService(self.database)
 
-    def execution_grant(self, mission_id):
-        return DelegationGrant(
-            grant_id='worker-execution-grant',
-            issuer=self.owner,
-            subject=self.worker,
-            mission_id=mission_id,
-            allowed_operations=frozenset({'EXECUTE_ACTION'}),
-            roe_ceiling=RoeLevel.REVIEW,
+    def grant(self, service, mission_id, operations, roe_ceiling=RoeLevel.REVIEW):
+        return service.issue_delegation(
+            issuer=self.owner, subject=self.worker, mission_id=mission_id,
+            allowed_operations=frozenset(operations), roe_ceiling=roe_ceiling,
             expires_at='9999-01-01T00:00:00Z',
         )
 
@@ -72,17 +68,18 @@ class PersistentAquilaServiceTests(unittest.TestCase):
             'decision': 'APPROVE', 'reason': 'Reviewed.',
         })
         self.assertEqual(approval.body['status'], 'APPROVED')
+        grant_id = self.grant(service, mission_id, {'EXECUTE_ACTION'})
         service.close()
 
         restarted = self.create_service()
         self.assertEqual(restarted.get_mission(actor=self.owner, mission_id=mission_id).body['version'], 3)
-        self.assertEqual(len(restarted.get_timeline(actor=self.owner, mission_id=mission_id).body['events']), 7)
+        self.assertEqual(len(restarted.get_timeline(actor=self.owner, mission_id=mission_id).body['events']), 8)
         with self.assertRaises(WorkerKilled):
             restarted.execute_action(
                 mission_id=mission_id,
                 action_id='33333333-3333-4333-8333-333333333333',
                 worker=self.worker,
-                delegation=self.execution_grant(mission_id),
+                delegation_id=grant_id,
                 fail_after_side_effect=True,
             )
         execution_id = restarted.action_executions['33333333-3333-4333-8333-333333333333']
@@ -94,7 +91,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
             mission_id=mission_id,
             action_id='33333333-3333-4333-8333-333333333333',
             worker=self.worker,
-            delegation=self.execution_grant(mission_id),
+            delegation_id=grant_id,
         ), 'RECOVERED')
         self.assertEqual(recovered.kernel.side_effects['33333333-3333-4333-8333-333333333333'], 1)
         recovered_execution = recovered.execution.query(execution_id)
@@ -154,12 +151,13 @@ class PersistentAquilaServiceTests(unittest.TestCase):
             'approval_id': requested.body['approval_id'], 'expected_mission_version': 3,
             'decision': 'APPROVE', 'reason': 'Reviewed.',
         })
+        grant_id = self.grant(service, mission_id, {'EXECUTE_ACTION'})
         with self.assertRaises(WorkerKilled):
             service.execute_action(
                 mission_id=mission_id,
                 action_id='44444444-4444-4444-8444-444444444444',
                 worker=self.worker,
-                delegation=self.execution_grant(mission_id),
+                delegation_id=grant_id,
                 fail_after_side_effect=True,
             )
         cancelled = service.cancel_mission(actor=self.owner, mission_id=mission_id, body={
@@ -177,7 +175,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
                 mission_id=mission_id,
                 action_id='44444444-4444-4444-8444-444444444444',
                 worker=self.worker,
-                delegation=self.execution_grant(mission_id),
+                delegation_id=grant_id,
             )
         restarted.close()
 
@@ -246,11 +244,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
         service.invoke_read_tool(
             mission_id=mission_id,
             worker=self.worker,
-            delegation=DelegationGrant(
-                grant_id='read-tool-grant', issuer=self.owner, subject=self.worker,
-                mission_id=mission_id, allowed_operations=frozenset({'READ_TOOL'}),
-                roe_ceiling=RoeLevel.OBSERVE, expires_at='9999-01-01T00:00:00Z',
-            ),
+            delegation_id=self.grant(service, mission_id, {'READ_TOOL'}, RoeLevel.OBSERVE),
             fabrica=fabrica,
             capability='metrics.read',
             arguments={'service': 'api'},
@@ -281,11 +275,7 @@ class PersistentAquilaServiceTests(unittest.TestCase):
         service.run_scout(
             mission_id=mission_id,
             scout=self.worker,
-            delegation=DelegationGrant(
-                grant_id='persistent-scout-grant', issuer=self.owner, subject=self.worker,
-                mission_id=mission_id, allowed_operations=frozenset({'READ_MISSION'}),
-                roe_ceiling=RoeLevel.OBSERVE, expires_at='9999-01-01T00:00:00Z',
-            ),
+            delegation_id=self.grant(service, mission_id, {'READ_MISSION'}, RoeLevel.OBSERVE),
             runtime=LangGraphScoutRuntime(ModelProviderScoutResponder(PersistentTestModelProvider())),
             query='Summarize the Mission.',
             granted_capabilities=frozenset({'read.mission'}),

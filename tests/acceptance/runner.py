@@ -9,7 +9,7 @@ import re
 import tempfile
 from typing import Callable
 
-from aquila_api import AquilaService, DelegationGrant, PersistentAquilaService
+from aquila_api import AquilaService, PersistentAquilaService
 from legion_kernel import AuthorizationError, LegionKernel, Principal, PrincipalType, RoeLevel, WorkerKilled
 
 
@@ -62,12 +62,11 @@ class AquilaM1Adapter:
             "command_type": kind, "payload": payload,
         })
 
-    def grant(self, mission_id: str) -> DelegationGrant:
-        return DelegationGrant(
-            grant_id=f"acceptance-execution-{mission_id}", issuer=self.owner,
-            subject=self.worker, mission_id=mission_id,
-            allowed_operations=frozenset({"EXECUTE_ACTION"}),
-            roe_ceiling=RoeLevel.REVIEW, expires_at="9999-01-01T00:00:00Z",
+    def grant(self, mission_id: str) -> str:
+        return self.service.issue_delegation(
+            issuer=self.owner, subject=self.worker, mission_id=mission_id,
+            allowed_operations=frozenset({"EXECUTE_ACTION"}), roe_ceiling=RoeLevel.REVIEW,
+            expires_at="9999-01-01T00:00:00Z",
         )
 
 
@@ -162,7 +161,7 @@ class M1AcceptanceRunner:
         )
         assert adapter.command(adapter.owner, mission_id, 3, "m1-004-roe", "SET_ROE", {"level": "OBSERVE", "reason": "Narrow authority."}).status_code == 200
         try:
-            adapter.service.execute_action(mission_id=mission_id, action_id=action["action_id"], worker=adapter.worker, delegation=adapter.grant(mission_id))
+            adapter.service.execute_action(mission_id=mission_id, action_id=action["action_id"], worker=adapter.worker, delegation_id=adapter.grant(mission_id))
         except AuthorizationError as exc:
             assert str(exc) == "ROE_DENIED"
         else:
@@ -180,14 +179,14 @@ class M1AcceptanceRunner:
             requested = adapter.command(adapter.owner, mission_id, 2, "m1-005-action", "REQUEST_ACTION", action)
             adapter.service.decide_approval(actor=adapter.approver, mission_id=mission_id, body={"approval_id": requested.body["approval_id"], "expected_mission_version": 3, "decision": "APPROVE", "reason": "Approved."})
             try:
-                adapter.service.execute_action(mission_id=mission_id, action_id=action["action_id"], worker=adapter.worker, delegation=adapter.grant(mission_id), fail_after_side_effect=True)
+                adapter.service.execute_action(mission_id=mission_id, action_id=action["action_id"], worker=adapter.worker, delegation_id=adapter.grant(mission_id), fail_after_side_effect=True)
             except WorkerKilled:
                 pass
             else:
                 raise AssertionError("failure injection was not exercised")
             adapter.service.close()
             adapter = AquilaM1Adapter(PersistentAquilaService(database))
-            assert adapter.service.execute_action(mission_id=mission_id, action_id=action["action_id"], worker=adapter.worker, delegation=adapter.grant(mission_id)) == "RECOVERED"
+            assert adapter.service.execute_action(mission_id=mission_id, action_id=action["action_id"], worker=adapter.worker, delegation_id=adapter.grant(mission_id)) == "RECOVERED"
             assert adapter.service.kernel.side_effects[action["action_id"]] == 1
             result = self._result("M1-005", adapter, mission_id, ["A1", "A2", "A3"])
             adapter.service.close()

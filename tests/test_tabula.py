@@ -1,6 +1,6 @@
 import unittest
 
-from aquila_api import AquilaService, DelegationGrant
+from aquila_api import AquilaService
 from legion_cognition import InMemoryScoutRuntime
 from legion_kernel import AuthorizationError, Principal, PrincipalType, RoeLevel
 from legion_tabula import InMemoryTabula, KnowledgeRecord, KnowledgeScope
@@ -58,15 +58,15 @@ class TabulaTests(unittest.TestCase):
         ))
 
     def grant(self, operations=frozenset({"READ_KNOWLEDGE", "READ_MISSION"})):
-        return DelegationGrant(
-            grant_id="tabula-read-grant", issuer=self.owner, subject=self.scout,
-            mission_id=self.mission_id, allowed_operations=operations,
-            roe_ceiling=RoeLevel.OBSERVE, expires_at="9999-01-01T00:00:00Z",
+        return self.service.issue_delegation(
+            issuer=self.owner, subject=self.scout, mission_id=self.mission_id,
+            allowed_operations=operations, roe_ceiling=RoeLevel.OBSERVE,
+            expires_at="9999-01-01T00:00:00Z",
         )
 
     def test_retrieval_filters_other_workspace_and_organization_records(self):
         results = self.service.retrieve_knowledge(
-            mission_id=self.mission_id, worker=self.scout, delegation=self.grant(),
+            mission_id=self.mission_id, worker=self.scout, delegation_id=self.grant(),
             tabula=self.tabula, query="api error",
         )
         self.assertEqual([item.record_id for item in results], ["workspace-metrics"])
@@ -74,7 +74,7 @@ class TabulaTests(unittest.TestCase):
 
     def test_tabula_scout_receives_provenance_bearing_evidence(self):
         result = self.service.run_tabula_scout(
-            mission_id=self.mission_id, scout=self.scout, delegation=self.grant(),
+            mission_id=self.mission_id, scout=self.scout, delegation_id=self.grant(),
             runtime=InMemoryScoutRuntime(), tabula=self.tabula, query="api error",
             granted_capabilities=frozenset({"read.mission", "read.knowledge"}),
         )
@@ -86,7 +86,7 @@ class TabulaTests(unittest.TestCase):
         with self.assertRaisesRegex(AuthorizationError, "DELEGATED_OPERATION_DENIED"):
             self.service.retrieve_knowledge(
                 mission_id=self.mission_id, worker=self.scout,
-                delegation=self.grant(frozenset({"READ_MISSION"})),
+                delegation_id=self.grant(frozenset({"READ_MISSION"})),
                 tabula=self.tabula, query="api error",
             )
 

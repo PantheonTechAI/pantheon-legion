@@ -4,7 +4,7 @@ from .service import ApiResponse, AquilaService
 from .persistent import PersistentAquilaService
 from .auth import AuthenticationError, AuthentikConfig, AuthentikPrincipalMapper, BearerAuthenticator
 from .wsgi import AquilaWSGIApp
-from .authorization import AuthorizationEngine, AuthorizationRequest, AuthorizationDecision, DelegationGrant
+from .authorization import AuthorizationEngine, AuthorizationRequest, AuthorizationDecision
 
 __all__ = [
     "ApiResponse",
@@ -18,5 +18,4 @@ __all__ = [
     "AuthorizationEngine",
     "AuthorizationRequest",
     "AuthorizationDecision",
-    "DelegationGrant",
 ]
