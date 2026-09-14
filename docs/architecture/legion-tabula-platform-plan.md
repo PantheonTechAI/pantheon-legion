@@ -223,9 +223,10 @@ Required rules:
 ### Phase 0 — architecture decisions and inventory
 
 1. Adopt this target ownership model in Legion documentation.
-2. Jointly review and accept [ADR-002](../adr/ADR-002-legion-tabula-authorized-read-integration.md)
-   covering tenancy mapping, service/workload identity, token exchange,
-   correlation, data retention, audit ownership, and version compatibility.
+2. Jointly review and accept [ADR-002](../adr/ADR-002-pantheon-federated-workload-authorization.md)
+   for reusable workload identity, token exchange/status, revocation, and
+   shared audit vocabulary; then accept [ADR-003](../adr/ADR-003-legion-tabula-authorized-read-contract.md)
+   for Tabula scope bindings, provenance, and contract compatibility.
 3. Create a supported-component inventory in Tabula Registry for Aquila,
    Praetorium, Tabula MCP, Fabrica, model fabric, schemas, capabilities, and
    agents. Publish only reviewed, active entities.

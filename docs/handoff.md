@@ -30,11 +30,11 @@ approval/idempotency/execution projections, and grant state in one SQLite
 transaction. It has **92 passing tests** and all seven M1 acceptance scenarios
 passing on `main`.
 
-The only active slice is the proposed joint Legion–Tabula ADR for identity,
-scope bindings, token exchange, correlation, provenance, audit ownership,
-retention, and compatibility. Do not start a Tabula MCP client, Portal,
-Praetorium, Fabrica transport, or model-provider expansion before that ADR is
-jointly accepted.
+The only active slice is a pair of proposed ADRs: ADR-002 defines Pantheon's
+reusable federated workload-security model; ADR-003 applies it to Legion–Tabula
+scope bindings, read contracts, provenance, and compatibility. Do not start a
+Tabula MCP client, Portal, Praetorium, Fabrica transport, or model-provider
+expansion before both ADRs are jointly accepted.
 
 ## Current state
 
@@ -277,10 +277,11 @@ Other known boundaries, deliberately not started here:
 
 1. PRs #49 and #50 are merged; do not recreate their delegation or local
    atomic-persistence designs in another component.
-2. Jointly review and accept ADR-002 for tenancy bindings, token exchange,
-   correlation, provenance, audit ownership, retention, and version
-   compatibility.
-3. Only then define Tabula's read-only MCP contract and build separate corpus
+2. Jointly review and accept ADR-002 for federated workload authorization,
+   token status/revocation, resource-owner policy, and shared audit vocabulary.
+3. Then jointly review and accept ADR-003 for Tabula scope bindings and the
+   separate corpus and Registry read contracts.
+4. Only then implement Tabula's read-only MCP contract and build separate corpus
    and Registry adapters. Keep Tabula's Console as the knowledge/governance UI
    and build Praetorium as Aquila's thin human-operations client.
 
