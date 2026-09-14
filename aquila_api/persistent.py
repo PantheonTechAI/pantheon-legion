@@ -36,9 +36,10 @@ class PersistentAquilaService(AquilaService):
         if response.status_code == 201:
             mission_id = response.body["id"]
             mission = self.kernel.missions[mission_id]
-            self.store.save_mission(mission, expected_previous_version=None)
-            for event in self.kernel.audit[mission_id]:
-                self.store.append_audit(event)
+            with self.store.transaction():
+                self.store.save_mission(mission, expected_previous_version=None)
+                for event in self.kernel.audit[mission_id]:
+                    self.store.append_audit(event)
         return response
 
     def submit_command(
@@ -62,9 +63,10 @@ class PersistentAquilaService(AquilaService):
             correlation_id=correlation_id,
         )
         if mission_id in self.kernel.missions:
-            self._persist_operation(mission_id, before_version, before_sequence)
-            self._store_idempotency(mission_id, body, actor, response)
-            self._persist_execution_state()
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
+                self._store_idempotency(mission_id, body, actor, response)
+                self._persist_execution_state()
         return response
 
     def decide_approval(
@@ -78,10 +80,11 @@ class PersistentAquilaService(AquilaService):
         before_sequence = len(self.kernel.audit.get(mission_id, []))
         response = super().decide_approval(actor=actor, mission_id=mission_id, body=body)
         if mission_id in self.kernel.missions:
-            self._persist_operation(mission_id, before_version, before_sequence)
-            for approval in self.kernel.approvals.values():
-                if approval.mission_id == mission_id:
-                    self._persist_approval(approval.id)
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
+                for approval in self.kernel.approvals.values():
+                    if approval.mission_id == mission_id:
+                        self._persist_approval(approval.id)
         return response
 
     def execute_action(
@@ -105,12 +108,13 @@ class PersistentAquilaService(AquilaService):
                 fail_after_side_effect=fail_after_side_effect,
             )
         finally:
-            self._persist_operation(mission_id, before_version, before_sequence)
-            self._persist_side_effect(mission_id, action_id)
-            for approval in self.kernel.approvals.values():
-                if approval.mission_id == mission_id:
-                    self._persist_approval(approval.id)
-            self._persist_execution_state()
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
+                self._persist_side_effect(mission_id, action_id)
+                for approval in self.kernel.approvals.values():
+                    if approval.mission_id == mission_id:
+                        self._persist_approval(approval.id)
+                self._persist_execution_state()
 
     def issue_delegation(self, **kwargs: Any) -> str:
         mission_id = str(kwargs["mission_id"])
@@ -119,10 +123,12 @@ class PersistentAquilaService(AquilaService):
         try:
             delegation_id = super().issue_delegation(**kwargs)
         except Exception:
-            self._persist_operation(mission_id, before_version, before_sequence)
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
             raise
-        self._persist_operation(mission_id, before_version, before_sequence)
-        self._persist_delegation(delegation_id)
+        with self.store.transaction():
+            self._persist_operation(mission_id, before_version, before_sequence)
+            self._persist_delegation(delegation_id)
         return delegation_id
 
     def revoke_delegation(self, **kwargs: Any) -> None:
@@ -133,8 +139,10 @@ class PersistentAquilaService(AquilaService):
         try:
             super().revoke_delegation(**kwargs)
         finally:
-            self._persist_operation(mission_id, before_version, before_sequence)
-        self._persist_delegation(delegation_id)
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
+                if delegation_id in self.delegations:
+                    self._persist_delegation(delegation_id)
 
     def invoke_read_tool(self, **kwargs: Any) -> Any:
         """Persist the material authorization and result audit facts for a tool read."""
@@ -145,7 +153,8 @@ class PersistentAquilaService(AquilaService):
         try:
             return super().invoke_read_tool(**kwargs)
         finally:
-            self._persist_operation(mission_id, before_version, before_sequence)
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
 
     def run_scout(self, **kwargs: Any) -> Any:
         """Persist the digest-only model invocation fact when a Scout uses one."""
@@ -156,7 +165,8 @@ class PersistentAquilaService(AquilaService):
         try:
             return super().run_scout(**kwargs)
         finally:
-            self._persist_operation(mission_id, before_version, before_sequence)
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
 
     def cancel_mission(
         self,
@@ -241,7 +251,7 @@ class PersistentAquilaService(AquilaService):
 
     def _persist_approval(self, approval_id: str) -> None:
         approval = self.kernel.approvals[approval_id]
-        with self.store.connection:
+        with self.store.transaction():
             self.store.connection.execute(
                 """
                 INSERT INTO persistent_approvals (id, mission_id, payload)
@@ -253,7 +263,7 @@ class PersistentAquilaService(AquilaService):
 
     def _persist_delegation(self, delegation_id: str) -> None:
         delegation = self.delegations[delegation_id]
-        with self.store.connection:
+        with self.store.transaction():
             self.store.connection.execute(
                 """
                 INSERT INTO persistent_delegations (id, mission_id, payload)
@@ -278,7 +288,7 @@ class PersistentAquilaService(AquilaService):
 
     def _persist_side_effect(self, mission_id: str, action_id: str) -> None:
         count = self.kernel.side_effects.get(action_id, 0)
-        with self.store.connection:
+        with self.store.transaction():
             self.store.connection.execute(
                 """
                 INSERT INTO persistent_side_effects (action_id, mission_id, count)
@@ -296,7 +306,7 @@ class PersistentAquilaService(AquilaService):
 
     def _persist_execution_state(self) -> None:
         state = {"adapter": self.execution.snapshot(), "action_executions": self.action_executions}
-        with self.store.connection:
+        with self.store.transaction():
             self.store.connection.execute(
                 "INSERT INTO persistent_execution_state (id, payload) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload",
                 (json.dumps(state, sort_keys=True),),

@@ -49,7 +49,7 @@ Aquila-issued workload grant.
 
 | Area | Present implementation | Important gap |
 |---|---|---|
-| Aquila | Mission kernel, OpenAPI-shaped service, WSGI adapter, OIDC claim mapper | PR #49 adds Aquila-issued, persisted, revocable opaque delegation IDs. Atomic co-persistence of authority state and audit remains next. |
+| Aquila | Mission kernel, OpenAPI-shaped service, WSGI adapter, OIDC claim mapper, and persisted revocable opaque delegation IDs | Atomic co-persistence of authority state and audit remains next. |
 | Mission persistence | SQLite snapshots, ordered audit records, idempotency, restart tests | A Mission update, audit records, approval projection, idempotency result, and execution snapshot commit in separate transactions. |
 | Cognition | Read-only Scout contract and one-node LangGraph runtime | Model-provider seam currently sits in cognition, rather than an explicit model-fabric boundary. |
 | Tabula | In-memory `TabulaRetrievalAdapter` test double | No MCP client, service identity, Tabula-scope mapping, response contract, or cross-system correlation. |
@@ -90,10 +90,9 @@ Scout evidence shape.
 
 ### Architecture mismatches and risks
 
-1. **Delegation remediation is in progress.** PR #49 replaces caller-supplied
+1. **Delegation remediation is complete.** PR #49 replaces caller-supplied
    service grants with Aquila-issued opaque IDs, durable recovery, revocation,
-   and audit. Do not start an external integration until it is merged; do not
-   bypass it with a Tabula PAT or browser-held capability.
+   and audit. Do not bypass it with a Tabula PAT or browser-held capability.
 2. **Aquila's durable record is not atomic.** A process failure may persist a
    Mission state update without all corresponding audit, approval, idempotency,
    or execution records. This violates the intended reconstructable authority
@@ -235,10 +234,10 @@ Required rules:
 
 ### Phase 1 — repair Legion control-plane foundations
 
-1. **In PR #49:** implement Aquila-issued, persisted, issuer-authorized,
+1. **Completed in PR #49:** Aquila-issued, persisted, issuer-authorized,
    revocable DelegationGrants. Workloads present an opaque grant ID; they do
    not construct grant content.
-2. **In PR #49:** audit grant issue, use, denial, expiry, and revocation.
+2. **Completed in PR #49:** audit grant issue, use, denial, expiry, and revocation.
 3. Make each accepted operation's Mission snapshot, authoritative events,
    approvals, idempotency outcome, and execution transition atomic, or use a
    transactionally written outbox with replay.

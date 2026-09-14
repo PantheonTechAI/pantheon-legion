@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 import json
 from pathlib import Path
 import sqlite3
-from typing import Any
+from typing import Any, Iterator
 
 from legion_kernel.kernel import (
     Action,
@@ -47,16 +48,40 @@ class SQLiteMissionStore:
             self._owns_connection = True
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA foreign_keys = ON")
+        self._transaction_depth = 0
         self._initialize()
 
     def close(self) -> None:
         if self._owns_connection:
             self.connection.close()
 
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Commit a group of repository changes atomically.
+
+        Repository methods are safe to compose: inner writes join an outer
+        transaction instead of committing a partial authority record.
+        """
+        outermost = self._transaction_depth == 0
+        if outermost:
+            self.connection.execute("BEGIN IMMEDIATE")
+        self._transaction_depth += 1
+        try:
+            yield
+        except Exception:
+            if outermost:
+                self.connection.rollback()
+            raise
+        else:
+            if outermost:
+                self.connection.commit()
+        finally:
+            self._transaction_depth -= 1
+
     def save_mission(self, mission: Mission, *, expected_previous_version: int | None) -> None:
         payload = json.dumps(_mission_payload(mission), sort_keys=True)
         now = mission.updated_at
-        with self.connection:
+        with self.transaction():
             if expected_previous_version is None:
                 try:
                     self.connection.execute(
@@ -91,17 +116,17 @@ class SQLiteMissionStore:
         return [row["id"] for row in rows]
 
     def append_audit(self, event: AuditEvent) -> None:
-        row = self.connection.execute(
-            "SELECT COALESCE(MAX(sequence), 0) AS sequence FROM audit_events WHERE mission_id = ?",
-            (event.mission_id,),
-        ).fetchone()
-        expected_sequence = int(row["sequence"]) + 1
-        if event.sequence != expected_sequence:
-            raise DuplicateEvent(
-                f"Expected audit sequence {expected_sequence}, got {event.sequence}"
-            )
-        try:
-            with self.connection:
+        with self.transaction():
+            row = self.connection.execute(
+                "SELECT COALESCE(MAX(sequence), 0) AS sequence FROM audit_events WHERE mission_id = ?",
+                (event.mission_id,),
+            ).fetchone()
+            expected_sequence = int(row["sequence"]) + 1
+            if event.sequence != expected_sequence:
+                raise DuplicateEvent(
+                    f"Expected audit sequence {expected_sequence}, got {event.sequence}"
+                )
+            try:
                 self.connection.execute(
                     """
                     INSERT INTO audit_events
@@ -126,8 +151,8 @@ class SQLiteMissionStore:
                         json.dumps(event.data, sort_keys=True),
                     ),
                 )
-        except sqlite3.IntegrityError as exc:
-            raise DuplicateEvent(f"Audit event {event.id} already exists") from exc
+            except sqlite3.IntegrityError as exc:
+                raise DuplicateEvent(f"Audit event {event.id} already exists") from exc
 
     def get_audit(self, mission_id: str) -> list[AuditEvent]:
         rows = self.connection.execute(
@@ -161,7 +186,7 @@ class SQLiteMissionStore:
         fingerprint: str,
         result: dict[str, Any],
     ) -> None:
-        with self.connection:
+        with self.transaction():
             try:
                 self.connection.execute(
                     """
@@ -187,9 +212,8 @@ class SQLiteMissionStore:
         return {"fingerprint": row["fingerprint"], "result": json.loads(row["result"])}
 
     def _initialize(self) -> None:
-        with self.connection:
-            self.connection.executescript(
-                """
+        self.connection.executescript(
+            """
                 CREATE TABLE IF NOT EXISTS missions (
                     id TEXT PRIMARY KEY,
                     version INTEGER NOT NULL,
@@ -220,8 +244,8 @@ class SQLiteMissionStore:
                     result TEXT NOT NULL,
                     PRIMARY KEY (mission_id, idempotency_key)
                 );
-                """
-            )
+            """
+        )
 
 
 def _principal_payload(principal: Principal) -> dict[str, Any]:

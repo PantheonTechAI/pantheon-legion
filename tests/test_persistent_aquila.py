@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from aquila_api import PersistentAquilaService
 from legion_cognition import (
@@ -11,6 +12,7 @@ from legion_cognition import (
 from legion_fabrica import InMemoryFabrica, ToolDefinition
 from legion_kernel import AuthorizationError, Principal, PrincipalType, RoeLevel, WorkerKilled
 from legion_runtime import ExecutionState
+from legion_store import StoreConflict
 
 
 class PersistentTestModelProvider:
@@ -200,6 +202,75 @@ class PersistentAquilaServiceTests(unittest.TestCase):
         self.assertEqual(conflict.status_code, 409)
         self.assertEqual(conflict.body['code'], 'IDEMPOTENCY_KEY_REUSE')
         restarted.close()
+
+    def test_command_snapshot_audit_and_idempotency_roll_back_together(self):
+        service = self.create_service()
+        created = service.create_mission(actor=self.owner, body={
+            'organization_id': '11111111-1111-4111-8111-111111111111',
+            'workspace_id': '22222222-2222-4222-8222-222222222222',
+            'title': 'Atomic command persistence', 'objective': 'Reject partial commits.',
+        })
+        mission_id = created.body['id']
+        body = {
+            'expected_version': 1, 'idempotency_key': 'atomic-start',
+            'command_type': 'START', 'payload': {},
+        }
+        with mock.patch.object(service.store, 'append_audit', side_effect=OSError('disk full')):
+            with self.assertRaisesRegex(OSError, 'disk full'):
+                service.submit_command(actor=self.owner, mission_id=mission_id, body=body)
+        service.close()
+
+        restarted = self.create_service()
+        self.assertEqual(restarted.get_mission(actor=self.owner, mission_id=mission_id).body['version'], 1)
+        self.assertEqual(len(restarted.get_timeline(actor=self.owner, mission_id=mission_id).body['events']), 1)
+        self.assertIsNone(restarted.store.get_idempotency(
+            mission_id=mission_id, idempotency_key='atomic-start',
+        ))
+        restarted.close()
+
+    def test_delegation_audit_and_grant_roll_back_together(self):
+        service = self.create_service()
+        created = service.create_mission(actor=self.owner, body={
+            'organization_id': '11111111-1111-4111-8111-111111111111',
+            'workspace_id': '22222222-2222-4222-8222-222222222222',
+            'title': 'Atomic delegation persistence', 'objective': 'Reject partial grants.',
+        })
+        mission_id = created.body['id']
+        with mock.patch.object(service, '_persist_delegation', side_effect=OSError('disk full')):
+            with self.assertRaisesRegex(OSError, 'disk full'):
+                self.grant(service, mission_id, {'READ_MISSION'}, RoeLevel.OBSERVE)
+        service.close()
+
+        restarted = self.create_service()
+        self.assertEqual(restarted.delegations, {})
+        events = restarted.get_timeline(actor=self.owner, mission_id=mission_id).body['events']
+        self.assertEqual([event['event_type'] for event in events], ['MISSION_CREATED'])
+        restarted.close()
+
+    def test_losing_concurrent_writer_persists_no_partial_authority_record(self):
+        first = self.create_service()
+        created = first.create_mission(actor=self.owner, body={
+            'organization_id': '11111111-1111-4111-8111-111111111111',
+            'workspace_id': '22222222-2222-4222-8222-222222222222',
+            'title': 'Concurrent persistence', 'objective': 'Reject stale writers.',
+        })
+        mission_id = created.body['id']
+        second = self.create_service()
+        first.submit_command(actor=self.owner, mission_id=mission_id, body={
+            'expected_version': 1, 'idempotency_key': 'winner', 'command_type': 'START', 'payload': {},
+        })
+        with self.assertRaises(StoreConflict):
+            second.submit_command(actor=self.owner, mission_id=mission_id, body={
+                'expected_version': 1, 'idempotency_key': 'loser', 'command_type': 'START', 'payload': {},
+            })
+        first.close()
+        second.close()
+
+        recovered = self.create_service()
+        self.assertEqual(recovered.get_mission(actor=self.owner, mission_id=mission_id).body['version'], 2)
+        self.assertIsNone(recovered.store.get_idempotency(mission_id=mission_id, idempotency_key='loser'))
+        self.assertEqual(len(recovered.get_timeline(actor=self.owner, mission_id=mission_id).body['events']), 3)
+        recovered.close()
 
     def test_participant_projection_survives_service_restart(self):
         service = self.create_service()
