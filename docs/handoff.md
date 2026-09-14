@@ -27,24 +27,32 @@ and Registry workflows.
 PR #50, `Atomically persist Aquila authority records`, has merged. It commits
 each accepted operation's Mission snapshot, authoritative audit events,
 approval/idempotency/execution projections, and grant state in one SQLite
-transaction. It has **92 passing tests** and all seven M1 acceptance scenarios
-passing on `main`.
+transaction. The M1 acceptance runner continues to cover all seven catalog
+scenarios.
 
-ADRs 002 and 003 are accepted. PR #53 has merged the versioned schema artifacts
-for the Aquila-to-STS assertion, STS token introspection, Tabula scope binding,
-and separate corpus/Registry reads. The next work belongs to the STS and Tabula
-owners: implement and jointly test those contracts. Do not start a Legion MCP
-client, Portal, Praetorium, Fabrica transport, or model-provider expansion
-before conforming target services are available.
+ADRs 002 and 003 are accepted. PR #53 published the versioned schema artifacts;
+PR #55 required signed Organization and Workspace claims; PR #56 defined the
+two-tool Streamable HTTP MCP transport, deadline, retry, and error contract;
+and PR #57 made the FastMCP authentication boundary explicit. Tabula PRs #29–#33
+now implement the target-side read boundary: fail-closed STS introspection,
+exact Tabula-owned bindings, `legion_search_corpus`, and
+`legion_discover_registry`.
+
+The remaining gate is a real STS issuer/test fixture and joint conformance suite.
+Do not start an Aquila MCP client until that gate proves token issue,
+introspection, expiry/revocation, binding denial, provenance, correlation, and
+the generic pre-tool 401 versus post-auth error distinction. Portal, Praetorium,
+Fabrica transport, and model-provider expansion remain outside this slice.
 
 ## Current state
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged [PR #53](https://github.com/PantheonTechAI/pantheon-legion/pull/53)
-  (`0627083`), `Publish federated Tabula contract schemas`.
-- The full test suite passes: **93 tests** after installing
-  `requirements.txt` (which declares LangGraph).
+- `main` includes merged [PR #57](https://github.com/PantheonTechAI/pantheon-legion/pull/57)
+  (`4dfbc12`), which corrects the federated transport/authentication contract.
+- The merged baseline has **93 passing unit tests** and the M1 acceptance
+  runner passes all seven scenarios after installing `requirements.txt` (which
+  declares LangGraph); run both before a new implementation slice.
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
 
@@ -64,6 +72,10 @@ The repository now has a framework-neutral Mission control plane with:
   delegation state commit or roll back together.
 - Versioned, machine-readable contracts for federated workload authorization,
   STS token status, Tabula scope bindings, and separate corpus/Registry reads.
+- A contract-defined federated MCP transport boundary: the two dedicated tools,
+  opaque service-to-service bearer handling, a ten-second end-to-end deadline,
+  one bounded service-unavailable retry, generic pre-tool authentication 401s,
+  and non-disclosing post-auth error envelopes.
 - A provider-neutral durable execution adapter with idempotent starts, valid
   state transitions, pause/resume/cancel signaling, recovery, and snapshots.
 - Execution-boundary controls: current Mission state, ROE, fresh Approval,
@@ -152,6 +164,10 @@ Recent merged implementation slices:
 | #50 | Atomic Aquila authority persistence |
 | #51 | Federated workload-security and Legion–Tabula read ADRs |
 | #53 | Versioned STS and Tabula contract schemas |
+| #54 | Federated contract handoff checkpoint |
+| #55 | Required Organization and Workspace claims in federated STS context |
+| #56 | Dedicated Tabula MCP transport and error contract |
+| #57 | Correct FastMCP authentication versus post-auth error boundary |
 
 ## New-session quick start
 
@@ -167,8 +183,8 @@ python3 -m venv /tmp/pantheon-legion-venv
 /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
 ```
 
-Expected merged-main baseline: a clean `main`, **93 passing tests**, and seven
-passing M1 scenarios. Work one bounded feature branch at a time, open a PR,
+Expected merged-main baseline: a clean `main`, **93 passing unit tests**, and
+seven passing M1 scenarios. Work one bounded feature branch at a time, open a PR,
 and wait for its merge before starting the next implementation slice.
 
 Use `env -u GH_TOKEN` for GitHub CLI commands: the ambient token is invalid in
@@ -257,8 +273,9 @@ Other known boundaries, deliberately not started here:
   integration needs its own deployment and secret-management decision.
 - Fabrica has only an in-memory read-tool broker. MCP, sandbox enforcement,
   credentials, and Action-bound mutating tools remain future work.
-- Tabula has only in-memory scoped retrieval. Knowledge promotion, persistence,
-  vector retrieval, indexing, package signing, and UI remain future work.
+- The in-memory `TabulaRetrievalAdapter` remains the Legion test double. Tabula
+  now has its target-side federated read implementation, but no STS issuer,
+  shared conformance environment, or Aquila MCP client exists yet.
 - The WSGI surface is intentionally limited to the documented Mission API;
   durable action execution remains a worker/control-plane interface rather
   than a public HTTP endpoint.
@@ -282,14 +299,18 @@ Other known boundaries, deliberately not started here:
 
 1. PRs #49 and #50 are merged; do not recreate their delegation or local
    atomic-persistence designs in another component.
-2. PR #53 merged the STS authorization-assertion/introspection and Tabula
-   binding/read schemas required by ADRs 002 and 003.
-3. The security-platform and Tabula owners implement their contracts and add a
-   joint suite for token revocation, binding denial, provenance, and
-   correlation.
-4. Only after those conforming services are available, implement separate Legion corpus
-   and Registry clients. Keep Tabula's Console as the knowledge/governance UI
-   and build Praetorium as Aquila's thin human-operations client.
+2. PRs #53, #55, #56, and #57 complete Legion's contract/transport definition;
+   Tabula PRs #29–#33 complete the narrowly scoped target implementation.
+3. The security-platform owner supplies an STS issuer plus deterministic test
+   fixture. Then run the joint suite for token issue/revocation, binding and
+   tenant denial, provenance, correlation, deadline/retry, and the pre-tool
+   401/post-auth-envelope distinction.
+4. Only after that conforming environment exists, implement separate Legion
+   corpus and Registry clients. Keep Tabula's Console as the knowledge/governance
+   UI and build Praetorium as Aquila's thin human-operations client.
+5. Before external delivery becomes production work, replace Legion's M1 SQLite
+   Mission store with Legion-owned PostgreSQL plus a transactional outbox. Never
+   use Tabula's `console-db` as Legion persistence.
 
 ## Workflow notes
 
