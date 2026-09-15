@@ -28,6 +28,33 @@ security:
   - bearerAuth: []
 paths:
   /missions:
+    get:
+      operationId: listMissions
+      summary: List read-authorized Missions
+      description: |
+        Returns compact Mission projections for an authenticated user with
+        Aquila read authority. This is a Praetorium navigation view, not a
+        separate authorization or Mission-state authority.
+      tags: [Missions]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Compact Mission projections visible to the principal.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [missions]
+                properties:
+                  missions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MissionSummary'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createMission
       summary: Create a Mission
@@ -361,6 +388,30 @@ components:
   schemas:
     Mission:
       $ref: '../schemas/mission.schema.json'
+    MissionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, title, status, version, organization_id, workspace_id, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        organization_id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        updated_at:
+          type: string
+          format: date-time
     MissionCommand:
       $ref: '../schemas/mission-command.schema.json'
     Approval:
