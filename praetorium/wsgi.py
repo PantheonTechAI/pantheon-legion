@@ -31,6 +31,10 @@ class PraetoriumWSGIApp:
             return self._redirect(start_response, "/praetorium/missions")
         if path == "/praetorium/missions" and method == "GET":
             return self._missions(start_response, actor)
+        if path == "/praetorium/missions/new" and method == "GET":
+            return self._new_mission(start_response)
+        if path == "/praetorium/missions" and method == "POST":
+            return self._create_mission(start_response, actor, environ)
         parts = [part for part in path.split("/") if part]
         if len(parts) == 3 and parts[:2] == ["praetorium", "missions"] and method == "GET":
             return self._mission(start_response, actor, parts[2])
@@ -49,7 +53,22 @@ class PraetoriumWSGIApp:
             f'— {escape(item["status"])} (v{item["version"]})</li>'
             for item in response.body["missions"]
         ) or "<li>No visible Missions.</li>"
-        return self._send(start_response, 200, self._page("Praetorium Missions", f"<h1>Praetorium</h1><ul>{rows}</ul>"))
+        return self._send(start_response, 200, self._page("Praetorium Missions", f'<h1>Praetorium</h1><p><a href="/praetorium/missions/new">Create Mission</a></p><ul>{rows}</ul>'))
+
+    def _new_mission(self, start_response):
+        form = '''<h1>Create Mission</h1><form method="post" action="/praetorium/missions">
+<input name="organization_id" required placeholder="Organization UUID"><input name="workspace_id" required placeholder="Workspace UUID">
+<input name="title" required maxlength="200" placeholder="Title"><textarea name="objective" required maxlength="10000" placeholder="Objective"></textarea>
+<select name="initial_roe_level"><option>OBSERVE</option><option>RECOMMEND</option><option>REVIEW</option></select><button>Create Mission</button></form>'''
+        return self._send(start_response, 200, self._page("Create Mission", form))
+
+    def _create_mission(self, start_response, actor, environ):
+        form = self._form(environ)
+        body = {key: form.get(key, "") for key in ("organization_id", "workspace_id", "title", "objective", "initial_roe_level")}
+        response = self.service.create_mission(actor=actor, body=body)
+        if response.status_code != 201:
+            return self._error(start_response, response)
+        return self._redirect(start_response, f'/praetorium/missions/{quote(response.body["id"])}')
 
     def _mission(self, start_response, actor, mission_id: str, notice: str = ""):
         mission, timeline, approvals = (self.service.get_mission(actor=actor, mission_id=mission_id),

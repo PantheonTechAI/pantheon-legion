@@ -23,8 +23,6 @@ class PraetoriumUserAcceptanceTests(unittest.TestCase):
         mapper = AuthentikPrincipalMapper(AuthentikConfig(issuer="https://auth.example/", audience="aquila"))
         self.service = AquilaService(LegionKernel())
         self.app = PraetoriumWSGIApp(self.service, BearerAuthenticator(_Verifier(), mapper), tabula_console_url="https://tabula.example/console")
-        actor = self.app.authenticator.authenticate("Bearer operator")
-        self.mission = self.service.create_mission(actor=actor, body={"organization_id": "11111111-1111-4111-8111-111111111111", "workspace_id": "22222222-2222-4222-8222-222222222222", "title": "Approval journey", "objective": "Prove the bounded operator path.", "initial_roe_level": "REVIEW"}).body
 
     def request(self, method, path, form=None):
         raw, captured = urlencode(form or {}).encode(), {}
@@ -33,7 +31,9 @@ class PraetoriumUserAcceptanceTests(unittest.TestCase):
         return captured["status"], body
 
     def test_operator_can_inspect_submit_approve_and_follow_tabula_link(self):
-        mission_id = self.mission["id"]
+        status, _ = self.request("POST", "/praetorium/missions", {"organization_id": "11111111-1111-4111-8111-111111111111", "workspace_id": "22222222-2222-4222-8222-222222222222", "title": "Approval journey", "objective": "Prove the bounded operator path.", "initial_roe_level": "REVIEW"})
+        self.assertEqual(status, 303)
+        mission_id = next(iter(self.service.kernel.missions))
         status, body = self.request("GET", f"/praetorium/missions/{mission_id}")
         self.assertEqual(status, 200)
         self.assertIn("https://tabula.example/console", body)
