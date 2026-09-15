@@ -23,7 +23,8 @@ class PraetoriumWSGIApp:
 
     def __call__(self, environ, start_response):
         try:
-            actor = self.authenticator.authenticate(environ.get("HTTP_AUTHORIZATION"))
+            authenticate_request = getattr(self.authenticator, "authenticate_request", None)
+            actor = authenticate_request(environ) if authenticate_request else self.authenticator.authenticate(environ.get("HTTP_AUTHORIZATION"))
         except AuthenticationError as error:
             return self._send(start_response, 401, self._page("Sign in required", f"<p>{escape(str(error))}</p>"))
         method, path = environ.get("REQUEST_METHOD", "GET").upper(), environ.get("PATH_INFO", "")

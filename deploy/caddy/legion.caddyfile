@@ -1,0 +1,14 @@
+# Include in /etc/caddy/Caddyfile after DNS for legion.texasfight.net resolves here.
+legion.texasfight.net {
+	import tls_texasfight
+	route {
+		header -X-Authentik-Username -X-Authentik-Uid -X-Authentik-Groups
+		reverse_proxy /outpost.goauthentik.io/* http://auth.texasfight.net:9000
+		forward_auth http://auth.texasfight.net:9000 {
+			uri /outpost.goauthentik.io/auth/caddy
+			copy_headers X-Authentik-Username X-Authentik-Uid X-Authentik-Groups
+			trusted_proxies private_ranges
+		}
+		reverse_proxy 127.0.0.1:8101
+	}
+}
