@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, fields, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Callable
 from uuid import UUID, uuid4
 
 from legion_cognition import (
@@ -23,7 +23,7 @@ from legion_cognition import (
     ScoutResult,
 )
 from legion_fabrica import FabricaError, ToolExecutionAdapter, ToolInvocation, ToolResult
-from legion_tabula import KnowledgeScope, RetrievedKnowledge, TabulaRetrievalAdapter
+from legion_tabula import CorpusRead, CorpusReadError, KnowledgeScope, RetrievedKnowledge, ScopeBinding, TabulaCorpusClient, TabulaRetrievalAdapter
 from legion_kernel import (
     AuthorizationError,
     LegionKernel,
@@ -477,6 +477,69 @@ class AquilaService:
         if decision.decision == Decision.DENY:
             raise AuthorizationError(decision.reason)
         return tabula.retrieve(scope=KnowledgeScope.from_mission(mission), query=query, limit=limit)
+
+    def retrieve_federated_corpus(
+        self,
+        *,
+        mission_id: str,
+        worker: Principal,
+        delegation_id: str | None = None,
+        client: TabulaCorpusClient,
+        token: Callable[[], str],
+        binding: ScopeBinding,
+        query: str,
+        correlation_id: str | None = None,
+        intent: str = "SCOUT_EVIDENCE",
+        limit: int = 10,
+    ) -> CorpusRead:
+        """Authorize, invoke, and audit one narrow Tabula corpus read.
+
+        The delegated bearer is held only by the injected token supplier.  Mission
+        audit receives Tabula's correlation reference and record references, never
+        the token, query, citation, or corpus content.
+        """
+        mission = self.kernel.get_mission(mission_id)
+        correlation_id = correlation_id or str(uuid4())
+        self._validate_uuid(correlation_id)
+        invocation_id = str(uuid4())
+        decision = self._workload_decision(
+            principal=worker, mission_id=mission_id, operation="READ_KNOWLEDGE",
+            roe_level=mission.roe.level, mission_status=mission.status, delegation_id=delegation_id,
+        )
+        self.kernel.record_external_read_authorization(
+            mission_id=mission_id, actor=worker, target_product="TABULA",
+            operation="TABULA_CORPUS_READ", invocation_id=invocation_id,
+            decision_id=decision.decision_id, decision=decision.decision.value,
+            reason=decision.reason, policy_version=decision.policy_version,
+            evaluated_at=decision.evaluated_at, correlation_id=correlation_id,
+            delegation_id=delegation_id,
+        )
+        if decision.decision == Decision.DENY:
+            self.kernel.record_external_read_result(
+                mission_id=mission_id, actor=worker, target_product="TABULA",
+                operation="TABULA_CORPUS_READ", invocation_id=invocation_id,
+                correlation_id=correlation_id, result="DENY", data={"error_code": decision.reason},
+            )
+            raise AuthorizationError(decision.reason)
+        try:
+            result = client.read(
+                token=token, binding=binding, query=query, correlation_id=correlation_id,
+                intent=intent, limit=limit,
+            )
+        except (CorpusReadError, ValueError) as exc:
+            data = exc.audit_data() if isinstance(exc, CorpusReadError) else {"error_code": "INVALID_REQUEST"}
+            self.kernel.record_external_read_result(
+                mission_id=mission_id, actor=worker, target_product="TABULA",
+                operation="TABULA_CORPUS_READ", invocation_id=invocation_id,
+                correlation_id=correlation_id, result="REJECTED", data=data,
+            )
+            raise
+        self.kernel.record_external_read_result(
+            mission_id=mission_id, actor=worker, target_product="TABULA",
+            operation="TABULA_CORPUS_READ", invocation_id=invocation_id,
+            correlation_id=correlation_id, result="SUCCESS", data=result.audit_data(),
+        )
+        return result
 
     def run_tabula_scout(
         self,

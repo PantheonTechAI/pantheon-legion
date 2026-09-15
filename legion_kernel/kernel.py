@@ -744,6 +744,70 @@ class LegionKernel:
             },
         )
 
+    def record_external_read_authorization(
+        self,
+        *,
+        mission_id: str,
+        actor: Principal,
+        target_product: str,
+        operation: str,
+        invocation_id: str,
+        decision_id: str,
+        decision: str,
+        reason: str,
+        policy_version: str,
+        evaluated_at: str,
+        correlation_id: str,
+        delegation_id: str | None = None,
+    ) -> None:
+        """Append Aquila's authorization decision before a protected external read."""
+        mission = self._mission(mission_id)
+        self._record(
+            mission,
+            event_type="EXTERNAL_READ_AUTHORIZATION_EVALUATED",
+            actor=actor,
+            result=decision,
+            correlation_id=correlation_id,
+            data={
+                "target_product": target_product,
+                "operation": operation,
+                "invocation_id": invocation_id,
+                "decision_id": decision_id,
+                "reason": reason,
+                "policy_version": policy_version,
+                "evaluated_at": evaluated_at,
+                "delegation_id": delegation_id,
+            },
+        )
+
+    def record_external_read_result(
+        self,
+        *,
+        mission_id: str,
+        actor: Principal,
+        target_product: str,
+        operation: str,
+        invocation_id: str,
+        correlation_id: str,
+        result: str,
+        data: dict[str, Any],
+    ) -> None:
+        """Append a redacted terminal fact for a protected external read."""
+        mission = self._mission(mission_id)
+        self._record(
+            mission,
+            event_type="EXTERNAL_READ_COMPLETED" if result == "SUCCESS" else "EXTERNAL_READ_REJECTED",
+            actor=actor,
+            result=result,
+            correlation_id=correlation_id,
+            data={
+                "target_product": target_product,
+                "operation": operation,
+                "invocation_id": invocation_id,
+                **data,
+            },
+        )
+
     def record_model_invocation(
         self,
         *,

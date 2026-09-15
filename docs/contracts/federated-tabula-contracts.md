@@ -1,8 +1,8 @@
 # Federated security and Tabula read-contract artifacts
 
-Status: Versioned shared contract for ADR-002 and ADR-003. Tabula's target-side
-implementation is merged; the STS issuer, shared conformance environment, and
-Aquila clients remain pending.<br>
+Status: Versioned shared contract for ADR-002 and ADR-003. Tabula target
+implementation, the Legion disposable STS fixture, and live cross-service
+conformance are merged. Product client adapters remain incremental work.<br>
 Contract revision: 1.2 (wire schemas: 1.0)
 
 These schemas are the shared implementation boundary for the Pantheon STS,
@@ -12,14 +12,14 @@ by the service that implements them.
 
 ## Implementation checkpoint
 
-Legion PRs #53, #55, #56, and #57 publish the schemas and define the transport
-semantics. Tabula PRs #29–#33 implement the two protected tools, fail-closed STS
-introspection, exact active Organization/Workspace bindings, corpus provenance,
-and Registry discovery projection. This is **not** an end-to-end integration:
-there is no shared STS issuer/test fixture or Aquila client yet. The next
-approval gate is a cross-service conformance suite, not a PAT fallback or a
-browser-mediated call.
-
+Legion PRs #53, #55–#57 publish the schemas and transport semantics; PRs
+#59–#63 add a deterministic STS fixture, a disposable isolated Tabula stack,
+and a real MCP conformance matrix. Tabula PRs #29–#39 implement the protected
+tools, fail-closed STS introspection, exact bindings, provenance, Registry
+discovery, isolation support, and FastMCP verifier initialization. The matrix
+proves allowed corpus/Registry reads, generic pre-tool invalid-token denial,
+and non-disclosing post-auth binding denial. The next product work is the
+separate Aquila corpus and Registry clients, never a PAT or browser fallback.
 | Artifact | Producer | Consumer | Purpose |
 |---|---|---|---|
 | `sts-authorization-assertion.schema.json` | Aquila | STS | Signed, one-time proof that Aquila authorized a narrow target read. |
