@@ -821,6 +821,27 @@ class AquilaService:
             return self._error(404, "NOT_FOUND")
         return ApiResponse(200, self._approval_payload(approval), {})
 
+    def list_approvals(self, *, actor: Principal, mission_id: str) -> ApiResponse:
+        """Return approvals only after Aquila authorizes Mission read access."""
+        try:
+            mission = self.kernel.get_mission(mission_id)
+        except KeyError:
+            return self._error(404, "NOT_FOUND")
+        denied = self._authorize(
+            AuthorizationRequest(
+                principal=actor, mission_id=mission_id, operation="READ_MISSION",
+                roe_level=mission.roe.level, mission_status=mission.status,
+            )
+        )
+        if denied:
+            return denied
+        approvals = [
+            self._approval_payload(approval)
+            for approval in self.kernel.approvals.values()
+            if approval.mission_id == mission_id
+        ]
+        return ApiResponse(200, {"mission_id": mission_id, "approvals": approvals}, {})
+
     def get_timeline(
         self,
         *,

@@ -66,6 +66,8 @@ class AquilaWSGIApp:
                     mission_id=mission_id,
                     body=body,
                 )
+            if action == "approvals" and method == "GET":
+                return self.service.list_approvals(actor=actor, mission_id=mission_id)
             if action == "timeline" and method == "GET":
                 query = parse_qs(environ.get("QUERY_STRING", ""))
                 return self.service.get_timeline(
