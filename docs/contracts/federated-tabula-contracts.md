@@ -19,7 +19,7 @@ tools, fail-closed STS introspection, exact bindings, provenance, Registry
 discovery, isolation support, and FastMCP verifier initialization. The matrix
 proves allowed corpus/Registry reads, generic pre-tool invalid-token denial,
 and non-disclosing post-auth binding denial. The next product work is the
-separate Aquila corpus and Registry clients, never a PAT or browser fallback.
+merged Aquila Corpus and Registry clients, which remain read-only and never use a PAT or browser fallback. The next gate is broader live end-to-end failure coverage.
 | Artifact | Producer | Consumer | Purpose |
 |---|---|---|---|
 | `sts-authorization-assertion.schema.json` | Aquila | STS | Signed, one-time proof that Aquila authorized a narrow target read. |
