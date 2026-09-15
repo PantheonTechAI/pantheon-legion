@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
+from datetime import datetime, timedelta, timezone
 import json
 from threading import Thread
 from typing import Any
@@ -22,7 +23,8 @@ class FixtureSTSServer(AbstractContextManager):
         private_key = Ed25519PrivateKey.generate()
         verifier = Ed25519AssertionVerifier({"aquila-fixture": private_key.public_key()})
         self._private_key = private_key
-        self._service = InMemorySecurityTokenService(verifier)
+        self._clock = _FixtureClock()
+        self._service = InMemorySecurityTokenService(verifier, now=self._clock.now)
         self._host = host
         self._requested_port = port
         self._server = None
@@ -75,6 +77,33 @@ class FixtureSTSServer(AbstractContextManager):
         if not isinstance(token, str) or not token:
             raise RuntimeError("fixture STS did not issue a token")
         return token
+
+    def revoke_binding(self, binding_id: str) -> int:
+        """Revoke fixture tokens by binding through the same HTTP boundary as Aquila."""
+        response = _post_json(
+            f"{self.base_url}/v1/revocations", {"binding_id": binding_id}, "aquila"
+        )
+        revoked = response.get("revoked")
+        if not isinstance(revoked, int) or isinstance(revoked, bool):
+            raise RuntimeError("fixture STS returned an invalid revocation response")
+        return revoked
+
+    def advance(self, duration: timedelta) -> None:
+        """Move the fixture clock forward without sleeping in conformance tests."""
+        self._clock.advance(duration)
+
+
+class _FixtureClock:
+    def __init__(self) -> None:
+        self._value = datetime.now(timezone.utc)
+
+    def now(self) -> datetime:
+        return self._value
+
+    def advance(self, duration: timedelta) -> None:
+        if duration <= timedelta(0):
+            raise ValueError("fixture clock can only move forward")
+        self._value += duration
 
 
 def _post_json(url: str, payload: dict[str, Any], identity: str) -> dict[str, Any]:

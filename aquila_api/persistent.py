@@ -156,6 +156,14 @@ class PersistentAquilaService(AquilaService):
             with self.store.transaction():
                 self._persist_operation(mission_id, before_version, before_sequence)
 
+    def retrieve_federated_corpus(self, **kwargs: Any) -> Any:
+        """Persist the authorization and terminal audit facts for a Tabula corpus read."""
+        return self._persist_federated_read("retrieve_federated_corpus", kwargs)
+
+    def retrieve_federated_registry(self, **kwargs: Any) -> Any:
+        """Persist the authorization and terminal audit facts for a Tabula Registry read."""
+        return self._persist_federated_read("retrieve_federated_registry", kwargs)
+
     def run_scout(self, **kwargs: Any) -> Any:
         """Persist the digest-only model invocation fact when a Scout uses one."""
         mission_id = str(kwargs["mission_id"])
@@ -164,6 +172,18 @@ class PersistentAquilaService(AquilaService):
         before_sequence = len(self.kernel.audit[mission_id])
         try:
             return super().run_scout(**kwargs)
+        finally:
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
+
+    def _persist_federated_read(self, method_name: str, kwargs: dict[str, Any]) -> Any:
+        mission_id = str(kwargs["mission_id"])
+        mission = self.kernel.missions[mission_id]
+        before_version = mission.version
+        before_sequence = len(self.kernel.audit[mission_id])
+        try:
+            method = getattr(super(), method_name)
+            return method(**kwargs)
         finally:
             with self.store.transaction():
                 self._persist_operation(mission_id, before_version, before_sequence)

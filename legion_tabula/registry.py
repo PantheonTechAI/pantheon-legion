@@ -6,6 +6,7 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 from .corpus import McpTransport, ScopeBinding, _parse_error
+from .mcp import McpTransportError
 
 _INTENTS = frozenset({"SCOUT_DISCOVERY", "OPERATOR_DISCOVERY"})
 
@@ -51,6 +52,7 @@ class TabulaRegistryClient:
         for attempt in range(2):
             args = {"schema_version": "1.0", "request_id": request_id, "correlation_id": correlation, "binding": binding.payload(), "intent": intent, "query": query, "limit": limit}
             try: reply = self._transport(token, {"name": "legion_discover_registry", "arguments": args})
+            except McpTransportError as error: raise RegistryReadError(error.code, request_id=request_id, correlation_id=correlation) from None
             except OSError: raise RegistryReadError("SERVICE_UNAVAILABLE", request_id=request_id, correlation_id=correlation) from None
             if reply.status_code == 401: raise RegistryReadError("UNAUTHENTICATED", request_id=request_id, correlation_id=correlation)
             if reply.status_code != 200 or not isinstance(reply.body, dict): raise RegistryReadError("TABULA_PROTOCOL_ERROR", request_id=request_id, correlation_id=correlation)

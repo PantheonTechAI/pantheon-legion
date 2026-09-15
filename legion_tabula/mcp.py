@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from math import isfinite
+from time import monotonic
 from typing import Any, Callable
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
@@ -18,6 +20,14 @@ class McpResponse:
 
     status_code: int
     body: dict[str, Any] | None
+
+
+class McpTransportError(OSError):
+    """A safe local transport failure that callers may expose only by code."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -33,28 +43,36 @@ class McpHttpTransport:
     def __init__(self, endpoint: str, *, timeout_seconds: float = 10.0) -> None:
         if not endpoint.startswith(("http://", "https://")):
             raise ValueError("MCP endpoint must be an HTTP URL")
+        if (
+            not isinstance(timeout_seconds, (int, float))
+            or isinstance(timeout_seconds, bool)
+            or not isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("MCP timeout must be positive")
         self._endpoint = endpoint
         self._timeout_seconds = timeout_seconds
         self._session_id: str | None = None
 
     def __call__(self, token: str | Callable[[], str], request: dict[str, Any]) -> McpResponse:
         next_token = (lambda: token) if isinstance(token, str) else token
+        deadline = monotonic() + self._timeout_seconds
         if self._session_id is None:
             opening = self._post(next_token(), "initialize", {
                 "protocolVersion": _PROTOCOL_VERSION,
                 "capabilities": {},
                 "clientInfo": {"name": "pantheon-legion", "version": "1.0"},
-            })
+            }, deadline)
             if opening.status_code != 200 or not opening.session_id:
                 return McpResponse(opening.status_code, opening.body)
             self._session_id = opening.session_id
-            initialized = self._post(next_token(), "notifications/initialized", {}, notification=True)
+            initialized = self._post(next_token(), "notifications/initialized", {}, deadline, notification=True)
             if initialized.status_code not in {200, 202}:
                 return McpResponse(initialized.status_code, initialized.body)
-        response = self._post(next_token(), "tools/call", request)
+        response = self._post(next_token(), "tools/call", request, deadline)
         return McpResponse(response.status_code, response.body)
 
-    def _post(self, token: str, method: str, params: dict[str, Any], *, notification: bool = False) -> _HttpResponse:
+    def _post(self, token: str, method: str, params: dict[str, Any], deadline: float, *, notification: bool = False) -> _HttpResponse:
         payload: dict[str, Any] = {"jsonrpc": "2.0", "method": method, "params": params}
         if not notification:
             payload["id"] = str(uuid4())
@@ -71,10 +89,19 @@ class McpHttpTransport:
             method="POST", headers=headers,
         )
         try:
-            with urlopen(http_request, timeout=self._timeout_seconds) as response:
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise McpTransportError("DEADLINE_EXCEEDED")
+            with urlopen(http_request, timeout=remaining) as response:
                 return _HttpResponse(response.status, _decode_body(response.read()), response.headers.get("Mcp-Session-Id"))
         except HTTPError as error:
             return _HttpResponse(error.code, _decode_body(error.read()), error.headers.get("Mcp-Session-Id"))
+        except McpTransportError:
+            raise
+        except TimeoutError:
+            raise McpTransportError("DEADLINE_EXCEEDED") from None
+        except (URLError, OSError):
+            raise McpTransportError("SERVICE_UNAVAILABLE") from None
 
 
 def _sse_payload(text: str) -> dict[str, Any] | None:

@@ -32,7 +32,14 @@ class FederatedConformanceRunner:
     def success(self, scenario_id: str, operation: str, tool: str, arguments: dict[str, Any]) -> ConformanceResult:
         reply = self._call_mcp(lambda: self._issue_token(_claims(operation, arguments)), {"name": tool, "arguments": _mcp_arguments(arguments)})
         body = reply.body or {}
-        passed = reply.status_code == 200 and body.get("schema_version") == "1.0" and body.get("request_id") == arguments["request_id"] and body.get("correlation_id") == arguments["correlation_id"] and "tabula_audit_correlation_id" in body
+        passed = (
+            reply.status_code == 200
+            and "code" not in body
+            and body.get("schema_version") == "1.0"
+            and body.get("request_id") == arguments["request_id"]
+            and body.get("correlation_id") == arguments["correlation_id"]
+            and "tabula_audit_correlation_id" in body
+        )
         return ConformanceResult(scenario_id, passed, "success response" if passed else _unexpected(reply))
 
     def pre_tool_denial(self, scenario_id: str, token: str, tool: str, arguments: dict[str, Any]) -> ConformanceResult:

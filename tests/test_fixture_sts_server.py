@@ -34,6 +34,19 @@ class FixtureSTSServerTests(unittest.TestCase):
         self.assertEqual(payload["operation"], "TABULA_CORPUS_READ")
         self.assertTrue(token.startswith("pts_"))
 
+    def test_revocation_and_expiry_are_visible_through_introspection_without_sleeping(self):
+        with FixtureSTSServer() as fixture:
+            claims = _claims()
+            token = fixture.issue_token(claims)
+            self.assertEqual(fixture.revoke_binding(claims["binding_id"]), 1)
+            self.assertFalse(_introspect(fixture, token)["active"])
+
+            expiring_token = fixture.issue_token(_claims())
+            fixture.advance(timedelta(minutes=6))
+            expired = _introspect(fixture, expiring_token)
+        self.assertFalse(expired["active"])
+        self.assertEqual(expired["denial_code"], "TOKEN_EXPIRED")
+
     def test_docker_url_requires_explicit_all_interface_binding(self):
         with FixtureSTSServer() as fixture:
             with self.assertRaisesRegex(RuntimeError, "0.0.0.0"):
@@ -45,3 +58,12 @@ class FixtureSTSServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _introspect(fixture, token):
+    request = Request(
+        fixture.introspection_url, data=json.dumps({"token": token}).encode(), method="POST",
+        headers={"Content-Type": "application/json", "X-Pantheon-Service": "tabula"},
+    )
+    with urlopen(request) as response:
+        return json.loads(response.read().decode())

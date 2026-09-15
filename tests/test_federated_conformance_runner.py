@@ -29,6 +29,20 @@ class FederatedConformanceRunnerTests(unittest.TestCase):
         self.assertNotIn("organization_id", seen["request"]["arguments"])
         self.assertEqual(self.tokens[0]["organization_id"], self.arguments["organization_id"])
 
+    def test_success_rejects_a_normalized_error_envelope(self):
+        runner = FederatedConformanceRunner(
+            self._issue,
+            lambda token, request: McpReply(200, {
+                "schema_version": "1.0", "request_id": request["arguments"]["request_id"],
+                "correlation_id": request["arguments"]["correlation_id"],
+                "code": "AUTHORIZATION_DENIED", "retryable": False,
+                "tabula_audit_correlation_id": str(uuid4()),
+            }),
+        )
+        self.assertFalse(runner.success(
+            "C-error", "TABULA_CORPUS_READ", "legion_search_corpus", self.arguments,
+        ).passed)
+
     def test_pre_tool_and_post_auth_denials_are_distinguished(self):
         runner = FederatedConformanceRunner(self._issue, lambda token, request: (token(), McpReply)[1](401, {"code": "UNAUTHENTICATED"}))
         self.assertTrue(runner.pre_tool_denial("C2", "bad", "legion_search_corpus", self.arguments).passed)

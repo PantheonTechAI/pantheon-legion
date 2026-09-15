@@ -38,19 +38,21 @@ now implement the target-side read boundary: fail-closed STS introspection,
 exact Tabula-owned bindings, `legion_search_corpus`, and
 `legion_discover_registry`.
 
-The remaining gate is a real STS issuer/test fixture and joint conformance suite.
-Do not start an Aquila MCP client until that gate proves token issue,
-introspection, expiry/revocation, binding denial, provenance, correlation, and
-the generic pre-tool 401 versus post-auth error distinction. Portal, Praetorium,
-Fabrica transport, and model-provider expansion remain outside this slice.
+The disposable STS fixture, joint conformance baseline, and separate Aquila
+Corpus/Registry clients are now merged. The remaining gate is broader isolated
+live coverage for token expiry/revocation, timeout, malformed response, retry,
+and service restart. Maintain generic pre-tool 401s and normalized,
+non-disclosing post-auth failures. Portal, Praetorium, Fabrica transport, and
+model-provider expansion remain outside this slice.
 
 ## Current state
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged [PR #57](https://github.com/PantheonTechAI/pantheon-legion/pull/57)
-  (`4dfbc12`), which corrects the federated transport/authentication contract.
-- The merged baseline has **93 passing unit tests** and the M1 acceptance
+- `main` includes merged [PR #65](https://github.com/PantheonTechAI/pantheon-legion/pull/65)
+  (`214c038`), which adds the separate federated Tabula Registry client after
+  the STS fixture, disposable conformance baseline, and Corpus client.
+- The merged baseline has **118 passing unit tests** and the M1 acceptance
   runner passes all seven scenarios after installing `requirements.txt` (which
   declares LangGraph); run both before a new implementation slice.
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
@@ -168,6 +170,13 @@ Recent merged implementation slices:
 | #55 | Required Organization and Workspace claims in federated STS context |
 | #56 | Dedicated Tabula MCP transport and error contract |
 | #57 | Correct FastMCP authentication versus post-auth error boundary |
+| #59 | Deterministic Pantheon STS fixture |
+| #60 | HTTP MCP conformance transport |
+| #61 | Isolated federated conformance orchestration |
+| #62 | Disposable live federated conformance matrix |
+| #63 | Disposable Tabula stack migration |
+| #64 | Federated Tabula Corpus client |
+| #65 | Federated Tabula Registry client |
 
 ## New-session quick start
 
@@ -183,7 +192,7 @@ python3 -m venv /tmp/pantheon-legion-venv
 /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
 ```
 
-Expected merged-main baseline: a clean `main`, **93 passing unit tests**, and
+Expected merged-main baseline: a clean `main`, **118 passing unit tests**, and
 seven passing M1 scenarios. Work one bounded feature branch at a time, open a PR,
 and wait for its merge before starting the next implementation slice.
 
@@ -298,13 +307,15 @@ Other known boundaries, deliberately not started here:
 
 ## Next-session plan
 
-1. Preserve the merged delegation, atomic-persistence, and separated Corpus/Registry
-   client designs; do not collapse Registry discovery into execution authority.
-2. The shared contracts, disposable STS fixture, live Tabula conformance matrix,
-   and both Aquila clients are merged. Maintain generic pre-tool 401s and
-   normalized non-disclosing post-auth failures.
-3. Add isolated live end-to-end coverage for revoked and expired grants, timeout,
-   malformed response, retry, and service-restart cases using the real clients.
+1. Preserve the merged delegation, atomic-persistence, and separated
+   Corpus/Registry client designs; do not collapse Registry discovery into
+   execution authority.
+2. The shared contracts, disposable STS fixture, live Tabula conformance
+   baseline, and both Aquila clients are merged. Maintain generic pre-tool 401s
+   and normalized, non-disclosing post-auth failures.
+3. Add isolated live end-to-end coverage for revoked and expired grants,
+   timeout, malformed response, retry, and service-restart cases using the real
+   clients.
 4. Before production external delivery, replace Legion M1 SQLite persistence
    with Legion-owned PostgreSQL and a transactional outbox. Never use Tabula
    console-db as Legion persistence.

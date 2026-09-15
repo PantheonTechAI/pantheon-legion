@@ -1,9 +1,10 @@
 import json
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from legion_tabula.mcp import McpHttpTransport
+from legion_tabula.mcp import McpHttpTransport, McpTransportError
 
 
 class McpHttpTransportTests(unittest.TestCase):
@@ -13,6 +14,8 @@ class McpHttpTransportTests(unittest.TestCase):
 
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self):
+                if self.server.delay_seconds:
+                    time.sleep(self.server.delay_seconds)
                 length = int(self.headers["Content-Length"])
                 body = json.loads(self.rfile.read(length))
                 seen.append({"path": self.path, "authorization": self.headers.get("Authorization"), "session": self.headers.get("Mcp-Session-Id"), "protocol": self.headers.get("Mcp-Protocol-Version"), "body": body})
@@ -33,13 +36,17 @@ class McpHttpTransportTests(unittest.TestCase):
                     self.send_header("Content-Length", str(len(encoded)))
                 self.end_headers()
                 if payload is not None:
-                    self.wfile.write(encoded)
+                    try:
+                        self.wfile.write(encoded)
+                    except BrokenPipeError:
+                        pass
 
             def log_message(self, format, *args):
                 return
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.reject = False
+        self.server.delay_seconds = 0
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.transport = McpHttpTransport(f"http://127.0.0.1:{self.server.server_port}/mcp")
@@ -67,6 +74,18 @@ class McpHttpTransportTests(unittest.TestCase):
         self.assertEqual(reply.status_code, 401)
         self.assertEqual(reply.body, {"code": "UNAUTHENTICATED"})
         self.assertEqual(len(self.seen), 1)
+
+    def test_timeout_is_a_deadline_error(self):
+        self.server.delay_seconds = 0.05
+        transport = McpHttpTransport(f"http://127.0.0.1:{self.server.server_port}/mcp", timeout_seconds=0.01)
+        with self.assertRaisesRegex(McpTransportError, "DEADLINE_EXCEEDED"):
+            transport("token", {"name": "legion_search_corpus", "arguments": {}})
+
+    def test_rejects_non_positive_or_non_finite_deadlines(self):
+        endpoint = f"http://127.0.0.1:{self.server.server_port}/mcp"
+        for timeout in (0, -1, float("inf")):
+            with self.assertRaisesRegex(ValueError, "timeout"):
+                McpHttpTransport(endpoint, timeout_seconds=timeout)
 
 
 if __name__ == "__main__":
