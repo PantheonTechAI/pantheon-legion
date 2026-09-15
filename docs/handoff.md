@@ -273,9 +273,10 @@ Other known boundaries, deliberately not started here:
   integration needs its own deployment and secret-management decision.
 - Fabrica has only an in-memory read-tool broker. MCP, sandbox enforcement,
   credentials, and Action-bound mutating tools remain future work.
-- The in-memory `TabulaRetrievalAdapter` remains the Legion test double. Tabula
-  now has its target-side federated read implementation, but no STS issuer,
-  shared conformance environment, or Aquila MCP client exists yet.
+- The in-memory `TabulaRetrievalAdapter` remains the deterministic local test
+  double. Legion PRs #59–#63 now provide a disposable STS fixture, isolated
+  Tabula stack, and live joint conformance proof. Production issuer deployment and
+  product client adapters remain separate work.
 - The WSGI surface is intentionally limited to the documented Mission API;
   durable action execution remains a worker/control-plane interface rather
   than a public HTTP endpoint.
@@ -297,21 +298,18 @@ Other known boundaries, deliberately not started here:
 
 ## Next-session plan
 
-1. PRs #49 and #50 are merged; do not recreate their delegation or local
-   atomic-persistence designs in another component.
-2. PRs #53, #55, #56, and #57 complete Legion's contract/transport definition;
-   Tabula PRs #29–#33 complete the narrowly scoped target implementation.
-3. The security-platform owner supplies an STS issuer plus deterministic test
-   fixture. Then run the joint suite for token issue/revocation, binding and
-   tenant denial, provenance, correlation, deadline/retry, and the pre-tool
-   401/post-auth-envelope distinction.
-4. Only after that conforming environment exists, implement separate Legion
-   corpus and Registry clients. Keep Tabula's Console as the knowledge/governance
-   UI and build Praetorium as Aquila's thin human-operations client.
-5. Before external delivery becomes production work, replace Legion's M1 SQLite
-   Mission store with Legion-owned PostgreSQL plus a transactional outbox. Never
-   use Tabula's `console-db` as Legion persistence.
-
+1. Preserve the merged delegation and local atomic-persistence designs; do not
+   recreate them in a client adapter.
+2. The shared contracts, disposable STS fixture, and live Tabula conformance
+   matrix are merged. Maintain the pre-tool 401/post-auth-envelope boundary.
+3. Implement the separate Legion `TabulaCorpusClient` with strict response
+   validation and audit-safe references, retaining the in-memory retrieval seam
+   as a test double.
+4. Implement the independent `TabulaRegistryClient`; registry discovery must
+   remain metadata and cannot grant execution authority.
+5. Before production external delivery, replace Legion M1 SQLite persistence
+   with Legion-owned PostgreSQL and a transactional outbox. Never use Tabula
+   `console-db` as Legion persistence.
 ## Workflow notes
 
 - Create each feature branch from the latest merged `main`; do not overlap

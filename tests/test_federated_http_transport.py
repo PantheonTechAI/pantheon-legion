@@ -3,7 +3,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from tests.federation.http_transport import McpHttpTransport
+from legion_tabula.mcp import McpHttpTransport
 
 
 class McpHttpTransportTests(unittest.TestCase):
