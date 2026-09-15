@@ -23,7 +23,7 @@ from legion_cognition import (
     ScoutResult,
 )
 from legion_fabrica import FabricaError, ToolExecutionAdapter, ToolInvocation, ToolResult
-from legion_tabula import CorpusRead, CorpusReadError, KnowledgeScope, RetrievedKnowledge, ScopeBinding, TabulaCorpusClient, TabulaRetrievalAdapter
+from legion_tabula import CorpusRead, CorpusReadError, KnowledgeScope, RegistryDiscovery, RegistryReadError, RetrievedKnowledge, ScopeBinding, TabulaCorpusClient, TabulaRegistryClient, TabulaRetrievalAdapter
 from legion_kernel import (
     AuthorizationError,
     LegionKernel,
@@ -495,8 +495,8 @@ class AquilaService:
         """Authorize, invoke, and audit one narrow Tabula corpus read.
 
         The delegated bearer is held only by the injected token supplier.  Mission
-        audit receives Tabula's correlation reference and record references, never
-        the token, query, citation, or corpus content.
+        audit receives Tabula's correlation reference and registry references, never
+        the token, query or bearer tokens.
         """
         mission = self.kernel.get_mission(mission_id)
         correlation_id = correlation_id or str(uuid4())
@@ -537,6 +537,69 @@ class AquilaService:
         self.kernel.record_external_read_result(
             mission_id=mission_id, actor=worker, target_product="TABULA",
             operation="TABULA_CORPUS_READ", invocation_id=invocation_id,
+            correlation_id=correlation_id, result="SUCCESS", data=result.audit_data(),
+        )
+        return result
+
+    def retrieve_federated_registry(
+        self,
+        *,
+        mission_id: str,
+        worker: Principal,
+        delegation_id: str | None = None,
+        client: TabulaRegistryClient,
+        token: Callable[[], str],
+        binding: ScopeBinding,
+        query: str,
+        correlation_id: str | None = None,
+        intent: str = "SCOUT_DISCOVERY",
+        limit: int = 10,
+    ) -> RegistryDiscovery:
+        """Authorize, invoke, and audit one narrow Tabula Registry discovery.
+
+        The delegated bearer is held only by the injected token supplier.  Mission
+        audit receives Tabula's correlation reference and registry references, never
+        the token, query or bearer tokens.
+        """
+        mission = self.kernel.get_mission(mission_id)
+        correlation_id = correlation_id or str(uuid4())
+        self._validate_uuid(correlation_id)
+        invocation_id = str(uuid4())
+        decision = self._workload_decision(
+            principal=worker, mission_id=mission_id, operation="READ_KNOWLEDGE",
+            roe_level=mission.roe.level, mission_status=mission.status, delegation_id=delegation_id,
+        )
+        self.kernel.record_external_read_authorization(
+            mission_id=mission_id, actor=worker, target_product="TABULA",
+            operation="TABULA_REGISTRY_READ", invocation_id=invocation_id,
+            decision_id=decision.decision_id, decision=decision.decision.value,
+            reason=decision.reason, policy_version=decision.policy_version,
+            evaluated_at=decision.evaluated_at, correlation_id=correlation_id,
+            delegation_id=delegation_id,
+        )
+        if decision.decision == Decision.DENY:
+            self.kernel.record_external_read_result(
+                mission_id=mission_id, actor=worker, target_product="TABULA",
+                operation="TABULA_REGISTRY_READ", invocation_id=invocation_id,
+                correlation_id=correlation_id, result="DENY", data={"error_code": decision.reason},
+            )
+            raise AuthorizationError(decision.reason)
+        try:
+            result = client.discover(
+                token=token, binding=binding, query=query, correlation_id=correlation_id,
+                intent=intent, limit=limit,
+            )
+        except (RegistryReadError, ValueError) as exc:
+            data = exc.audit_data() if isinstance(exc, RegistryReadError) else {"error_code": "INVALID_REQUEST"}
+            self.kernel.record_external_read_result(
+                mission_id=mission_id, actor=worker, target_product="TABULA",
+                operation="TABULA_REGISTRY_READ", invocation_id=invocation_id,
+                correlation_id=correlation_id, result="REJECTED", data=data,
+            )
+            raise
+        self.kernel.record_external_read_result(
+            mission_id=mission_id, actor=worker, target_product="TABULA",
+            operation="TABULA_REGISTRY_READ", invocation_id=invocation_id,
             correlation_id=correlation_id, result="SUCCESS", data=result.audit_data(),
         )
         return result

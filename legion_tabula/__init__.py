@@ -1,5 +1,7 @@
 """Provider-neutral Tabula knowledge-retrieval boundary."""
 
+from .registry import RegistryDiscovery, RegistryEntity, RegistryReadError, TabulaRegistryClient
+
 from .corpus import CorpusRead, CorpusReadError, CorpusRecord, ScopeBinding, TabulaCorpusClient
 from .mcp import McpHttpTransport, McpResponse
 
@@ -12,6 +14,10 @@ from .retrieval import (
 )
 
 __all__ = [
+    "RegistryDiscovery",
+    "RegistryEntity",
+    "RegistryReadError",
+    "TabulaRegistryClient",
     "CorpusRead",
     "CorpusReadError",
     "CorpusRecord",
