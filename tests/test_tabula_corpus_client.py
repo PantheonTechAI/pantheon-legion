@@ -2,6 +2,7 @@ import unittest
 from uuid import uuid4
 
 from legion_tabula import CorpusReadError, McpResponse, ScopeBinding, TabulaCorpusClient
+from legion_tabula.mcp import McpTransportError
 
 
 ORG = "11111111-1111-4111-8111-111111111111"
@@ -94,6 +95,28 @@ class TabulaCorpusClientTests(unittest.TestCase):
         self.assertEqual([item["correlation_id"] for item in attempts], [CORRELATION_ID, CORRELATION_ID])
         self.assertEqual(result.correlation_id, CORRELATION_ID)
         self.assertEqual([call["token"] for call in self.calls], ["fresh-0", "fresh-1"])
+
+    def test_deadline_exceeded_is_terminal_and_never_retried(self):
+        def deadline(arguments):
+            return McpResponse(200, {
+                "schema_version": "1.0", "request_id": arguments["request_id"],
+                "correlation_id": arguments["correlation_id"], "code": "DEADLINE_EXCEEDED",
+                "retryable": False, "tabula_audit_correlation_id": TABULA_AUDIT_ID,
+            })
+
+        client = TabulaCorpusClient(self._transport(deadline))
+        with self.assertRaisesRegex(CorpusReadError, "DEADLINE_EXCEEDED"):
+            client.read(token=lambda: "fresh-token", binding=self.binding, query="bounded authorization")
+        self.assertEqual(len(self.calls), 1)
+
+    def test_local_transport_deadline_is_not_misclassified_as_service_unavailable(self):
+        def deadline(token, request):
+            raise McpTransportError("DEADLINE_EXCEEDED")
+
+        with self.assertRaisesRegex(CorpusReadError, "DEADLINE_EXCEEDED"):
+            TabulaCorpusClient(deadline).read(
+                token=lambda: "fresh-token", binding=self.binding, query="bounded authorization",
+            )
 
     def test_rejects_malformed_success_without_leaking_payload(self):
         def malformed(arguments):

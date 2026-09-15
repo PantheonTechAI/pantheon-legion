@@ -3,7 +3,7 @@
 from .registry import RegistryDiscovery, RegistryEntity, RegistryReadError, TabulaRegistryClient
 
 from .corpus import CorpusRead, CorpusReadError, CorpusRecord, ScopeBinding, TabulaCorpusClient
-from .mcp import McpHttpTransport, McpResponse
+from .mcp import McpHttpTransport, McpResponse, McpTransportError
 
 from .retrieval import (
     InMemoryTabula,
@@ -23,6 +23,7 @@ __all__ = [
     "CorpusRecord",
     "McpHttpTransport",
     "McpResponse",
+    "McpTransportError",
     "ScopeBinding",
     "TabulaCorpusClient",
     "InMemoryTabula",

@@ -9,7 +9,7 @@ import re
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-from .mcp import McpResponse
+from .mcp import McpResponse, McpTransportError
 
 _ERROR_CODES = frozenset({"INVALID_REQUEST", "AUTHORIZATION_DENIED", "DEADLINE_EXCEEDED", "SERVICE_UNAVAILABLE", "INTERNAL_ERROR"})
 _INTENTS = frozenset({"SCOUT_EVIDENCE", "OPERATOR_CONTEXT"})
@@ -120,6 +120,8 @@ class TabulaCorpusClient:
             }
             try:
                 reply = self._transport(token, {"name": "legion_search_corpus", "arguments": request})
+            except McpTransportError as error:
+                raise CorpusReadError(error.code, request_id=request_id, correlation_id=correlation) from None
             except OSError:
                 raise CorpusReadError("SERVICE_UNAVAILABLE", request_id=request_id, correlation_id=correlation) from None
             if reply.status_code == 401:
