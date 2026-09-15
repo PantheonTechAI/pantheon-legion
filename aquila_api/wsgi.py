@@ -43,6 +43,8 @@ class AquilaWSGIApp:
     def _dispatch(self, environ, actor, method, path, body) -> ApiResponse:
         segments = [segment for segment in path.split("/") if segment]
         correlation_id = environ.get("HTTP_X_CORRELATION_ID")
+        if segments == ["missions"] and method == "GET":
+            return self.service.list_missions(actor=actor)
         if segments == ["missions"] and method == "POST":
             return self.service.create_mission(actor=actor, body=body)
         if len(segments) == 2 and segments[0] == "missions":

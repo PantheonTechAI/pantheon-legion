@@ -72,6 +72,21 @@ class WsgiAdapterTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(command["status"], "ACCEPTED")
 
+    def test_list_missions_returns_compact_authorized_projections(self):
+        _, _, created = self.request("POST", "/missions", self.create_body())
+        status, _, listed = self.request("GET", "/missions")
+        self.assertEqual(status, 200)
+        self.assertEqual(listed["missions"], [{
+            "id": created["id"], "title": "WSGI Mission", "status": "DRAFT",
+            "version": 1, "organization_id": self.create_body()["organization_id"],
+            "workspace_id": self.create_body()["workspace_id"], "updated_at": created["updated_at"],
+        }])
+
+    def test_list_missions_requires_a_read_authorized_principal(self):
+        status, _, body = self.request("GET", "/missions", authorization=None)
+        self.assertEqual(status, 401)
+        self.assertEqual(body["code"], "UNAUTHENTICATED")
+
     def test_authentication_and_error_routes(self):
         status, _, body = self.request("GET", "/missions/unknown", authorization=None)
         self.assertEqual(status, 401)

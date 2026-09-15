@@ -207,6 +207,43 @@ class AquilaService:
             return denied
         return ApiResponse(200, self._mission_payload(mission), {})
 
+    def list_missions(self, *, actor: Principal) -> ApiResponse:
+        """Return compact read-authorized Mission projections for Praetorium.
+
+        This deliberately reuses Aquila's existing read policy rather than
+        treating a UI route or Mission participation as an authority source.
+        The detailed projection remains available only through ``get_mission``.
+        """
+        missions = [self.kernel.get_mission(mission_id) for mission_id in self.kernel.missions]
+        if not missions:
+            # A reader role remains required even when there is no Mission to
+            # use as a policy context.
+            denied = self._authorize(
+                AuthorizationRequest(
+                    principal=actor,
+                    mission_id="LIST",
+                    operation="READ_MISSION",
+                    roe_level=RoeLevel.OBSERVE,
+                    mission_status=MissionStatus.DRAFT,
+                )
+            )
+            if denied:
+                return denied
+        summaries = []
+        for mission in missions:
+            denied = self._authorize(
+                AuthorizationRequest(
+                    principal=actor,
+                    mission_id=mission.id,
+                    operation="READ_MISSION",
+                    roe_level=mission.roe.level,
+                    mission_status=mission.status,
+                )
+            )
+            if denied is None:
+                summaries.append(self._mission_summary_payload(mission))
+        return ApiResponse(200, {"missions": summaries}, {})
+
     def submit_command(
         self,
         *,
@@ -987,6 +1024,18 @@ class AquilaService:
             "created_at": mission.created_at,
             "updated_at": mission.updated_at,
             "created_by": _principal_payload(mission.created_by),
+        }
+
+    @staticmethod
+    def _mission_summary_payload(mission: Any) -> dict[str, Any]:
+        return {
+            "id": mission.id,
+            "title": mission.title,
+            "status": mission.status.value,
+            "version": mission.version,
+            "organization_id": mission.organization_id,
+            "workspace_id": mission.workspace_id,
+            "updated_at": mission.updated_at,
         }
 
     @staticmethod
