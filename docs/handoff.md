@@ -298,18 +298,16 @@ Other known boundaries, deliberately not started here:
 
 ## Next-session plan
 
-1. Preserve the merged delegation and local atomic-persistence designs; do not
-   recreate them in a client adapter.
-2. The shared contracts, disposable STS fixture, and live Tabula conformance
-   matrix are merged. Maintain the pre-tool 401/post-auth-envelope boundary.
-3. Implement the separate Legion `TabulaCorpusClient` with strict response
-   validation and audit-safe references, retaining the in-memory retrieval seam
-   as a test double.
-4. Implement the independent `TabulaRegistryClient`; registry discovery must
-   remain metadata and cannot grant execution authority.
-5. Before production external delivery, replace Legion M1 SQLite persistence
+1. Preserve the merged delegation, atomic-persistence, and separated Corpus/Registry
+   client designs; do not collapse Registry discovery into execution authority.
+2. The shared contracts, disposable STS fixture, live Tabula conformance matrix,
+   and both Aquila clients are merged. Maintain generic pre-tool 401s and
+   normalized non-disclosing post-auth failures.
+3. Add isolated live end-to-end coverage for revoked and expired grants, timeout,
+   malformed response, retry, and service-restart cases using the real clients.
+4. Before production external delivery, replace Legion M1 SQLite persistence
    with Legion-owned PostgreSQL and a transactional outbox. Never use Tabula
-   `console-db` as Legion persistence.
+   console-db as Legion persistence.
 ## Workflow notes
 
 - Create each feature branch from the latest merged `main`; do not overlap
