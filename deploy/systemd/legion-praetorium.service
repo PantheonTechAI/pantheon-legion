@@ -1,0 +1,20 @@
+[Unit]
+Description=Pantheon Legion Praetorium
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jtdauria
+WorkingDirectory=/home/jtdauria/pantheon-legion
+EnvironmentFile=/etc/legion/praetorium.env
+ExecStart=/usr/bin/python3 -m praetorium.deployment --host 127.0.0.1 --port 8101
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/legion
+
+[Install]
+WantedBy=multi-user.target
