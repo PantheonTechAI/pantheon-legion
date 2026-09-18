@@ -8,6 +8,9 @@ from aquila_api.service import AquilaService
 from legion_kernel import LegionKernel
 from praetorium import PraetoriumWSGIApp
 
+ORGANIZATION_ID = "11111111-1111-4111-8111-111111111111"
+WORKSPACE_ID = "22222222-2222-4222-8222-222222222222"
+
 
 class Verifier:
     def verify(self, token):
@@ -20,7 +23,13 @@ class PraetoriumWSGITests(unittest.TestCase):
     def setUp(self):
         mapper = AuthentikPrincipalMapper(AuthentikConfig(issuer="https://auth.example/", audience="aquila"))
         self.service = AquilaService(LegionKernel())
-        self.app = PraetoriumWSGIApp(self.service, BearerAuthenticator(Verifier(), mapper), tabula_console_url="https://tabula.example/console")
+        self.app = PraetoriumWSGIApp(
+            self.service,
+            BearerAuthenticator(Verifier(), mapper),
+            tabula_console_url="https://tabula.example/console",
+            organization_id=ORGANIZATION_ID,
+            workspace_id=WORKSPACE_ID,
+        )
 
     def request(self, method, path, form=None, authorization="Bearer human"):
         raw = urlencode(form or {}).encode()
@@ -43,8 +52,25 @@ class PraetoriumWSGITests(unittest.TestCase):
         self.assertIn("https://tabula.example/console", body)
         self.assertNotIn("pts_", body)
 
+    def test_root_redirects_to_missions(self):
+        response, body = self.request("GET", "/")
+        self.assertEqual(response["status"], 303)
+        self.assertEqual(response["headers"]["Location"], "/praetorium/missions")
+        self.assertEqual(body, "")
+
+    def test_create_mission_uses_server_scope_not_browser_scope(self):
+        response, body = self.request("GET", "/praetorium/missions/new")
+        self.assertNotIn('name="organization_id"', body)
+        self.assertNotIn('name="workspace_id"', body)
+        response, body = self.request("POST", "/praetorium/missions", {"organization_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "workspace_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "title": "Server scoped Mission", "objective": "Prove browser scope is ignored.", "initial_roe_level": "REVIEW"})
+        self.assertEqual(response["status"], 303)
+        self.assertEqual(body, "")
+        mission = next(iter(self.service.kernel.missions.values()))
+        self.assertEqual(mission.organization_id, ORGANIZATION_ID)
+        self.assertEqual(mission.workspace_id, WORKSPACE_ID)
     def test_command_form_delegates_to_aquila(self):
         mission = self.mission()
+
         response, body = self.request("POST", f"/praetorium/missions/{mission['id']}/commands", {"expected_version": "1", "idempotency_key": "start-ui", "command_type": "START", "payload_json": json.dumps({})})
         self.assertEqual(response["status"], 200)
         self.assertIn("ACCEPTED", body)

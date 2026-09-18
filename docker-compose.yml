@@ -1,0 +1,26 @@
+name: pantheon-legion
+
+services:
+  runtime-db:
+    image: postgres:16-alpine
+    restart: on-failure
+    ports:
+      - "127.0.0.1:${LEGION_RUNTIME_DB_PORT:-5434}:5432"
+    environment:
+      POSTGRES_DB: "${LEGION_RUNTIME_DB_NAME:-legion_runtime_test}"
+      POSTGRES_USER: "${LEGION_RUNTIME_DB_USER:-legion_runtime}"
+      POSTGRES_PASSWORD: "${LEGION_RUNTIME_DB_PASSWORD:?set LEGION_RUNTIME_DB_PASSWORD}"
+    volumes:
+      - legion_runtime_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${LEGION_RUNTIME_DB_USER:-legion_runtime} -d ${LEGION_RUNTIME_DB_NAME:-legion_runtime_test}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  legion_runtime_postgres_data:

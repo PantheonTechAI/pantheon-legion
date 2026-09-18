@@ -60,6 +60,171 @@ class AquilaService:
         self.action_executions: dict[str, str] = {}
         self.delegations: dict[str, DelegationGrant] = {}
 
+    def authorize_agent_assignment(
+        self,
+        *,
+        actor: Principal,
+        mission_id: str,
+        agent_id: str,
+        assignment_id: str,
+        correlation_id: str,
+    ) -> ApiResponse:
+        """Evaluate one Agent assignment without taking ownership of Agent state."""
+        try:
+            mission = self.kernel.get_mission(mission_id)
+        except KeyError:
+            return self._error(404, "NOT_FOUND")
+        decision = self.authorization.decide(
+            AuthorizationRequest(
+                principal=actor,
+                mission_id=mission_id,
+                operation="ASSIGN_AGENT",
+                roe_level=mission.roe.level,
+                mission_status=mission.status,
+                side_effect_class="CONTROL",
+            )
+        )
+        self.kernel.record_agent_authorization(
+            mission_id=mission_id,
+            actor=actor,
+            event_type="AGENT_ASSIGNMENT_AUTHORIZATION_EVALUATED",
+            result=decision.decision.value,
+            correlation_id=correlation_id,
+            agent_id=agent_id,
+            assignment_id=assignment_id,
+            binding_id=None,
+            decision_id=decision.decision_id,
+            reason=decision.reason,
+            policy_version=decision.policy_version,
+            evaluated_at=decision.evaluated_at,
+        )
+        if decision.decision == Decision.DENY:
+            status = 409 if decision.reason == "MISSION_TERMINAL" else 403
+            return self._error(status, decision.reason)
+        return ApiResponse(
+            200,
+            self._agent_authority_payload(mission, decision),
+            {},
+        )
+
+    def authorize_agent_resume(
+        self,
+        *,
+        workload: Principal,
+        mission_id: str,
+        agent_id: str,
+        assignment_id: str,
+        binding_id: str,
+        delegation_id: str,
+        correlation_id: str,
+    ) -> ApiResponse:
+        """Revalidate delegated Runtime access before a workload resumes an Agent."""
+        try:
+            mission = self.kernel.get_mission(mission_id)
+        except KeyError:
+            return self._error(404, "NOT_FOUND")
+        decision = self._workload_decision(
+            principal=workload,
+            mission_id=mission_id,
+            operation="READ_MISSION",
+            roe_level=mission.roe.level,
+            mission_status=mission.status,
+            delegation_id=delegation_id,
+            record_audit=False,
+        )
+        reason = decision.reason
+        allowed = decision.decision == Decision.ALLOW
+        if workload.type != PrincipalType.WORKLOAD:
+            allowed, reason = False, "WORKLOAD_IDENTITY_REQUIRED"
+        elif mission.status in {MissionStatus.CANCELLED, MissionStatus.COMPLETED}:
+            allowed, reason = False, "MISSION_TERMINAL"
+        self.kernel.record_agent_authorization(
+            mission_id=mission_id,
+            actor=workload,
+            event_type="AGENT_RUNTIME_AUTHORIZATION_EVALUATED",
+            result=Decision.ALLOW.value if allowed else Decision.DENY.value,
+            correlation_id=correlation_id,
+            agent_id=agent_id,
+            assignment_id=assignment_id,
+            binding_id=binding_id,
+            decision_id=decision.decision_id,
+            reason=reason,
+            policy_version=decision.policy_version,
+            evaluated_at=decision.evaluated_at,
+            delegation_id=delegation_id,
+        )
+        if not allowed:
+            status = 409 if reason == "MISSION_TERMINAL" else 403
+            return self._error(status, reason)
+        return ApiResponse(
+            200,
+            self._agent_authority_payload(mission, decision),
+            {},
+        )
+
+    def authorize_scout_context(
+        self,
+        *,
+        workload: Principal,
+        mission_id: str,
+        agent_id: str,
+        assignment_id: str,
+        work_item_id: str,
+        attempt_id: str,
+        delegation_id: str,
+        correlation_id: str,
+    ) -> ApiResponse:
+        """Authorize one fresh read and return a bounded Mission projection."""
+        try:
+            mission = self.kernel.get_mission(mission_id)
+        except KeyError:
+            return self._error(404, "NOT_FOUND")
+        decision = self._workload_decision(
+            principal=workload,
+            mission_id=mission_id,
+            operation="READ_MISSION",
+            roe_level=mission.roe.level,
+            mission_status=mission.status,
+            delegation_id=delegation_id,
+            record_audit=False,
+        )
+        reason = decision.reason
+        allowed = decision.decision == Decision.ALLOW
+        if workload.type != PrincipalType.WORKLOAD:
+            allowed, reason = False, "WORKLOAD_IDENTITY_REQUIRED"
+        elif mission.status in {MissionStatus.CANCELLED, MissionStatus.COMPLETED}:
+            allowed, reason = False, "MISSION_TERMINAL"
+        self.kernel.record_agent_authorization(
+            mission_id=mission_id,
+            actor=workload,
+            event_type="SCOUT_MISSION_CONTEXT_AUTHORIZATION_EVALUATED",
+            result=Decision.ALLOW.value if allowed else Decision.DENY.value,
+            correlation_id=correlation_id,
+            agent_id=agent_id,
+            assignment_id=assignment_id,
+            binding_id=None,
+            decision_id=decision.decision_id,
+            reason=reason,
+            policy_version=decision.policy_version,
+            evaluated_at=decision.evaluated_at,
+            delegation_id=delegation_id,
+            work_item_id=work_item_id,
+            attempt_id=attempt_id,
+        )
+        if not allowed:
+            status = 409 if reason == "MISSION_TERMINAL" else 403
+            return self._error(status, reason)
+        body = self._agent_authority_payload(mission, decision)
+        body.update(
+            {
+                "title": mission.title,
+                "objective": mission.objective,
+                "roe_level": mission.roe.level.value,
+                "constraints": [item.text for item in mission.constraints],
+            }
+        )
+        return ApiResponse(200, body, {})
+
     def issue_delegation(
         self,
         *,
@@ -139,7 +304,8 @@ class AquilaService:
 
     def _workload_decision(
         self, *, principal: Principal, mission_id: str, operation: str, roe_level: RoeLevel,
-        mission_status: MissionStatus, delegation_id: str | None, **kwargs: Any,
+        mission_status: MissionStatus, delegation_id: str | None,
+        record_audit: bool = True, **kwargs: Any,
     ) -> Any:
         grant = self.delegations.get(delegation_id) if delegation_id else None
         decision = self.authorization.decide(
@@ -147,12 +313,14 @@ class AquilaService:
                                  roe_level=roe_level, mission_status=mission_status,
                                  delegation=grant, delegation_id=delegation_id, **kwargs)
         )
-        self.kernel.record_delegation_event(
-            mission_id=mission_id, actor=principal, event_type="DELEGATION_EVALUATED",
-            result=decision.decision.value, grant_id=delegation_id or "none",
-            data={"operation": operation, "reason": decision.reason,
-                  "decision_id": decision.decision_id, "policy_version": decision.policy_version},
-        )
+        if record_audit:
+            self.kernel.record_delegation_event(
+                mission_id=mission_id, actor=principal, event_type="DELEGATION_EVALUATED",
+                result=decision.decision.value, grant_id=delegation_id or "none",
+                data={"operation": operation, "reason": decision.reason,
+                      "decision_id": decision.decision_id,
+                      "policy_version": decision.policy_version},
+            )
         return decision
 
     def create_mission(self, *, actor: Principal, body: dict[str, Any]) -> ApiResponse:
@@ -967,6 +1135,20 @@ class AquilaService:
             return None
         status = 409 if decision.reason == "MISSION_TERMINAL" else 403
         return self._error(status, decision.reason)
+
+    @staticmethod
+    def _agent_authority_payload(mission: Any, decision: Any) -> dict[str, Any]:
+        return {
+            "mission_id": mission.id,
+            "organization_id": mission.organization_id,
+            "workspace_id": mission.workspace_id,
+            "mission_status": mission.status.value,
+            "mission_version": mission.version,
+            "roe_revision": mission.roe.revision,
+            "decision_id": decision.decision_id,
+            "policy_version": decision.policy_version,
+            "evaluated_at": decision.evaluated_at,
+        }
 
     @staticmethod
     def _principal_from_body(value: Any, fallback: Principal) -> Principal:

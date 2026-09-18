@@ -31,6 +31,45 @@ class PersistentAquilaService(AquilaService):
     def close(self) -> None:
         self.store.close()
 
+    def authorize_agent_assignment(self, **kwargs: Any) -> ApiResponse:
+        mission_id = str(kwargs["mission_id"])
+        mission = self.kernel.missions.get(mission_id)
+        if mission is None:
+            return super().authorize_agent_assignment(**kwargs)
+        before_version = mission.version
+        before_sequence = len(self.kernel.audit[mission_id])
+        try:
+            return super().authorize_agent_assignment(**kwargs)
+        finally:
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
+
+    def authorize_agent_resume(self, **kwargs: Any) -> ApiResponse:
+        mission_id = str(kwargs["mission_id"])
+        mission = self.kernel.missions.get(mission_id)
+        if mission is None:
+            return super().authorize_agent_resume(**kwargs)
+        before_version = mission.version
+        before_sequence = len(self.kernel.audit[mission_id])
+        try:
+            return super().authorize_agent_resume(**kwargs)
+        finally:
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
+
+
+    def authorize_scout_context(self, **kwargs: Any) -> ApiResponse:
+        mission_id = str(kwargs["mission_id"])
+        mission = self.kernel.missions.get(mission_id)
+        if mission is None:
+            return super().authorize_scout_context(**kwargs)
+        before_version = mission.version
+        before_sequence = len(self.kernel.audit[mission_id])
+        try:
+            return super().authorize_scout_context(**kwargs)
+        finally:
+            with self.store.transaction():
+                self._persist_operation(mission_id, before_version, before_sequence)
     def create_mission(self, *, actor: Principal, body: dict[str, Any]) -> ApiResponse:
         response = super().create_mission(actor=actor, body=body)
         if response.status_code == 201:

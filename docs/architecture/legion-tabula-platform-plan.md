@@ -4,7 +4,7 @@ Status: target architecture. The shared contract, Tabula's target-side
 federated-read implementation, disposable STS fixture, joint conformance
 baseline, and separate Aquila clients are now merged. Broader live failure
 coverage remains pending.<br>
-Date: 2026-09-14<br>
+Date: 2026-09-16<br>
 Scope: architecture alignment; no production integration is implemented by this document.
 
 ## Purpose
@@ -61,7 +61,7 @@ Aquila-issued workload grant.
 | Tabula | Legion retains an in-memory `TabulaRetrievalAdapter` test double; Tabula itself implements the dedicated protected corpus and Registry MCP tools, STS verifier, bindings, provenance, and audit correlation | Production issuer deployment and the remaining live failure matrix are separate work. |
 | Fabrica | In-memory declared read-tool broker | No MCP transport, sandbox, network/filesystem enforcement, or credential broker. |
 | Durable execution | In-memory provider-neutral adapter | No Temporal or other production workflow provider. |
-| Praetorium | Architecture concept only | No Legion human-operations UI exists. |
+| Praetorium | Initial authenticated Mission list/detail, creation, commands, approvals, timeline, Tabula deep link, and AI-box deployment composition | First browser test is underway. Temporary paired Organization/Workspace defaults are server-enforced; identity-derived scope remains future work. |
 | Castrum/package registry | Architecture concept only | No implementation exists. |
 
 The direct retrieval call in Aquila is a reference seam only; it is not a
@@ -289,8 +289,12 @@ Required rules:
 
 ### Phase 4 — product experience and execution systems
 
-1. Build Praetorium as the Legion application, first for Mission list/detail,
-   command submission, approvals, timeline, and deep links to Tabula.
+1. **Initial slice delivered; browser test in progress.** Praetorium now has
+   Mission list/detail, creation, command submission, approvals, timeline, and
+   Tabula deep links. It is deployed behind Caddy and Authentik on the AI box.
+   Paired Organization/Workspace environment defaults are validated at startup
+   and enforced server-side; complete and record the first end-user test using
+   approved environment-specific values.
 2. Add a portal shell/app launcher after both products can independently
    authenticate through the shared identity provider. Prefer navigation and
    deep links over embedded cross-origin application frames.

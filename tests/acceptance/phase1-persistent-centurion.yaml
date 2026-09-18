@@ -1,0 +1,33 @@
+suite_version: "1.0"
+name: Pantheon Legion Phase 1 Persistent Centurion Acceptance
+description: >-
+  Local-first proof that a persistent Centurion and its bounded coordination
+  intent survive Runtime and workload replacement while Aquila remains the
+  authority plane.
+required_model_runtime: false
+scenarios:
+  - id: P1-001
+    name: Centurion identity survives Runtime and workload replacement
+    assertions:
+      - stable Agent and assignment identifiers
+      - unchanged ASSESS_MISSION checkpoint intent
+      - previous workload binding released and replacement active
+      - no duplicate events on replay
+  - id: P1-002
+    name: Unavailable authority leaves recoverable assignment intent
+    assertions:
+      - assignment and checkpoint durably blocked
+      - READ_MISSION resume cannot bypass ASSIGN_AGENT
+      - explicit fresh reconciliation succeeds
+  - id: P1-003
+    name: Aquila denial fails closed
+    assertions:
+      - observer assignment rejected
+      - denial appears in Aquila authoritative audit
+      - Mission version remains unchanged
+  - id: P1-004
+    name: Runtime and Aquila persistence remain separate
+    assertions:
+      - Runtime database owns Agent state
+      - Aquila database owns Mission and authority facts
+      - neither database contains the other domain's primary tables

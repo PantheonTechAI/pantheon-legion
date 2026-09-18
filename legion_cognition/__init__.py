@@ -1,5 +1,6 @@
 """Provider-neutral cognition boundaries for Legion agents."""
 
+from .agent_adapter import LegacyScoutRuntimeBridge
 from .scout import (
     CognitionRuntimeAdapter,
     InMemoryScoutRuntime,
@@ -28,6 +29,7 @@ __all__ = [
     "CognitionRuntimeAdapter",
     "ConformanceCheck",
     "InMemoryScoutRuntime",
+    "LegacyScoutRuntimeBridge",
     "LangGraphScoutRuntime",
     "ModelInvocationError",
     "ModelInvocationProvenance",

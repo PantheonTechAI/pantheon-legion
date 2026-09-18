@@ -67,7 +67,7 @@ A **HumanIdentity** is an authenticated person represented by the configured ide
 
 ### WorkloadIdentity
 
-A **WorkloadIdentity** is the authenticated identity of a service, worker, agent instance, or external integration. It is distinct from the human who initiated a Mission or delegated work. A workload MUST NOT inherit unrestricted human authority merely because it operates on that human's Mission.
+A **WorkloadIdentity** is the authenticated identity of a service, worker, Runtime binding, or external integration. It is distinct from both a persistent Agent and the human who initiated a Mission or delegated work. A workload MUST NOT inherit unrestricted human authority merely because it operates for an Agent or on a human's Mission. Replacing a WorkloadIdentity does not replace the Agent it serves.
 
 ### DelegationGrant
 
@@ -109,6 +109,14 @@ A **Deployment** is a recorded placement of an immutable package/version into an
 
 ## Work organization
 
+### Agent
+
+An **Agent** is a persistent organizational identity owned by one Organization and Workspace. It has a stable identifier, organizational role, lifecycle state, and provenance independent of any model, prompt, package, Runtime binding, workload identity, credential, process, container, machine, or agent framework.
+
+An Agent may be assigned work and may use changing cognition and execution resources. Its identity and declared role do not grant authority. Aquila authorization, Mission ROE, Approval, workload identity, and bounded grants remain separate requirements.
+
+Agent identity and coordination state belong to Legion Runtime. An Agent does not own Mission truth.
+
 ### TaskForce
 
 A **TaskForce** is a Mission-scoped grouping of agents, humans, or external participants assembled to accomplish a bounded objective. It is coordination metadata, not an independent source of authority.
@@ -121,22 +129,45 @@ An **AgentCohort** is a reusable organizational definition of related agent capa
 
 An **AgentUnit** is a reusable grouping within a Cohort for a specialized operational function. **Century** is the product term for this concept.
 
-### SupervisorAgent / Centurion
+### Centurion
 
-A **SupervisorAgent** coordinates subordinate work within a bounded scope. **Centurion** is the product term. A supervisor does not gain authority over its declared scope merely by coordinating it.
+A **Centurion** is the Agent role responsible for coordinating bounded organizational work around one or more Missions. Phase 1 proves one active Mission assignment per Centurion without deciding the long-term cardinality. A Centurion does not gain authority over its assignment merely by coordinating it.
 
 ### AgentPackage and AgentVersion
 
-An **AgentPackage** is the distributable, policy-described artifact for an agent capability. An **AgentVersion** is an immutable, content-addressed version of that package, including code/configuration metadata, declared capabilities, provenance, and evaluation data.
+An **AgentPackage** is a distributable, policy-described implementation resource that an Agent Runtime binding may use. An **AgentVersion** is an immutable, content-addressed version of that package, including code/configuration metadata, declared capabilities, provenance, and evaluation data. Neither is the Agent's identity.
 
-### AgentInstance
+### AgentRuntimeBinding
 
-An **AgentInstance** is a runtime execution of a specific AgentVersion under a WorkloadIdentity and explicit Mission/task scope.
+An **AgentRuntimeBinding** is an inspectable association between a persistent Agent and one ephemeral Runtime/workload incarnation under explicit Mission/task scope and bounded authority. Replacing or retrying a binding does not replace the Agent. The historical term `AgentInstance` SHOULD NOT be used for identity; where retained for compatibility it refers only to a Runtime binding or run.
 
-### ObserverAgent / Scout
+### Scout
 
-An **ObserverAgent** is an agent role restricted to evidence collection and observation. **Scout** is the product term. A Scout MUST NOT mutate production state unless a later contract explicitly expands its role and grants the required authority.
+A **Scout** is an Agent role restricted to evidence collection and observation. A Scout MUST NOT mutate production state unless a later contract explicitly expands its role and Aquila grants the required authority.
 
+
+### WorkItem
+
+A **WorkItem** is a Legion Runtime-owned, Mission-scoped record of bounded
+organizational direction from one persistent Agent to another. A WorkItem is
+coordination state, not an Aquila `DelegationGrant`, Approval, Mission command,
+or source of authority. Phase 2 permits one read-only Scout objective with an
+explicit lifecycle and correlation/causation provenance.
+
+### WorkAttempt
+
+A **WorkAttempt** is one inspectable attempt by an authenticated workload bound
+to the assigned persistent Agent to complete a WorkItem. An attempt records the
+Agent, binding, Mission version, Aquila decision reference, status, and bounded
+error code. A crash may make cognition invocation ambiguous; such an attempt is
+recorded as abandoned before explicit retry.
+
+### WorkResult
+
+A **WorkResult** is the single bounded coordination outcome accepted by Runtime
+for a WorkItem. It retains Agent, workload, Mission, attempt, digest, and opaque
+evidence-reference provenance. It is not a general artifact store, does not
+mutate Mission state, and does not promote knowledge into Tabula.
 ## Knowledge and capabilities
 
 ### KnowledgeScope
@@ -169,11 +200,10 @@ The **Durable Execution Adapter** is Legion's provider-neutral contract for star
 
 The **Cognition Runtime Adapter** is the provider-neutral contract through which a Mission may invoke reasoning or agent runtime capabilities. LangGraph, PydanticAI, Microsoft Agent Framework, or another runtime MUST remain replaceable behind this boundary.
 
-### Thread, Run, Agent, and Workflow
+### Thread, Run, and Workflow
 
 - **Thread** — a conversational or interaction context; it MAY reference a Mission but does not own Mission state.
-- **Run** — one attempt or execution instance of a task, activity, model call, or tool call.
-- **Agent** — a capability-bearing workload that can act under an identity and scope.
+- **Run** — one attempt or execution of a task, activity, model call, tool call, or Runtime binding. A Run is never Agent identity.
 - **Workflow** — a durable execution structure or provider-level orchestration; it is an implementation of work, not the authoritative operational object.
 
 ## Naming rules

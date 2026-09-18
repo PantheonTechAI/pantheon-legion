@@ -1,6 +1,219 @@
-# Pantheon Legion M1 New-Session Handoff
+# Pantheon Legion Handoff
 
-Last updated: 2026-09-14
+Last updated: 2026-09-18
+
+## Phase 2 implementation checkpoint - 2026-09-18
+
+Persistent Organization Phase 2 is implemented in the current shared worktree.
+It proves the first durable Centurion-to-Scout work cycle: one persistent
+Centurion directs one bounded read-only `WorkItem` to one persistent Scout;
+Runtime owns coordination; Aquila freshly authorizes Mission context; a
+provider-neutral cognition bridge returns one bounded durable result; and the
+same identities and work survive workload and PostgreSQL restart.
+
+Phase 2 explicitly excludes live Tabula retrieval, Fabrica, real model
+providers, Cognition/Resource Fabric routing, public API/UI, multi-Scout
+coordination, and Aquila persistence migration. It adds Runtime-owned schema
+and production code, but no production dependency or deployment change.
+
+The implementation has role-aware resume, sorted multi-key locking across the
+work item and both assignments, reference-only event projections, fresh Aquila
+authorization, a canonical Agent cognition contract plus legacy bridge,
+at-least-once cognition with at-most-one accepted result, explicit ambiguous
+attempt recovery, and non-destructive migration downgrade refusal.
+
+The first independent implementation review reproduced all tests, acceptance
+runners, Alembic checks, and the real PostgreSQL restart proof. It found no
+runtime or architecture blocker, but correctly returned `REWORK` because this
+authoritative handoff still described Phase 2 as unimplemented. That major
+documentation finding is remediated here. Its two minor findings are also
+remediated by a dedicated terminal-Mission Scout-context test and an explicit
+record of implementation-file simplifications in the review package. The
+required re-review concluded `ACCEPT` with no new blocker, major, or minor
+finding.
+
+Post-remediation evidence is 186/186 tests, 7/7 M1 scenarios, 4/4 Phase 1
+scenarios, and 3/3 Phase 2 scenarios passing. Alembic drift and downgrade
+checks pass, and the independent reviewer reproduced the real PostgreSQL
+restart proof end to end.
+
+The accepted plan is
+[phase-2-first-delegated-scout-plan.md](architecture/phase-2-first-delegated-scout-plan.md);
+the implementation evidence and review record is
+[phase-2-implementation-review-package.md](architecture/phase-2-implementation-review-package.md);
+the historical planning review is
+[phase-2-plan-claude-review-package.md](architecture/phase-2-plan-claude-review-package.md);
+and the accepted architecture decision is
+[ADR-005](adr/ADR-005-runtime-work-delegation.md).
+
+### Next session start here
+
+This is the authoritative next-session runbook. It supersedes the historical
+quick-start and next-session sections retained later in this document.
+
+The next session should begin by reading, in order:
+
+1. `AGENTS.md` and `Codex_Delivery_Instructions.md`;
+2. this Phase 2 implementation checkpoint;
+3. the Phase 2 implementation review package;
+4. the accepted plan and ADR-005; and
+5. this handoff's Phase 1 checkpoint and dirty-worktree qualification.
+
+At this checkpoint the branch is `pr/71-ai-box-setup` and HEAD is
+`5d095e4e0a7490ed09460d97e303022b5d9183b2`. The worktree is intentionally
+dirty: Phase 0, Phase 1, Phase 2, AI-box/Praetorium, and user-owned changes are
+not a committed baseline. Do not reset, clean, overwrite, or opportunistically
+fold these changes together. Record the exact starting status before further
+work.
+
+The dedicated `pantheon-legion-runtime-db-1` PostgreSQL 16 container was
+healthy at handoff and exposed only on `127.0.0.1:5434`. Compose interpolation
+requires the Runtime database variables, so use the environment file explicitly:
+
+```sh
+docker compose --env-file deploy/runtime-postgres.env.example up --detach --wait runtime-db
+```
+
+Phase 2 implementation and its required independent review are complete.
+The next development slice must be selected explicitly. Before starting it:
+
+1. capture branch, HEAD, and full worktree status;
+2. confirm the Phase 2 files and migrations being used as the baseline;
+3. start/verify the dedicated Runtime PostgreSQL container;
+4. rerun the full suite and all three acceptance runners; and
+5. preserve the accepted ownership, authority, migration, and non-goal
+   boundaries unless a new architecture decision changes them.
+
+The last verified Python interpreter was
+`/tmp/pantheon-legion-venv/bin/python`. Re-establish a project interpreter if
+that temporary path no longer exists. The disposable test database URL is the
+`LEGION_RUNTIME_TEST_DATABASE_URL` value in
+`deploy/runtime-postgres.env.example`; never point destructive tests at the
+deployed Runtime database, Aquila, or Tabula.
+
+Verification commands used for the current checkpoint were:
+
+```sh
+env LEGION_RUNTIME_TEST_DATABASE_URL=postgresql+psycopg://legion_runtime:replace-with-a-local-secret@127.0.0.1:5434/legion_runtime_test \
+  /tmp/pantheon-legion-venv/bin/python -m unittest discover -s tests -q
+env LEGION_RUNTIME_TEST_DATABASE_URL=postgresql+psycopg://legion_runtime:replace-with-a-local-secret@127.0.0.1:5434/legion_runtime_test \
+  /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
+env LEGION_RUNTIME_TEST_DATABASE_URL=postgresql+psycopg://legion_runtime:replace-with-a-local-secret@127.0.0.1:5434/legion_runtime_test \
+  /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.phase1_runner
+env LEGION_RUNTIME_TEST_DATABASE_URL=postgresql+psycopg://legion_runtime:replace-with-a-local-secret@127.0.0.1:5434/legion_runtime_test \
+  /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.phase2_runner
+git diff --check
+```
+
+Do not silently extend Phase 2 into Tabula, Fabrica, a live model provider,
+public APIs/UI, or multi-Scout coordination. Do not mutate legacy
+`ScoutRequest`. Stop and re-plan if the Phase 2 baseline cannot be reproduced
+or a proposed next slice crosses a reviewed non-goal or ownership boundary.
+
+## Phase 1 persistent Centurion checkpoint — 2026-09-17
+
+Phase 1 is implemented in the current shared working tree. It proves one
+persistent `CENTURION` identity, one authorized Mission assignment, a bounded
+`ASSESS_MISSION` checkpoint, and replacement of an authenticated Runtime
+workload without replacing the Agent or duplicating meaningful Runtime events.
+
+The persistence amendment replaces the initial SQLite proof provider with a
+separate Runtime-owned PostgreSQL 16 database running through Docker Compose.
+SQLAlchemy Core and psycopg implement the existing `AgentRepository` contract;
+Alembic owns explicit migrations. Runtime state does not share Aquila or Tabula
+tables, credentials, migrations, or database ownership. Aquila retains Mission,
+ROE, grant, approval, and authorization ownership.
+
+`ASSIGN_AGENT` remains a dedicated human owner/operator decision, and resume
+requires a current delegated `READ_MISSION` grant. Both domains record
+correlated facts, but Aquila stores no Agent state and Runtime has no Mission
+mutation contract. Real adapter failures from Aquila's current SQLite store are
+translated to `AuthorityUnavailable`, leaving Runtime intent fail-closed and
+recoverable.
+
+Current acceptance evidence:
+
+- **169/169** unit and integration tests pass;
+- **7/7** canonical M1 scenarios pass unchanged;
+- **4/4** Phase 1 persistent-Centurion scenarios pass;
+- Alembic upgrade, drift check, downgrade/upgrade round trip pass;
+- the same Agent, assignment, checkpoint, binding, and five events survive a
+  real PostgreSQL container restart; and
+- `git diff --check` passes.
+
+The initial independent PostgreSQL review concluded **REWORK** on two narrow
+MAJOR findings: this handoff still described SQLite, and real Aquila SQLite
+failures were not translated at the Runtime authority adapter. Both were
+remediated with documentation and real-failure regression tests. Required
+Claude Code re-review independently reproduced **169/169** tests, **31/31**
+focused tests, **7/7** M1 scenarios, **4/4** Phase 1 scenarios, and the Alembic
+round trip, then concluded **ACCEPT** with no unresolved blocker or major issue.
+
+The current implementation/review record is
+[phase-1-postgresql-implementation-review-package.md](architecture/phase-1-postgresql-implementation-review-package.md).
+The original
+[SQLite review package](architecture/phase-1-implementation-claude-review-package.md)
+is historical. The accepted architecture is in
+[ADR-004](adr/ADR-004-persistent-agent-identity.md), and the executable catalog
+is [phase1-persistent-centurion.yaml](../tests/acceptance/phase1-persistent-centurion.yaml).
+
+Phase 1 does not add cognition, planning, Scouts, tool execution, public Agent
+HTTP/UI, background reconciliation, workload attestation, or production
+deployment wiring. `ASSESS_MISSION` is a durable next-intent marker only. The
+next implementation slice must be selected explicitly; do not silently begin
+Phase 2 or attach the historical Scout runtime to the Centurion.
+
+The repository remains on the user-selected `pr/71-ai-box-setup` baseline with
+the pre-existing AI-box/Praetorium checkpoint still present. Phase 1 files are
+not committed here, and those pre-existing changes remain user-owned.
+
+## End-of-day operational checkpoint — 2026-09-16
+
+Phase 4 now has a deployable initial Praetorium slice. `main` contains the
+merged Mission operations shell and initial user-acceptance flow (PRs #68 and
+#69) plus the first AI-box deployment composition (PR #70). The current
+working branch, `pr/71-ai-box-setup`, contains the uncommitted operational
+corrections and test findings from the first browser trial:
+
+- Praetorium is exposed at `https://legion.texasfight.net` through Caddy and
+  an Authentik Proxy Provider in forward-auth single-application mode. The
+  Legion application has been added to the existing proxy outpost.
+- Pantheon KB owns port `8101`. Legion must remain loopback-only on `8106`;
+  the branch updates the Caddy template, systemd unit, and deployment default
+  accordingly.
+- `deploy/setup-ai-box.sh` creates the project `.venv`, installs
+  `requirements.txt` (including LangGraph), prepares `/var/lib/legion` and
+  `/etc/legion`, installs/enables the service, and only starts it with
+  `--start`. It never overwrites an existing environment file.
+- The browser root now redirects to `/praetorium/missions`. The live service
+  is active, but it must be restarted once more to load the latest group-header
+  parsing fix described below.
+- Authentik sends `X-Authentik-Groups` with pipe separators. The branch now
+  accepts pipe, comma, and semicolon delimiters. Before that fix, a valid value
+  such as `tabula-admins|legion/mission-owners` became one unmapped group and
+  caused `READ_ROLE_REQUIRED`.
+- The user's membership in `legion/mission-owners` is the correct Legion role
+  source. `tabula-admins` may remain the application-access binding, but it
+  does not itself confer a Legion role. The canonical mappings are
+  `legion/mission-owners` → `MISSION_OWNER`,
+  `legion/mission-operators` → `OPERATOR`,
+  `legion/mission-approvers` → `APPROVER`, and
+  `legion/mission-observers` → `OBSERVER`.
+- Praetorium now requires paired `LEGION_DEFAULT_ORGANIZATION_ID` and
+  `LEGION_DEFAULT_WORKSPACE_ID` deployment settings, validates them at startup,
+  and supplies them server-side when a Mission is created. Browser input cannot
+  override the scope; replace the example's disposable pair before shared use.
+
+Before resuming browser testing, run:
+
+```sh
+sudo systemctl restart legion-praetorium
+sudo systemctl status legion-praetorium
+```
+
+Then revisit `https://legion.texasfight.net`. If Authentik membership was
+changed after the proxy session began, sign out at
+`/outpost.goauthentik.io/sign_out` on that host and authenticate again.
 
 ## North star — read before selecting work
 
@@ -39,22 +252,25 @@ exact Tabula-owned bindings, `legion_search_corpus`, and
 `legion_discover_registry`.
 
 The disposable STS fixture, joint conformance baseline, and separate Aquila
-Corpus/Registry clients are now merged. The remaining gate is broader isolated
-live coverage for token expiry/revocation, timeout, malformed response, retry,
-and service restart. Maintain generic pre-tool 401s and normalized,
-non-disclosing post-auth failures. Portal, Praetorium, Fabrica transport, and
+Corpus/Registry clients are now merged. The remaining federation gate is
+broader isolated live coverage for token expiry/revocation, timeout, malformed
+response, retry, and service restart. Maintain generic pre-tool 401s and
+normalized, non-disclosing post-auth failures. Praetorium's initial UI and
+AI-box test deployment are now in progress; Portal, Fabrica transport, and
 model-provider expansion remain outside this slice.
 
 ## Current state
 
 Repository: `https://github.com/PantheonTechAI/pantheon-legion.git`
 
-- `main` includes merged [PR #65](https://github.com/PantheonTechAI/pantheon-legion/pull/65)
-  (`214c038`), which adds the separate federated Tabula Registry client after
-  the STS fixture, disposable conformance baseline, and Corpus client.
-- The merged baseline has **118 passing unit tests** and the M1 acceptance
-  runner passes all seven scenarios after installing `requirements.txt` (which
-  declares LangGraph); run both before a new implementation slice.
+- `main` includes merged [PR #70](https://github.com/PantheonTechAI/pantheon-legion/pull/70),
+  the first AI-box deployment composition, after PR #67's Tabula federation
+  wiring and PRs #68–#69's Praetorium Mission operations UI and user flow.
+- The merged PR #70 baseline has **135 passing unit tests**. The current
+  uncommitted `pr/71-ai-box-setup` checkpoint has **138 passing unit tests**
+  after the root redirect, Authentik group, and server-scope regression tests.
+  The M1 acceptance runner continues to cover all seven scenarios after
+  installing `requirements.txt` (which declares LangGraph).
 - The canonical M1 acceptance runner passes all seven catalog scenarios and
   emits inspectable scenario-level evidence.
 
@@ -177,8 +393,12 @@ Recent merged implementation slices:
 | #63 | Disposable Tabula stack migration |
 | #64 | Federated Tabula Corpus client |
 | #65 | Federated Tabula Registry client |
+| #67 | Legion–Tabula federation wiring |
+| #68 | Praetorium Mission operations shell |
+| #69 | Praetorium user-acceptance and Mission-creation flow |
+| #70 | Initial Praetorium AI-box deployment composition |
 
-## New-session quick start
+## Historical new-session quick start - superseded 2026-09-18
 
 Start from the repository root and establish these facts before changing code:
 
@@ -192,9 +412,11 @@ python3 -m venv /tmp/pantheon-legion-venv
 /tmp/pantheon-legion-venv/bin/python -m tests.acceptance.runner
 ```
 
-Expected merged-main baseline: a clean `main`, **118 passing unit tests**, and
-seven passing M1 scenarios. Work one bounded feature branch at a time, open a PR,
-and wait for its merge before starting the next implementation slice.
+Expected merged-main baseline: a clean `main`, **135 passing unit tests**, and
+seven passing M1 scenarios. The day-close `pr/71-ai-box-setup` working tree has
+138 passing tests but is intentionally uncommitted; it is not a clean-main
+baseline. Work one bounded feature branch at a time, open a PR, and wait for
+its merge before starting the next implementation slice.
 
 Use `env -u GH_TOKEN` for GitHub CLI commands: the ambient token is invalid in
 the development environment.
@@ -305,20 +527,23 @@ Other known boundaries, deliberately not started here:
   event-volume and retention policy rather than making reads or all policy
   checks write events.
 
-## Next-session plan
+## Historical next-session plan - superseded 2026-09-18
 
-1. Preserve the merged delegation, atomic-persistence, and separated
+1. Restart `legion-praetorium` so the deployed process loads the uncommitted
+   Authentik pipe-delimited-group parser, then retest browser access as a
+   `legion/mission-owners` member.
+2. Configure the approved paired Organization and Workspace UUIDs in
+   `/etc/legion/praetorium.env`; the example values are disposable only.
+3. Complete and record the first end-user Mission-create/list/detail/command/
+   approval test. Then commit, push, and open the bounded deployment-fix PR.
+4. Preserve the merged delegation, atomic-persistence, and separated
    Corpus/Registry client designs; do not collapse Registry discovery into
-   execution authority.
-2. The shared contracts, disposable STS fixture, live Tabula conformance
-   baseline, and both Aquila clients are merged. Maintain generic pre-tool 401s
-   and normalized, non-disclosing post-auth failures.
-3. Add isolated live end-to-end coverage for revoked and expired grants,
-   timeout, malformed response, retry, and service-restart cases using the real
-   clients.
-4. Before production external delivery, replace Legion M1 SQLite persistence
-   with Legion-owned PostgreSQL and a transactional outbox. Never use Tabula
-   console-db as Legion persistence.
+   execution authority. Maintain generic pre-tool 401s and normalized,
+   non-disclosing post-auth failures.
+5. After the Praetorium test, resume the broader isolated live federation
+   matrix for revoked/expired grants, timeout, malformed response, retry, and
+   service restart. Before production external delivery, use Legion-owned
+   PostgreSQL plus a transactional outbox, never Tabula's console database.
 ## Workflow notes
 
 - Create each feature branch from the latest merged `main`; do not overlap

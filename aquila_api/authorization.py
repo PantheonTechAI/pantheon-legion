@@ -111,7 +111,10 @@ class AuthorizationEngine:
         if not principal.subject:
             return "MISSING_SUBJECT"
 
-        if principal.type == PrincipalType.WORKLOAD:
+        if (
+            principal.type == PrincipalType.WORKLOAD
+            and request.operation != "ASSIGN_AGENT"
+        ):
             grant = request.delegation
             if grant is None:
                 return "DELEGATION_INVALID" if request.delegation_id else "DELEGATION_REQUIRED"
@@ -142,6 +145,13 @@ class AuthorizationEngine:
 
         if request.mission_status in {MissionStatus.CANCELLED, MissionStatus.COMPLETED}:
             return "MISSION_TERMINAL"
+
+        if request.operation == "ASSIGN_AGENT":
+            if principal.type != PrincipalType.HUMAN:
+                return "OPERATOR_ROLE_REQUIRED"
+            if not principal.has_any_role(*self.policy.operator_roles):
+                return "OPERATOR_ROLE_REQUIRED"
+            return None
 
         if request.operation == "ISSUE_DELEGATION":
             if principal.type != PrincipalType.HUMAN or not principal.has_any_role("MISSION_OWNER"):

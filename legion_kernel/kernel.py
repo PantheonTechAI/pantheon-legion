@@ -880,6 +880,47 @@ class LegionKernel:
             },
         )
 
+    def record_agent_authorization(
+        self,
+        *,
+        mission_id: str,
+        actor: Principal,
+        event_type: str,
+        result: str,
+        correlation_id: str,
+        agent_id: str,
+        assignment_id: str | None,
+        binding_id: str | None,
+        decision_id: str,
+        reason: str,
+        policy_version: str,
+        evaluated_at: str,
+        delegation_id: str | None = None,
+        work_item_id: str | None = None,
+        attempt_id: str | None = None,
+    ) -> None:
+        """Append an Aquila-owned Agent assignment or resume decision fact."""
+        mission = self._mission(mission_id)
+        self._record(
+            mission,
+            event_type=event_type,
+            actor=actor,
+            result=result,
+            correlation_id=correlation_id,
+            data={
+                "agent_id": agent_id,
+                "assignment_id": assignment_id,
+                "binding_id": binding_id,
+                "decision_id": decision_id,
+                "reason": reason,
+                "policy_version": policy_version,
+                "evaluated_at": evaluated_at,
+                "grant_id": delegation_id,
+                **({"work_item_id": work_item_id} if work_item_id else {}),
+                **({"attempt_id": attempt_id} if attempt_id else {}),
+            },
+        )
+
     def record_approval_authorization(
         self,
         *,
