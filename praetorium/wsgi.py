@@ -17,9 +17,18 @@ from aquila_api.service import AquilaService
 
 
 class PraetoriumWSGIApp:
-    def __init__(self, service: AquilaService, authenticator: BearerAuthenticator, *, tabula_console_url: str) -> None:
+    def __init__(
+        self,
+        service: AquilaService,
+        authenticator: BearerAuthenticator,
+        *,
+        tabula_console_url: str,
+        organization_id: str,
+        workspace_id: str,
+    ) -> None:
         self.service, self.authenticator = service, authenticator
         self.tabula_console_url = tabula_console_url.rstrip("/")
+        self.organization_id, self.workspace_id = organization_id, workspace_id
 
     def __call__(self, environ, start_response):
         try:
@@ -28,7 +37,7 @@ class PraetoriumWSGIApp:
         except AuthenticationError as error:
             return self._send(start_response, 401, self._page("Sign in required", f"<p>{escape(str(error))}</p>"))
         method, path = environ.get("REQUEST_METHOD", "GET").upper(), environ.get("PATH_INFO", "")
-        if path in {"/praetorium", "/praetorium/"} and method == "GET":
+        if path in {"/", "/praetorium", "/praetorium/"} and method == "GET":
             return self._redirect(start_response, "/praetorium/missions")
         if path == "/praetorium/missions" and method == "GET":
             return self._missions(start_response, actor)
@@ -58,14 +67,18 @@ class PraetoriumWSGIApp:
 
     def _new_mission(self, start_response):
         form = '''<h1>Create Mission</h1><form method="post" action="/praetorium/missions">
-<input name="organization_id" required placeholder="Organization UUID"><input name="workspace_id" required placeholder="Workspace UUID">
+<p>Organization and Workspace scope are configured by this deployment.</p>
 <input name="title" required maxlength="200" placeholder="Title"><textarea name="objective" required maxlength="10000" placeholder="Objective"></textarea>
 <select name="initial_roe_level"><option>OBSERVE</option><option>RECOMMEND</option><option>REVIEW</option></select><button>Create Mission</button></form>'''
         return self._send(start_response, 200, self._page("Create Mission", form))
 
     def _create_mission(self, start_response, actor, environ):
         form = self._form(environ)
-        body = {key: form.get(key, "") for key in ("organization_id", "workspace_id", "title", "objective", "initial_roe_level")}
+        body = {
+            "organization_id": self.organization_id,
+            "workspace_id": self.workspace_id,
+            **{key: form.get(key, "") for key in ("title", "objective", "initial_roe_level")},
+        }
         response = self.service.create_mission(actor=actor, body=body)
         if response.status_code != 201:
             return self._error(start_response, response)

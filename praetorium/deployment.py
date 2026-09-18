@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from uuid import UUID
 from wsgiref.simple_server import make_server
 
 from aquila_api.auth import AuthenticationError, AuthentikConfig, AuthentikPrincipalMapper
@@ -22,22 +23,44 @@ class CaddyForwardAuthAuthenticator:
         if environ.get("REMOTE_ADDR") not in {"127.0.0.1", "::1"}:
             raise AuthenticationError("UNTRUSTED_PROXY")
         subject = environ.get("HTTP_X_AUTHENTIK_UID") or environ.get("HTTP_X_AUTHENTIK_USERNAME")
-        groups = [group.strip() for group in environ.get("HTTP_X_AUTHENTIK_GROUPS", "").replace(";", ",").split(",") if group.strip()]
+        groups = [
+            group.strip()
+            for group in environ.get("HTTP_X_AUTHENTIK_GROUPS", "").replace("|", ",").replace(";", ",").split(",")
+            if group.strip()
+        ]
         return self.mapper.map_claims({"iss": os.environ["LEGION_OIDC_ISSUER"], "aud": os.environ["LEGION_OIDC_AUDIENCE"], "sub": subject, "groups": groups})
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Praetorium behind local Caddy forward-auth.")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8101)
+    parser.add_argument("--port", type=int, default=8106)
     args = parser.parse_args()
-    required = ("LEGION_DATABASE", "LEGION_OIDC_ISSUER", "LEGION_OIDC_AUDIENCE", "TABULA_CONSOLE_URL")
+    required = (
+        "LEGION_DATABASE",
+        "LEGION_OIDC_ISSUER",
+        "LEGION_OIDC_AUDIENCE",
+        "TABULA_CONSOLE_URL",
+        "LEGION_DEFAULT_ORGANIZATION_ID",
+        "LEGION_DEFAULT_WORKSPACE_ID",
+    )
     missing = [key for key in required if not os.environ.get(key)]
     if missing:
         raise SystemExit(f"missing required configuration: {', '.join(missing)}")
+    try:
+        organization_id = str(UUID(os.environ["LEGION_DEFAULT_ORGANIZATION_ID"]))
+        workspace_id = str(UUID(os.environ["LEGION_DEFAULT_WORKSPACE_ID"]))
+    except ValueError as exc:
+        raise SystemExit("LEGION_DEFAULT_ORGANIZATION_ID and LEGION_DEFAULT_WORKSPACE_ID must be UUIDs") from exc
     service = PersistentAquilaService(os.environ["LEGION_DATABASE"])
     mapper = AuthentikPrincipalMapper(AuthentikConfig(issuer=os.environ["LEGION_OIDC_ISSUER"], audience=os.environ["LEGION_OIDC_AUDIENCE"]))
-    app = PraetoriumWSGIApp(service, CaddyForwardAuthAuthenticator(mapper), tabula_console_url=os.environ["TABULA_CONSOLE_URL"])
+    app = PraetoriumWSGIApp(
+        service,
+        CaddyForwardAuthAuthenticator(mapper),
+        tabula_console_url=os.environ["TABULA_CONSOLE_URL"],
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+    )
     try:
         make_server(args.host, args.port, app).serve_forever()
     finally:

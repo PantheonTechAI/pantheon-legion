@@ -10,6 +10,9 @@ from aquila_api.service import AquilaService
 from legion_kernel import LegionKernel
 from praetorium import PraetoriumWSGIApp
 
+ORGANIZATION_ID = "11111111-1111-4111-8111-111111111111"
+WORKSPACE_ID = "22222222-2222-4222-8222-222222222222"
+
 
 class _Verifier:
     def verify(self, token):
@@ -22,7 +25,13 @@ class PraetoriumUserAcceptanceTests(unittest.TestCase):
     def setUp(self):
         mapper = AuthentikPrincipalMapper(AuthentikConfig(issuer="https://auth.example/", audience="aquila"))
         self.service = AquilaService(LegionKernel())
-        self.app = PraetoriumWSGIApp(self.service, BearerAuthenticator(_Verifier(), mapper), tabula_console_url="https://tabula.example/console")
+        self.app = PraetoriumWSGIApp(
+            self.service,
+            BearerAuthenticator(_Verifier(), mapper),
+            tabula_console_url="https://tabula.example/console",
+            organization_id=ORGANIZATION_ID,
+            workspace_id=WORKSPACE_ID,
+        )
 
     def request(self, method, path, form=None):
         raw, captured = urlencode(form or {}).encode(), {}
@@ -31,9 +40,12 @@ class PraetoriumUserAcceptanceTests(unittest.TestCase):
         return captured["status"], body
 
     def test_operator_can_inspect_submit_approve_and_follow_tabula_link(self):
-        status, _ = self.request("POST", "/praetorium/missions", {"organization_id": "11111111-1111-4111-8111-111111111111", "workspace_id": "22222222-2222-4222-8222-222222222222", "title": "Approval journey", "objective": "Prove the bounded operator path.", "initial_roe_level": "REVIEW"})
+        status, _ = self.request("POST", "/praetorium/missions", {"title": "Approval journey", "objective": "Prove the bounded operator path.", "initial_roe_level": "REVIEW"})
         self.assertEqual(status, 303)
         mission_id = next(iter(self.service.kernel.missions))
+        mission = self.service.kernel.get_mission(mission_id)
+        self.assertEqual(mission.organization_id, ORGANIZATION_ID)
+        self.assertEqual(mission.workspace_id, WORKSPACE_ID)
         status, body = self.request("GET", f"/praetorium/missions/{mission_id}")
         self.assertEqual(status, 200)
         self.assertIn("https://tabula.example/console", body)

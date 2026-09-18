@@ -9,6 +9,6 @@ legion.texasfight.net {
 			copy_headers X-Authentik-Username X-Authentik-Uid X-Authentik-Groups
 			trusted_proxies private_ranges
 		}
-		reverse_proxy 127.0.0.1:8101
+		reverse_proxy 127.0.0.1:8106
 	}
 }

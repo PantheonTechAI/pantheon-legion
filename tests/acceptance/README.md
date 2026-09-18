@@ -120,3 +120,65 @@ Evidence MUST be sufficient to explain a failure without relying on application 
 | ROE | `schemas/rules-of-engagement.schema.json`, `docs/mission/conflict-resolution.md` |
 | Authoritative audit | `schemas/audit-event.schema.json`, `docs/domain-glossary.md` |
 | HTTP surface | `api/openapi.yaml` |
+
+## Phase 1 persistent Centurion suite
+
+The separate Phase 1 catalog is
+[phase1-persistent-centurion.yaml](./phase1-persistent-centurion.yaml). It does
+not alter or reinterpret the M1 Mission gate. It proves stable Agent identity,
+bounded checkpoint recovery, workload replacement, fail-closed Aquila
+authority, idempotent replay, and physical ownership separation between the
+Runtime PostgreSQL database and Aquila's current SQLite database.
+
+Start and migrate the Runtime database, then run it with:
+
+```sh
+docker compose --env-file .env.runtime.local up --detach --wait runtime-db
+export LEGION_RUNTIME_TEST_DATABASE_URL='postgresql+psycopg://.../legion_runtime_test'
+LEGION_RUNTIME_DATABASE_URL="$LEGION_RUNTIME_TEST_DATABASE_URL" \
+  python -m alembic -c legion_runtime/alembic.ini upgrade head
+python -m tests.acceptance.phase1_runner
+```
+
+`LEGION_RUNTIME_TEST_DATABASE_URL` must point to a PostgreSQL database whose
+name ends in `_test`; the runner refuses to truncate any other database. The
+suite requires no model runtime, cloud dependency, or external credential. It
+emits one JSON evidence record for each `P1-*` scenario and exits nonzero on
+any failure.
+
+Container-restart evidence is a separate reproducible probe:
+
+```sh
+python -m tests.acceptance.postgres_restart seed
+docker compose --env-file .env.runtime.local restart runtime-db
+python -m tests.acceptance.postgres_restart verify
+```
+
+## Phase 2 first delegated Scout suite
+
+The separate Phase 2 catalog is
+[phase2-first-delegated-scout.yaml](./phase2-first-delegated-scout.yaml). It
+proves the first durable Centurion-to-Scout work cycle without changing M1 or
+Phase 1 acceptance semantics.
+
+Run it against the migrated disposable Runtime PostgreSQL database:
+
+```sh
+export LEGION_RUNTIME_TEST_DATABASE_URL='postgresql+psycopg://.../legion_runtime_test'
+LEGION_RUNTIME_DATABASE_URL="$LEGION_RUNTIME_TEST_DATABASE_URL" \
+  python -m alembic -c legion_runtime/alembic.ini upgrade head
+python -m tests.acceptance.phase2_runner
+```
+
+The runner emits one JSON evidence record for each `P2-*` scenario. It uses
+real persistent Aquila state, real Runtime PostgreSQL state, fresh workload
+grants, and the provider-neutral deterministic cognition bridge. It requires
+no model provider, cloud dependency, Tabula call, or Fabrica action.
+
+Real database-process restart evidence is separate:
+
+```sh
+python -m tests.acceptance.phase2_postgres_restart seed
+docker compose --env-file .env.runtime.local restart runtime-db
+python -m tests.acceptance.phase2_postgres_restart verify
+```

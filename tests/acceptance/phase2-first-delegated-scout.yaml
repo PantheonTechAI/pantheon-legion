@@ -1,0 +1,26 @@
+suite_version: "1.0"
+name: Pantheon Legion Phase 2 First Delegated Scout Acceptance
+description: >-
+  Local-first proof that a persistent Centurion can direct one persistent
+  Scout through a bounded, authorized, recoverable read-only work cycle.
+required_model_runtime: false
+scenarios:
+  - id: P2-001
+    name: Durable delegated Scout cycle survives replacement
+    assertions:
+      - Centurion and Scout remain distinct persistent Agents
+      - replacement Scout workload preserves EXECUTE_WORK and focused task
+      - fresh Aquila context precedes deterministic cognition
+      - one bounded result survives Runtime reconstruction
+  - id: P2-002
+    name: Revoked Scout authority prevents cognition
+    assertions:
+      - fresh READ_MISSION decision fails closed
+      - cognition is not invoked
+      - failed work has no result
+  - id: P2-003
+    name: Cancellation is terminal and reference-only
+    assertions:
+      - active Centurion can cancel queued work
+      - both Agent checkpoints release the task
+      - cancellation events contain references but not task content
