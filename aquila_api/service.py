@@ -225,6 +225,122 @@ class AquilaService:
         )
         return ApiResponse(200, body, {})
 
+    def authorize_grounded_knowledge_operation(
+        self,
+        *,
+        workload: Principal,
+        mission_id: str,
+        delegation_id: str,
+        binding: ScopeBinding,
+        work_item_id: str,
+        attempt_id: str,
+        correlation_id: str,
+    ) -> ApiResponse:
+        """Authorize and audit one credential issuance for a protected Tabula call."""
+        try:
+            mission = self.kernel.get_mission(mission_id)
+        except KeyError:
+            return self._error(404, "NOT_FOUND")
+        decision = self._workload_decision(
+            principal=workload,
+            mission_id=mission_id,
+            operation="READ_KNOWLEDGE",
+            roe_level=mission.roe.level,
+            mission_status=mission.status,
+            delegation_id=delegation_id,
+            record_audit=False,
+        )
+        invocation_id = str(uuid4())
+        self.kernel.record_external_read_authorization(
+            mission_id=mission_id,
+            actor=workload,
+            target_product="TABULA",
+            operation="TABULA_CORPUS_READ",
+            invocation_id=invocation_id,
+            decision_id=decision.decision_id,
+            decision=decision.decision.value,
+            reason=decision.reason,
+            policy_version=decision.policy_version,
+            evaluated_at=decision.evaluated_at,
+            correlation_id=correlation_id,
+            delegation_id=delegation_id,
+            binding_id=binding.id,
+            binding_version=binding.version,
+            work_item_id=work_item_id,
+            attempt_id=attempt_id,
+        )
+        if decision.decision == Decision.DENY:
+            self.kernel.record_external_read_result(
+                mission_id=mission_id,
+                actor=workload,
+                target_product="TABULA",
+                operation="TABULA_CORPUS_READ",
+                invocation_id=invocation_id,
+                correlation_id=correlation_id,
+                result="DENY",
+                data={"error_code": decision.reason},
+            )
+            return self._error(403, decision.reason)
+        body = self._agent_authority_payload(mission, decision)
+        body.update(
+            {
+                "invocation_id": invocation_id,
+                "binding_id": binding.id,
+                "binding_version": binding.version,
+                "work_item_id": work_item_id,
+                "attempt_id": attempt_id,
+            }
+        )
+        return ApiResponse(200, body, {})
+
+    def record_grounded_knowledge_outcome(
+        self,
+        *,
+        workload: Principal,
+        mission_id: str,
+        invocation_id: str,
+        correlation_id: str,
+        result: str,
+        binding: ScopeBinding,
+        tabula_audit_correlation_id: str | None = None,
+        record_references: tuple[dict[str, str], ...] = (),
+        error_code: str | None = None,
+        work_item_id: str | None = None,
+        attempt_id: str | None = None,
+        successful_authorization_decision_id: str | None = None,
+    ) -> None:
+        """Record only safe post-read facts; never accept content or credentials."""
+        if result not in {"SUCCESS", "REJECTED"}:
+            raise ValueError("invalid grounded knowledge result")
+        for reference in record_references:
+            if set(reference) != {"record_id", "revision", "canonical_uri"}:
+                raise ValueError("invalid grounded knowledge audit reference")
+        data: dict[str, Any] = {
+            "binding_id": binding.id,
+            "binding_version": binding.version,
+            "record_count": len(record_references),
+            "record_references": list(record_references),
+            "work_item_id": work_item_id,
+            "attempt_id": attempt_id,
+            "successful_authorization_decision_id": (
+                successful_authorization_decision_id
+            ),
+        }
+        if tabula_audit_correlation_id is not None:
+            data["tabula_audit_correlation_id"] = tabula_audit_correlation_id
+        if error_code is not None:
+            data["error_code"] = error_code
+        self.kernel.record_external_read_result(
+            mission_id=mission_id,
+            actor=workload,
+            target_product="TABULA",
+            operation="TABULA_CORPUS_READ",
+            invocation_id=invocation_id,
+            correlation_id=correlation_id,
+            result=result,
+            data=data,
+        )
+
     def issue_delegation(
         self,
         *,

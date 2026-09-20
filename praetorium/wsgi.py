@@ -10,10 +10,11 @@ from __future__ import annotations
 from html import escape
 import io
 import json
-from urllib.parse import parse_qs, quote
+from urllib.parse import parse_qs, quote, urlparse
 
 from aquila_api.auth import AuthenticationError, BearerAuthenticator
 from aquila_api.service import AquilaService
+from legion_runtime import MissionOrganizationReadModel
 
 
 class PraetoriumWSGIApp:
@@ -25,10 +26,12 @@ class PraetoriumWSGIApp:
         tabula_console_url: str,
         organization_id: str,
         workspace_id: str,
+        organization_read_model: MissionOrganizationReadModel | None = None,
     ) -> None:
         self.service, self.authenticator = service, authenticator
         self.tabula_console_url = tabula_console_url.rstrip("/")
         self.organization_id, self.workspace_id = organization_id, workspace_id
+        self.organization_read_model = organization_read_model
 
     def __call__(self, environ, start_response):
         try:
@@ -90,6 +93,7 @@ class PraetoriumWSGIApp:
                                         self.service.list_approvals(actor=actor, mission_id=mission_id))
         if mission.status_code != 200:
             return self._error(start_response, mission)
+        organization_panel = self._organization_panel(mission_id)
         events = "".join(f"<li>{escape(event['event_type'])}: {escape(event['result'])}</li>" for event in timeline.body.get("events", []))
         approval_forms = "".join(
             f'<li>{escape(item["status"])} — {escape(item["scope"]["capability"])}'
@@ -100,8 +104,61 @@ class PraetoriumWSGIApp:
         ) or "<li>No approvals.</li>"
         command_form = f'''<form method="post" action="/praetorium/missions/{quote(mission_id)}/commands">
 <input type="hidden" name="expected_version" value="{mission.body['version']}"><input name="idempotency_key" required placeholder="idempotency key"><input name="command_type" required placeholder="START"><textarea name="payload_json">{{}}</textarea><button>Submit command</button></form>'''
-        body = f"<p>{escape(notice)}</p><h1>{escape(mission.body['title'])}</h1><p>{escape(mission.body['objective'])}</p><p>Status: {escape(mission.body['status'])}; version {mission.body['version']}</p>{command_form}<h2>Approvals</h2><ul>{approval_forms}</ul><h2>Timeline</h2><ul>{events}</ul><p><a href=\"{escape(self.tabula_console_url, quote=True)}\">Open Tabula Console</a></p>"
+        body = f"<p>{escape(notice)}</p><h1>{escape(mission.body['title'])}</h1><p>{escape(mission.body['objective'])}</p><p>Status: {escape(mission.body['status'])}; version {mission.body['version']}</p>{command_form}{organization_panel}<h2>Approvals</h2><ul>{approval_forms}</ul><h2>Timeline</h2><ul>{events}</ul><p><a href=\"{escape(self.tabula_console_url, quote=True)}\">Open Tabula Console</a></p>"
         return self._send(start_response, 200, self._page("Praetorium Mission", body))
+
+    def _organization_panel(self, mission_id: str) -> str:
+        heading = "<h2>Persistent organization</h2>"
+        if self.organization_read_model is None:
+            return heading + "<p>Organization status unavailable.</p>"
+        try:
+            snapshot = self.organization_read_model.snapshot(
+                organization_id=self.organization_id,
+                workspace_id=self.workspace_id,
+                mission_id=mission_id,
+            )
+        except Exception:
+            return heading + "<p>Organization status unavailable.</p>"
+        agents = "".join(
+            f"<li>{escape(item.display_name)} — {escape(item.role)} "
+            f"({escape(item.assignment_status)})</li>"
+            for item in snapshot.agents
+        ) or "<li>No assigned persistent Agents.</li>"
+        work_rows = []
+        for item in snapshot.work:
+            citations = "".join(
+                f"<li>{self._citation_label(reference)} "
+                f"revision {escape(reference.external_revision)}; "
+                f"retrieved {escape(reference.retrieved_at)}</li>"
+                for reference in item.evidence
+            ) or "<li>No accepted citations.</li>"
+            result = (
+                f"<p>Result: {escape(item.result_summary)} "
+                f"(digest {escape(item.result_digest or '')})</p>"
+                if item.result_summary is not None
+                else "<p>No accepted result.</p>"
+            )
+            work_rows.append(
+                f"<li>{escape(item.work_kind)} — {escape(item.status)}"
+                f"<p>{escape(item.objective)}</p>{result}"
+                f"<ul>{citations}</ul></li>"
+            )
+        work = "".join(work_rows) or "<li>No delegated work.</li>"
+        return (
+            heading
+            + f"<h3>Agents</h3><ul>{agents}</ul>"
+            + f"<h3>Work and accepted evidence</h3><ul>{work}</ul>"
+        )
+
+    @staticmethod
+    def _citation_label(reference) -> str:
+        """Render provider-neutral provenance without making unsafe URIs active."""
+        uri = reference.canonical_uri
+        parsed = urlparse(uri)
+        record_id = escape(reference.external_record_id)
+        if parsed.scheme.lower() in {"http", "https"} and parsed.netloc:
+            return f'<a href="{escape(uri, quote=True)}">{record_id}</a>'
+        return f"{record_id} — {escape(uri)} (non-web URI)"
 
     def _command(self, start_response, actor, mission_id, environ):
         form = self._form(environ)

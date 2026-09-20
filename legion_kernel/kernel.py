@@ -759,6 +759,10 @@ class LegionKernel:
         evaluated_at: str,
         correlation_id: str,
         delegation_id: str | None = None,
+        binding_id: str | None = None,
+        binding_version: str | None = None,
+        work_item_id: str | None = None,
+        attempt_id: str | None = None,
     ) -> None:
         """Append Aquila's authorization decision before a protected external read."""
         mission = self._mission(mission_id)
@@ -777,6 +781,10 @@ class LegionKernel:
                 "policy_version": policy_version,
                 "evaluated_at": evaluated_at,
                 "delegation_id": delegation_id,
+                "binding_id": binding_id,
+                "binding_version": binding_version,
+                "work_item_id": work_item_id,
+                "attempt_id": attempt_id,
             },
         )
 

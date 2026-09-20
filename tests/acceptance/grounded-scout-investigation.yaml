@@ -1,0 +1,32 @@
+suite_version: "1.0"
+name: Pantheon Legion Grounded Persistent Scout Investigation Acceptance
+description: >-
+  Local-first proof that persistent Centurion-to-Scout work can consume fresh,
+  bounded, authorized Tabula evidence and preserve only safe provenance.
+required_model_runtime: false
+scenarios:
+  - id: GSI-001
+    name: Grounded cited result survives Runtime reconstruction
+    assertions:
+      - Centurion and Scout identities remain stable
+      - Mission and knowledge authorization precede cognition
+      - only safe evidence provenance is durable
+      - one cited result and human projection survive reconstruction
+  - id: GSI-002
+    name: Knowledge revocation fails closed after Mission context
+    assertions:
+      - fresh READ_MISSION succeeds before the evidence boundary
+      - revoked READ_KNOWLEDGE prevents the protected operation
+      - cognition and accepted result do not occur
+  - id: GSI-003
+    name: Closed profile and objective bound preserve Phase 2 behavior
+    assertions:
+      - grounded work requires the exact closed capability tuple
+      - an objective over 2000 characters fails before persistence
+      - ordinary read-only work does not invoke the evidence reader
+  - id: GSI-004
+    name: Ambiguous evidence retrieval reconciles under a new attempt
+    assertions:
+      - the persisted retrieval stage maps to a distinct safe error
+      - a new attempt re-authorizes and re-reads evidence
+      - at most one cited result is accepted

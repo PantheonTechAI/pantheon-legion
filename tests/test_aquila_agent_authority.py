@@ -3,9 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 from aquila_api import (
     AquilaService,
     InProcessAquilaAgentAuthority,
+    InProcessAquilaKnowledgeAuthority,
     PersistentAquilaService,
 )
 from legion_kernel import LegionKernel, Principal, PrincipalType, RoeLevel
@@ -16,6 +19,13 @@ from legion_runtime import (
     AgentStatus,
     AuthorityDenied,
     AuthorityUnavailable,
+    GroundedEvidenceReadRequest,
+)
+from legion_tabula import ScopeBinding
+from pantheon_sts import (
+    Ed25519AssertionVerifier,
+    InMemorySecurityTokenService,
+    sign_assertion,
 )
 
 
@@ -337,6 +347,100 @@ class AquilaAgentAuthorityTests(unittest.TestCase):
         )
         self.assertEqual(event.result, "DENY")
         self.assertEqual(event.data["reason"], "MISSION_TERMINAL")
+
+    def test_grounded_knowledge_operations_get_fresh_decisions_and_safe_audit(self):
+        service = AquilaService(LegionKernel())
+        mission_id = self.create_mission(service)
+        grant_id = service.issue_delegation(
+            issuer=self.owner,
+            subject=self.worker,
+            mission_id=mission_id,
+            allowed_operations=frozenset({"READ_KNOWLEDGE"}),
+            roe_ceiling=RoeLevel.OBSERVE,
+            expires_at="9999-01-01T00:00:00Z",
+        )
+        private_key = Ed25519PrivateKey.generate()
+        sts = InMemorySecurityTokenService(
+            Ed25519AssertionVerifier({"aquila-test": private_key.public_key()})
+        )
+        adapter = InProcessAquilaKnowledgeAuthority(
+            service,
+            lambda claims: sts.issue(
+                sign_assertion(claims, private_key, key_id="aquila-test")
+            ).token,
+        )
+        binding = ScopeBinding(BINDING_ID, "1.0.0")
+        work_item_id = "77777777-7777-4777-8777-777777777777"
+        attempt_id = "88888888-8888-4888-8888-888888888888"
+        request = GroundedEvidenceReadRequest(
+            organization_id=ORG,
+            workspace_id=WORKSPACE,
+            mission_id=mission_id,
+            agent_id=AGENT_ID,
+            assignment_id=ASSIGNMENT_ID,
+            workload=self.worker,
+            delegation_id=grant_id,
+            work_item_id=work_item_id,
+            attempt_id=attempt_id,
+            query="secret query must not enter audit",
+            correlation_id=CORRELATION,
+        )
+
+        first = adapter.authorize_operation(request, binding)
+        second = adapter.authorize_operation(request, binding)
+        self.assertNotEqual(first.decision_id, second.decision_id)
+        self.assertNotEqual(first.token, second.token)
+        self.assertNotIn(first.token, repr(service.kernel.timeline(mission_id)))
+        adapter.record_outcome(
+            request,
+            binding,
+            invocation_id=second.invocation_id,
+            result="SUCCESS",
+            tabula_audit_correlation_id=(
+                "99999999-9999-4999-8999-999999999999"
+            ),
+            record_references=(
+                {
+                    "record_id": "record-one",
+                    "revision": "rev-1",
+                    "canonical_uri": "tabula://corpus/record-one/rev-1",
+                },
+            ),
+            successful_authorization_decision_id=second.decision_id,
+        )
+        events = service.kernel.timeline(mission_id)
+        authorizations = [
+            event
+            for event in events
+            if event.event_type == "EXTERNAL_READ_AUTHORIZATION_EVALUATED"
+        ]
+        self.assertEqual(len(authorizations), 2)
+        self.assertNotEqual(
+            authorizations[0].data["decision_id"],
+            authorizations[1].data["decision_id"],
+        )
+        self.assertTrue(
+            all(event.data["work_item_id"] == work_item_id for event in authorizations)
+        )
+        outcome = events[-1]
+        self.assertEqual(outcome.data["attempt_id"], attempt_id)
+        self.assertEqual(
+            outcome.data["successful_authorization_decision_id"],
+            second.decision_id,
+        )
+        audit_text = repr(events) + repr(sts.audit_events)
+        self.assertNotIn(request.query, audit_text)
+        self.assertNotIn(first.token, audit_text)
+        self.assertNotIn(second.token, audit_text)
+
+        service.revoke_delegation(
+            actor=self.owner,
+            mission_id=mission_id,
+            delegation_id=grant_id,
+            reason="End knowledge access.",
+        )
+        with self.assertRaisesRegex(AuthorityDenied, "DELEGATION_REVOKED"):
+            adapter.authorize_operation(request, binding)
 
 
 if __name__ == "__main__":

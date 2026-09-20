@@ -26,6 +26,21 @@ class AttemptStatus(str, Enum):
     ABANDONED = "ABANDONED"
 
 
+class WorkKind(str, Enum):
+    READ_ONLY_ANALYSIS = "READ_ONLY_ANALYSIS"
+    GROUNDED_CORPUS_ANALYSIS = "GROUNDED_CORPUS_ANALYSIS"
+
+
+class AttemptStage(str, Enum):
+    MISSION_CONTEXT = "MISSION_CONTEXT"
+    EVIDENCE_RETRIEVAL = "EVIDENCE_RETRIEVAL"
+    COGNITION = "COGNITION"
+
+
+class EvidenceSourceType(str, Enum):
+    TABULA_CORPUS = "TABULA_CORPUS"
+
+
 @dataclass(frozen=True)
 class WorkItem:
     work_item_id: str
@@ -44,6 +59,7 @@ class WorkItem:
     updated_at: str
     cancelled_at: str | None = None
     cancellation_reason: str | None = None
+    kind: WorkKind = WorkKind.READ_ONLY_ANALYSIS
 
     def __post_init__(self) -> None:
         for name in (
@@ -79,6 +95,16 @@ class WorkItem:
                 raise ValueError("cancelled work requires cancellation provenance")
         elif self.cancelled_at is not None or self.cancellation_reason is not None:
             raise ValueError("non-cancelled work cannot have cancellation provenance")
+        if self.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS:
+            if self.required_capabilities != (
+                "read_only_analysis",
+                "tabula_corpus_read",
+            ):
+                raise ValueError("grounded work requires exact capabilities")
+            if len(self.objective) > 2000:
+                raise ValueError("grounded objective exceeds Corpus query limit")
+        elif self.required_capabilities != ("read_only_analysis",):
+            raise ValueError("read-only work requires exact capabilities")
 
 
 @dataclass(frozen=True)
@@ -95,6 +121,11 @@ class WorkAttempt:
     version: int
     created_at: str
     updated_at: str
+    attempt_stage: AttemptStage | None = None
+    knowledge_authorization_decision_ids: tuple[str, ...] = ()
+    successful_knowledge_decision_id: str | None = None
+    evidence_correlation_id: str | None = None
+    tabula_audit_correlation_id: str | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -111,9 +142,77 @@ class WorkAttempt:
             self.authorization_decision_id, "authorization_decision_id", 512
         )
         _optional_bounded(self.error_code, "error_code", 256)
+        if not isinstance(self.knowledge_authorization_decision_ids, tuple):
+            raise TypeError("knowledge_authorization_decision_ids must be a tuple")
+        if len(self.knowledge_authorization_decision_ids) > 4:
+            raise ValueError("knowledge authorization decision IDs exceed limit")
+        for decision_id in self.knowledge_authorization_decision_ids:
+            _bounded(decision_id, "knowledge authorization decision ID", 1, 512)
+        if len(set(self.knowledge_authorization_decision_ids)) != len(
+            self.knowledge_authorization_decision_ids
+        ):
+            raise ValueError("knowledge authorization decision IDs must be distinct")
+        _optional_bounded(
+            self.successful_knowledge_decision_id,
+            "successful knowledge decision ID",
+            512,
+        )
+        if (
+            self.successful_knowledge_decision_id is not None
+            and self.successful_knowledge_decision_id
+            not in self.knowledge_authorization_decision_ids
+        ):
+            raise ValueError("successful knowledge decision must be in decision IDs")
+        for value, name in (
+            (self.evidence_correlation_id, "evidence_correlation_id"),
+            (self.tabula_audit_correlation_id, "tabula_audit_correlation_id"),
+        ):
+            if value is not None:
+                _uuid(value, name)
         _positive(self.version, "version")
         _timestamp(self.created_at, "created_at")
         _timestamp(self.updated_at, "updated_at")
+
+
+@dataclass(frozen=True)
+class WorkEvidenceReference:
+    evidence_reference_id: str
+    work_item_id: str
+    attempt_id: str
+    source_type: EvidenceSourceType
+    external_record_id: str
+    external_revision: str
+    canonical_uri: str
+    scope_binding_id: str
+    scope_binding_version: str
+    successful_authorization_decision_id: str
+    tabula_audit_correlation_id: str
+    retrieved_at: str
+    created_at: str
+
+    def __post_init__(self) -> None:
+        for name in (
+            "evidence_reference_id",
+            "work_item_id",
+            "attempt_id",
+            "tabula_audit_correlation_id",
+        ):
+            _uuid(getattr(self, name), name)
+        for value, name, maximum in (
+            (self.external_record_id, "external_record_id", 512),
+            (self.external_revision, "external_revision", 256),
+            (self.canonical_uri, "canonical_uri", 2048),
+            (self.scope_binding_id, "scope_binding_id", 512),
+            (self.scope_binding_version, "scope_binding_version", 256),
+            (
+                self.successful_authorization_decision_id,
+                "successful_authorization_decision_id",
+                512,
+            ),
+        ):
+            _bounded(value, name, 1, maximum)
+        _timestamp(self.retrieved_at, "retrieved_at")
+        _timestamp(self.created_at, "created_at")
 
 
 @dataclass(frozen=True)

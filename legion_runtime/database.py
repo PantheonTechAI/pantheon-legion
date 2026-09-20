@@ -72,6 +72,7 @@ Index(
         ("PENDING_AUTHORIZATION", "ASSIGNED", "BLOCKED")
     ),
 )
+Index("ix_mission_assignments_mission", mission_assignments.c.mission_id)
 
 coordination_checkpoints = Table(
     "coordination_checkpoints",
@@ -154,6 +155,7 @@ runtime_work_items = Table(
     Column("scout_assignment_id", String(36), ForeignKey("mission_assignments.assignment_id"), nullable=False),
     Column("objective", Text, nullable=False),
     Column("required_capabilities", JSONB, nullable=False),
+    Column("work_kind", String(64), nullable=False),
     Column("status", String(32), nullable=False),
     Column("version", Integer, nullable=False),
     Column("correlation_id", String(36), nullable=False),
@@ -167,6 +169,10 @@ runtime_work_items = Table(
         name="ck_runtime_work_items_status",
     ),
     CheckConstraint("version > 0", name="ck_runtime_work_items_version"),
+    CheckConstraint(
+        "work_kind IN ('READ_ONLY_ANALYSIS', 'GROUNDED_CORPUS_ANALYSIS')",
+        name="ck_runtime_work_items_kind",
+    ),
 )
 
 Index("ix_runtime_work_items_mission", runtime_work_items.c.mission_id)
@@ -185,6 +191,11 @@ runtime_work_attempts = Table(
     Column("attempt_number", Integer, nullable=False),
     Column("mission_version", Integer),
     Column("authorization_decision_id", String(512)),
+    Column("attempt_stage", String(64)),
+    Column("knowledge_authorization_decision_ids", JSONB),
+    Column("successful_knowledge_decision_id", String(512)),
+    Column("evidence_correlation_id", String(36)),
+    Column("tabula_audit_correlation_id", String(36)),
     Column("error_code", String(256)),
     Column("version", Integer, nullable=False),
     Column("created_at", String(64), nullable=False),
@@ -196,6 +207,11 @@ runtime_work_attempts = Table(
     CheckConstraint("attempt_number > 0", name="ck_runtime_work_attempts_number"),
     CheckConstraint("version > 0", name="ck_runtime_work_attempts_version"),
     CheckConstraint("mission_version IS NULL OR mission_version > 0", name="ck_runtime_work_attempts_mission_version"),
+    CheckConstraint(
+        "attempt_stage IS NULL OR attempt_stage IN "
+        "('MISSION_CONTEXT', 'EVIDENCE_RETRIEVAL', 'COGNITION')",
+        name="ck_runtime_work_attempts_stage",
+    ),
 )
 
 Index(
@@ -219,6 +235,49 @@ runtime_work_results = Table(
     Column("content_digest", String(64), nullable=False),
     Column("produced_at", String(64), nullable=False),
     CheckConstraint("mission_version > 0", name="ck_runtime_work_results_mission_version"),
+)
+
+runtime_work_evidence_references = Table(
+    "runtime_work_evidence_references",
+    metadata,
+    Column("evidence_reference_id", String(36), primary_key=True),
+    Column(
+        "work_item_id",
+        String(36),
+        ForeignKey("runtime_work_items.work_item_id"),
+        nullable=False,
+    ),
+    Column(
+        "attempt_id",
+        String(36),
+        ForeignKey("runtime_work_attempts.attempt_id"),
+        nullable=False,
+    ),
+    Column("source_type", String(32), nullable=False),
+    Column("external_record_id", String(512), nullable=False),
+    Column("external_revision", String(256), nullable=False),
+    Column("canonical_uri", String(2048), nullable=False),
+    Column("scope_binding_id", String(512), nullable=False),
+    Column("scope_binding_version", String(256), nullable=False),
+    Column("successful_authorization_decision_id", String(512), nullable=False),
+    Column("tabula_audit_correlation_id", String(36), nullable=False),
+    Column("retrieved_at", String(64), nullable=False),
+    Column("created_at", String(64), nullable=False),
+    CheckConstraint(
+        "source_type IN ('TABULA_CORPUS')",
+        name="ck_runtime_work_evidence_source_type",
+    ),
+)
+Index(
+    "uq_runtime_work_evidence_attempt_record_revision",
+    runtime_work_evidence_references.c.attempt_id,
+    runtime_work_evidence_references.c.external_record_id,
+    runtime_work_evidence_references.c.external_revision,
+    unique=True,
+)
+Index(
+    "ix_runtime_work_evidence_work",
+    runtime_work_evidence_references.c.work_item_id,
 )
 
 runtime_events = Table(

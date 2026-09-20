@@ -94,6 +94,42 @@ python -m tests.acceptance.phase2_postgres_restart verify
 Phase 2 adds no live Tabula retrieval, Fabrica execution, concrete model
 provider, scheduler, public API/UI, background worker, or new production
 dependency.
+
+## Grounded Persistent Scout Investigation
+
+The grounded milestone adds a closed `GROUNDED_CORPUS_ANALYSIS` work kind to
+the existing durable Scout cycle. Runtime still owns sequencing and recovery;
+Aquila separately authorizes Mission context and each knowledge operation;
+Tabula enforces one deployment-configured Corpus binding; and cognition
+receives at most eight records and 32 KiB of transient content.
+
+Runtime persists only typed evidence references: record ID, revision,
+canonical URI, binding, authorization-decision ID, Tabula audit correlation,
+and timestamps. Corpus content, citation text, prompts, assertions, and bearer
+tokens are never coordination state. A cited result can reference only the
+Runtime evidence IDs supplied to cognition.
+
+Attempts persist `MISSION_CONTEXT`, `EVIDENCE_RETRIEVAL`, or `COGNITION`
+before the corresponding external call. Reconciliation abandons an ambiguous
+attempt with a stage-specific safe code; a new attempt obtains fresh authority
+and rereads evidence. Existing result fencing still permits only one accepted
+result.
+
+Schema revision `0003_grounded_scout_evidence` preserves old work as
+`READ_ONLY_ANALYSIS`. Downgrade refuses before DDL when grounded data exists.
+Run the milestone proof with:
+
+```sh
+export LEGION_RUNTIME_TEST_DATABASE_URL='postgresql+psycopg://.../legion_runtime_test'
+python -m tests.acceptance.grounded_scout_runner
+python -m tests.acceptance.grounded_postgres_restart seed
+# Restart only the disposable Runtime PostgreSQL service.
+python -m tests.acceptance.grounded_postgres_restart verify
+```
+
+The production Runtime composition intentionally has no test-STS fallback.
+Grounded retrieval remains unavailable until a production workload credential
+provider is explicitly selected and reviewed.
 ## Durable execution adapter
 
 The `DurableExecutionAdapter` keeps execution lifecycle semantics independent of Temporal or another workflow provider. Aquila owns Mission authority, ROE, authorization, and approvals; the execution adapter owns durable execution attempts, signals, cancellation, and recovery.

@@ -5,7 +5,10 @@ from .persistent import PersistentAquilaService
 from .auth import AuthenticationError, AuthentikConfig, AuthentikPrincipalMapper, BearerAuthenticator
 from .wsgi import AquilaWSGIApp
 from .authorization import AuthorizationEngine, AuthorizationRequest, AuthorizationDecision
-from .runtime_authority import InProcessAquilaAgentAuthority
+from .runtime_authority import (
+    InProcessAquilaAgentAuthority,
+    InProcessAquilaKnowledgeAuthority,
+)
 
 __all__ = [
     "ApiResponse",
@@ -20,4 +23,5 @@ __all__ = [
     "AuthorizationRequest",
     "AuthorizationDecision",
     "InProcessAquilaAgentAuthority",
+    "InProcessAquilaKnowledgeAuthority",
 ]

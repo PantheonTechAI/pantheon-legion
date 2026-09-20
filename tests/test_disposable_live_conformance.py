@@ -13,6 +13,8 @@ class DisposableLiveConformanceTests(unittest.TestCase):
         def start_stack(sts_url):
             received.append(sts_url)
 
+        restarts = []
+
         class Transport:
             def __init__(self, endpoint):
                 self.endpoint = endpoint
@@ -29,16 +31,22 @@ class DisposableLiveConformanceTests(unittest.TestCase):
                 return McpReply(200, {"schema_version": "1.0", "request_id": args["request_id"], "correlation_id": args["correlation_id"], "binding": args["binding"], "tabula_audit_correlation_id": str(uuid4()), "results": []})
 
         results = run_disposable_conformance(
-            DisposableRun("http://127.0.0.1:18100/mcp", start_stack, Transport)
+            DisposableRun(
+                "http://127.0.0.1:18100/mcp",
+                start_stack,
+                Transport,
+                lambda: restarts.append("mcp"),
+            )
         )
 
         self.assertEqual(
             [result.scenario_id for result in results],
-            ["corpus-success", "registry-success", "corpus-client-success", "registry-client-success", "invalid-token", "suspended-binding", "revoked-token", "expired-token"],
+            ["corpus-success", "registry-success", "corpus-client-success", "registry-client-success", "invalid-token", "suspended-binding", "revoked-token", "corpus-after-service-restart", "expired-token"],
         )
         self.assertTrue(all(result.passed for result in results))
         self.assertEqual(len(received), 1)
         self.assertTrue(received[0].startswith("http://host.docker.internal:"))
+        self.assertEqual(restarts, ["mcp"])
 
 
 if __name__ == "__main__":

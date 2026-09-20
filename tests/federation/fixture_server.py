@@ -42,6 +42,11 @@ class FixtureSTSServer(AbstractContextManager):
         return f"{self.base_url}/v1/introspect"
 
     @property
+    def current_time(self) -> datetime:
+        """Expose the deterministic fixture clock for assertion construction."""
+        return self._clock.now()
+
+    @property
     def docker_introspection_url(self) -> str:
         """Return the host-gateway URL only when explicitly bound for Docker."""
         if self._host != "0.0.0.0" or self._server is None:

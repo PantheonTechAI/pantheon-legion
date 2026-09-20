@@ -1,6 +1,73 @@
 # Pantheon Legion Handoff
 
-Last updated: 2026-09-18
+Last updated: 2026-09-20
+
+## Grounded Scout implementation checkpoint - 2026-09-20
+
+**Grounded Persistent Scout Investigation** is implemented and has passed the
+developer self-evaluation. It joins the accepted durable Centurion-to-Scout
+cycle to one bounded Tabula Corpus read while preserving ownership: Runtime
+sequences work, Aquila makes fresh authority decisions, Tabula owns
+scope/enforcement, and one-time credentials remain inside the integration
+adapter. Runtime stores safe typed provenance, not raw evidence.
+
+ADR-006 is accepted. The implementation adds Runtime revision `0003`, a closed
+grounded work profile, a consumer-owned evidence port, fresh Aquila knowledge
+authorization for every protected MCP operation, safe evidence references,
+stage-aware recovery, a cited result, and an optional failure-isolated
+Praetorium organization panel. The deterministic STS remains test-only;
+production grounded retrieval fails closed until a production credential
+provider is selected and reviewed.
+
+Claude Code performed three adversarial review passes. The first returned
+`REWORK` for an unspecified legacy citation round trip and unclear credential
+freshness. The first re-review cleared citation mapping but found a blocker:
+memoizing a credential contradicts the deterministic STS's one-time-token
+semantics. The final design obtains a fresh `READ_KNOWLEDGE` decision, one-time
+assertion, and one-time token for every protected MCP operation under one
+logical correlation. The required second re-review returned `ACCEPT` with no
+unresolved blocker or major finding.
+
+The planning baseline on merged `main` commit
+`b24b6b2f61d402b89cdfeff95d2ff8bb00d89002` was independently reproduced:
+186 tests PASS, M1 7/7, Phase 1 4/4, Phase 2 3/3, and Alembic no drift. Planning
+work is on branch `docs/grounded-scout-investigation-plan`.
+
+Post-remediation evidence is 211 tests plus 12 subtests PASS, M1 7/7,
+Phase 1 4/4, Phase 2 3/3, and GSI 4/4. Alembic upgrade and drift checks pass;
+the real PostgreSQL restart probe preserved grounded work, two safe references,
+and the cited result. The isolated disposable Tabula matrix passed all 12 live
+scenarios, including authorization failures, timeout, and MCP service restart,
+then removed its containers and volumes automatically. Malformed and transient
+unavailable responses were injected at Legion's client edge after successful
+live Tabula calls; they prove fail-closed parsing and bounded retry against the
+live integration without claiming that Tabula emitted those faults.
+
+The first independent Claude implementation review reproduced the suite,
+acceptance catalogs, and migration checks, then returned `REWORK` for a real
+stored-XSS risk: provider-neutral Corpus URIs were HTML-escaped but any URI
+scheme was made clickable. Praetorium now activates only absolute HTTP(S)
+citations and renders every other URI as escaped, explicitly non-web text. The
+review's two minor findings were also fixed: duplicate fixture code was removed
+and the live-fault qualification above was added. Three observations were
+recorded with rationale in the implementation review package.
+
+The required Claude re-review independently tested additional malicious URI
+forms, reran 211 tests plus 12 subtests, and concluded `ACCEPT` with no new
+BLOCKER, MAJOR, or MINOR finding. The Grounded Persistent Scout Investigation
+delivery is complete. No commit, push, production deployment, or production
+credential-provider selection is implied by this checkpoint; select the next
+slice explicitly.
+
+Read next:
+
+1. [grounded-scout-investigation-plan.md](architecture/grounded-scout-investigation-plan.md)
+2. [ADR-006](adr/ADR-006-runtime-grounded-evidence-retrieval.md)
+3. [grounded-scout-investigation-implementation-review-package.md](architecture/grounded-scout-investigation-implementation-review-package.md)
+4. [grounded-scout-investigation-claude-review-package.md](architecture/grounded-scout-investigation-claude-review-package.md)
+
+This checkpoint supersedes the older “next slice must be selected” instruction
+below, but not the accepted Phase 2 implementation evidence.
 
 ## Phase 2 implementation checkpoint - 2026-09-18
 
