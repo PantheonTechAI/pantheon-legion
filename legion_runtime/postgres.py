@@ -31,12 +31,23 @@ from .database import (
     runtime_events,
     runtime_idempotency,
     runtime_work_attempts,
+    runtime_work_evidence_references,
     runtime_work_items,
     runtime_work_results,
 )
 from .repository import AgentStoreConflict, DuplicateRuntimeEvent, IdempotencyRecord
 
-from .work import AttemptStatus, WorkAttempt, WorkItem, WorkResult, WorkStatus
+from .work import (
+    AttemptStage,
+    AttemptStatus,
+    EvidenceSourceType,
+    WorkAttempt,
+    WorkEvidenceReference,
+    WorkItem,
+    WorkKind,
+    WorkResult,
+    WorkStatus,
+)
 
 class PostgreSQLAgentStore:
     """Runtime-owned PostgreSQL repository with explicit transaction locking."""
@@ -182,6 +193,17 @@ class PostgreSQLAgentStore:
         )
         return self._assignment(row) if row else None
 
+    def list_assignments_for_mission(self, mission_id: str) -> list[MissionAssignment]:
+        rows = self._all(
+            select(mission_assignments)
+            .where(mission_assignments.c.mission_id == mission_id)
+            .order_by(
+                mission_assignments.c.created_at,
+                mission_assignments.c.assignment_id,
+            )
+        )
+        return [self._assignment(row) for row in rows]
+
     def get_active_assignment(self, agent_id: str) -> MissionAssignment | None:
         row = self._one(
             select(mission_assignments)
@@ -319,6 +341,7 @@ class PostgreSQLAgentStore:
             "scout_assignment_id": work_item.scout_assignment_id,
             "objective": work_item.objective,
             "required_capabilities": list(work_item.required_capabilities),
+            "work_kind": work_item.kind.value,
             "status": work_item.status.value,
             "version": work_item.version,
             "correlation_id": work_item.correlation_id,
@@ -366,6 +389,14 @@ class PostgreSQLAgentStore:
         )
         return [self._work_item(row) for row in rows]
 
+    def list_work_for_mission(self, mission_id: str) -> list[WorkItem]:
+        rows = self._all(
+            select(runtime_work_items)
+            .where(runtime_work_items.c.mission_id == mission_id)
+            .order_by(runtime_work_items.c.created_at, runtime_work_items.c.work_item_id)
+        )
+        return [self._work_item(row) for row in rows]
+
     def save_work_attempt(
         self, attempt: WorkAttempt, *, expected_previous_version: int | None
     ) -> None:
@@ -378,6 +409,15 @@ class PostgreSQLAgentStore:
             "attempt_number": attempt.attempt_number,
             "mission_version": attempt.mission_version,
             "authorization_decision_id": attempt.authorization_decision_id,
+            "attempt_stage": (
+                attempt.attempt_stage.value if attempt.attempt_stage is not None else None
+            ),
+            "knowledge_authorization_decision_ids": list(
+                attempt.knowledge_authorization_decision_ids
+            ),
+            "successful_knowledge_decision_id": attempt.successful_knowledge_decision_id,
+            "evidence_correlation_id": attempt.evidence_correlation_id,
+            "tabula_audit_correlation_id": attempt.tabula_audit_correlation_id,
             "error_code": attempt.error_code,
             "version": attempt.version,
             "created_at": attempt.created_at,
@@ -452,6 +492,44 @@ class PostgreSQLAgentStore:
             )
         )
         return self._work_result(row) if row else None
+
+    def save_work_evidence_reference(self, reference: WorkEvidenceReference) -> None:
+        self._insert(
+            runtime_work_evidence_references,
+            {
+                "evidence_reference_id": reference.evidence_reference_id,
+                "work_item_id": reference.work_item_id,
+                "attempt_id": reference.attempt_id,
+                "source_type": reference.source_type.value,
+                "external_record_id": reference.external_record_id,
+                "external_revision": reference.external_revision,
+                "canonical_uri": reference.canonical_uri,
+                "scope_binding_id": reference.scope_binding_id,
+                "scope_binding_version": reference.scope_binding_version,
+                "successful_authorization_decision_id": reference.successful_authorization_decision_id,
+                "tabula_audit_correlation_id": reference.tabula_audit_correlation_id,
+                "retrieved_at": reference.retrieved_at,
+                "created_at": reference.created_at,
+            },
+            "WORK_EVIDENCE_REFERENCE_CONFLICT",
+        )
+
+    def list_work_evidence_references(
+        self, *, work_item_id: str | None = None, attempt_id: str | None = None
+    ) -> list[WorkEvidenceReference]:
+        if (work_item_id is None) == (attempt_id is None):
+            raise ValueError("exactly one evidence reference selector is required")
+        statement = select(runtime_work_evidence_references)
+        if work_item_id is not None:
+            statement = statement.where(
+                runtime_work_evidence_references.c.work_item_id == work_item_id
+            )
+        else:
+            statement = statement.where(
+                runtime_work_evidence_references.c.attempt_id == attempt_id
+            )
+        rows = self._all(statement.order_by(runtime_work_evidence_references.c.created_at, runtime_work_evidence_references.c.evidence_reference_id))
+        return [self._work_evidence_reference(row) for row in rows]
 
     def append_event(self, event: RuntimeEvent) -> None:
         if event.sequence != self.next_event_sequence(event.agent_id):
@@ -628,6 +706,7 @@ class PostgreSQLAgentStore:
             scout_assignment_id=row["scout_assignment_id"],
             objective=row["objective"],
             required_capabilities=tuple(row["required_capabilities"]),
+            kind=WorkKind(row["work_kind"]),
             status=WorkStatus(row["status"]),
             version=row["version"],
             correlation_id=row["correlation_id"],
@@ -649,10 +728,39 @@ class PostgreSQLAgentStore:
             attempt_number=row["attempt_number"],
             mission_version=row["mission_version"],
             authorization_decision_id=row["authorization_decision_id"],
+            attempt_stage=(
+                AttemptStage(row["attempt_stage"]) if row["attempt_stage"] else None
+            ),
+            knowledge_authorization_decision_ids=tuple(
+                row["knowledge_authorization_decision_ids"] or ()
+            ),
+            successful_knowledge_decision_id=row["successful_knowledge_decision_id"],
+            evidence_correlation_id=row["evidence_correlation_id"],
+            tabula_audit_correlation_id=row["tabula_audit_correlation_id"],
             error_code=row["error_code"],
             version=row["version"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+        )
+
+    @staticmethod
+    def _work_evidence_reference(row: Mapping[str, Any]) -> WorkEvidenceReference:
+        return WorkEvidenceReference(
+            evidence_reference_id=row["evidence_reference_id"],
+            work_item_id=row["work_item_id"],
+            attempt_id=row["attempt_id"],
+            source_type=EvidenceSourceType(row["source_type"]),
+            external_record_id=row["external_record_id"],
+            external_revision=row["external_revision"],
+            canonical_uri=row["canonical_uri"],
+            scope_binding_id=row["scope_binding_id"],
+            scope_binding_version=row["scope_binding_version"],
+            successful_authorization_decision_id=row[
+                "successful_authorization_decision_id"
+            ],
+            tabula_audit_correlation_id=row["tabula_audit_correlation_id"],
+            retrieved_at=row["retrieved_at"],
+            created_at=row["created_at"],
         )
 
     @staticmethod

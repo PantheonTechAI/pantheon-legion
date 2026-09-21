@@ -11,10 +11,21 @@ validates contract-v1 success and error envelopes, and retries exactly once
 only for a valid `SERVICE_UNAVAILABLE` response. It never sends tenant scope,
 tokens, or assertions in MCP arguments.
 
-`AquilaService.retrieve_federated_corpus` first enforces `READ_KNOWLEDGE` and a
-current workload delegation. It records the authorization and terminal outcome
-with Tabula's audit correlation and record references only. Corpus content,
-citations, queries, and bearer tokens are excluded from Mission audit.
+`FederatedCorpusEvidenceReader` is the consumer adapter for persistent grounded
+Scout work. It owns one configured `ScopeBinding`, asks Aquila for a fresh
+`READ_KNOWLEDGE` decision for every protected MCP operation, obtains a fresh
+one-time assertion/token through its credential callback, and returns bounded
+transient content plus safe provenance. Initialization, notification, tool
+call, and a retry therefore never reuse a credential.
+
+The adapter records only decisions, binding identity, counts, record/revision/
+URI references, and shared correlations in Aquila audit. Corpus content,
+citations, queries, assertions, and bearer tokens are excluded. Runtime, model,
+browser, and work input cannot choose or widen the binding.
+
+`AquilaService.retrieve_federated_corpus` remains a historical Aquila-owned
+orchestration path for compatibility. New persistent Agent work must use the
+Runtime-owned reader path and must not call that method.
 
 Registry discovery remains a separate next adapter. It must not reuse the
 corpus client or turn registry metadata into execution authority.

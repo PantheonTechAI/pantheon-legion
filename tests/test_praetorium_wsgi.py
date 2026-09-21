@@ -6,6 +6,12 @@ from urllib.parse import urlencode
 from aquila_api.auth import AuthentikConfig, AuthentikPrincipalMapper, BearerAuthenticator
 from aquila_api.service import AquilaService
 from legion_kernel import LegionKernel
+from legion_runtime import (
+    MissionAgentView,
+    MissionEvidenceView,
+    MissionOrganizationSnapshot,
+    MissionWorkView,
+)
 from praetorium import PraetoriumWSGIApp
 
 ORGANIZATION_ID = "11111111-1111-4111-8111-111111111111"
@@ -14,9 +20,65 @@ WORKSPACE_ID = "22222222-2222-4222-8222-222222222222"
 
 class Verifier:
     def verify(self, token):
-        if token != "human":
+        if token not in {"human", "denied"}:
             raise ValueError("invalid")
-        return {"iss": "https://auth.example/", "aud": "aquila", "sub": "operator", "groups": ["legion/mission-operators"]}
+        return {
+            "iss": "https://auth.example/",
+            "aud": "aquila",
+            "sub": "operator",
+            "groups": ["legion/mission-operators"] if token == "human" else [],
+        }
+
+
+class OrganizationReadModel:
+    def __init__(
+        self,
+        *,
+        error=None,
+        canonical_uri='https://example.test/"citation',
+    ):
+        self.calls = []
+        self.error = error
+        self.canonical_uri = canonical_uri
+
+    def snapshot(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error:
+            raise self.error
+        return MissionOrganizationSnapshot(
+            mission_id=kwargs["mission_id"],
+            agents=(
+                MissionAgentView(
+                    agent_id="33333333-3333-4333-8333-333333333333",
+                    display_name="Scout <one>",
+                    role="SCOUT",
+                    assignment_status="ASSIGNED",
+                ),
+            ),
+            work=(
+                MissionWorkView(
+                    work_item_id="44444444-4444-4444-8444-444444444444",
+                    work_kind="GROUNDED_CORPUS_ANALYSIS",
+                    objective="Inspect <unsafe> evidence",
+                    status="COMPLETED",
+                    created_at="2026-09-18T00:00:00Z",
+                    updated_at="2026-09-18T00:01:00Z",
+                    result_summary="Bounded <result>",
+                    result_digest="digest-one",
+                    evidence=(
+                        MissionEvidenceView(
+                            evidence_reference_id=(
+                                "55555555-5555-4555-8555-555555555555"
+                            ),
+                            external_record_id="record-<one>",
+                            external_revision="rev-1",
+                            canonical_uri=self.canonical_uri,
+                            retrieved_at="2026-09-18T00:01:00Z",
+                        ),
+                    ),
+                ),
+            ),
+        )
 
 
 class PraetoriumWSGITests(unittest.TestCase):
@@ -80,3 +142,59 @@ class PraetoriumWSGITests(unittest.TestCase):
         response, body = self.request("GET", "/praetorium/missions", authorization=None)
         self.assertEqual(response["status"], 401)
         self.assertIn("UNAUTHENTICATED", body)
+
+    def test_authorized_detail_renders_escaped_runtime_projection(self):
+        mission = self.mission()
+        read_model = OrganizationReadModel()
+        self.app.organization_read_model = read_model
+        response, body = self.request(
+            "GET", f"/praetorium/missions/{mission['id']}"
+        )
+        self.assertEqual(response["status"], 200)
+        self.assertIn("Persistent organization", body)
+        self.assertIn("Scout &lt;one&gt;", body)
+        self.assertIn("Bounded &lt;result&gt;", body)
+        self.assertIn("record-&lt;one&gt;", body)
+        self.assertIn("&quot;citation", body)
+        self.assertNotIn("<unsafe>", body)
+        self.assertEqual(read_model.calls[0]["organization_id"], ORGANIZATION_ID)
+
+    def test_runtime_projection_failure_isolated_from_mission_detail(self):
+        mission = self.mission()
+        self.app.organization_read_model = OrganizationReadModel(
+            error=TimeoutError("database details must not render")
+        )
+        response, body = self.request(
+            "GET", f"/praetorium/missions/{mission['id']}"
+        )
+        self.assertEqual(response["status"], 200)
+        self.assertIn("Operator view", body)
+        self.assertIn("Organization status unavailable.", body)
+        self.assertNotIn("database details", body)
+
+    def test_non_web_citation_uri_is_visible_but_never_clickable(self):
+        mission = self.mission()
+        self.app.organization_read_model = OrganizationReadModel(
+            canonical_uri="javascript:alert(document.domain)"
+        )
+
+        response, body = self.request(
+            "GET", f"/praetorium/missions/{mission['id']}"
+        )
+
+        self.assertEqual(response["status"], 200)
+        self.assertIn("javascript:alert(document.domain)", body)
+        self.assertIn("(non-web URI)", body)
+        self.assertNotIn('href="javascript:', body.lower())
+
+    def test_mission_denial_prevents_runtime_projection_call(self):
+        mission = self.mission()
+        read_model = OrganizationReadModel()
+        self.app.organization_read_model = read_model
+        response, _ = self.request(
+            "GET",
+            f"/praetorium/missions/{mission['id']}",
+            authorization="Bearer denied",
+        )
+        self.assertEqual(response["status"], 403)
+        self.assertEqual(read_model.calls, [])

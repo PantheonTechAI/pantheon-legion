@@ -182,3 +182,42 @@ python -m tests.acceptance.phase2_postgres_restart seed
 docker compose --env-file .env.runtime.local restart runtime-db
 python -m tests.acceptance.phase2_postgres_restart verify
 ```
+
+## Grounded Persistent Scout Investigation suite
+
+The GSI catalog is
+[grounded-scout-investigation.yaml](./grounded-scout-investigation.yaml). It
+proves a persistent grounded Scout result, fail-closed knowledge revocation,
+closed work profiles and objective bounds, and stage-aware recovery under a
+fresh attempt. The runner uses real Aquila persistence, real Runtime
+PostgreSQL, fixture STS cryptography, the production authority/reader adapters,
+and the unchanged deterministic cognition bridge:
+
+```sh
+export LEGION_RUNTIME_TEST_DATABASE_URL='postgresql+psycopg://.../legion_runtime_test'
+python -m tests.acceptance.grounded_scout_runner
+```
+
+It emits one safe JSON evidence record for each `GSI-*` scenario. Raw Corpus
+content, citations, credentials, and assertions are not emitted.
+
+The database-process restart proof is separate:
+
+```sh
+python -m tests.acceptance.grounded_postgres_restart seed
+docker compose --env-file deploy/runtime-postgres.env.example restart runtime-db
+python -m tests.acceptance.grounded_postgres_restart verify
+```
+
+The live federation matrix is intentionally opt-in because it starts an
+isolated disposable Tabula stack. Its preflight rejects the deployed Tabula
+directory and non-test resources; cleanup removes only the named disposable
+project:
+
+```sh
+python -m tests.federation.execute \
+  --tabula-root /path/to/distinct/disposable-tabula-worktree \
+  --project-name pantheon-federation-gsi-local \
+  --env-file /path/to/disposable.env \
+  --execute
+```

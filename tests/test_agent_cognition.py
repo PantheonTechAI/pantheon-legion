@@ -1,7 +1,13 @@
 import unittest
 
-from legion_cognition import InMemoryScoutRuntime, LegacyScoutRuntimeBridge
+from legion_cognition import (
+    InMemoryScoutRuntime,
+    LegacyScoutRuntimeBridge,
+    ScoutEvidence,
+    ScoutResult,
+)
 from legion_runtime import (
+    AgentEvidence,
     AgentCognitionRequest,
     AgentMissionContext,
     AgentRole,
@@ -57,6 +63,63 @@ class AgentCognitionContractTests(unittest.TestCase):
                 self._request(
                     logical_capability="write.production",
                     required_capabilities=("write.production",),
+                )
+            )
+
+    def test_grounded_bridge_round_trips_runtime_reference_ids(self):
+        evidence = AgentEvidence(
+            reference_id="55555555-5555-4555-8555-555555555555",
+            record_id="record-one",
+            revision="rev-1",
+            canonical_uri="tabula://corpus/record-one/rev-1",
+            content="bounded evidence",
+            retrieved_at="2026-09-18T00:01:00Z",
+        )
+        request = self._request(
+            logical_capability="grounded_corpus_analysis",
+            required_capabilities=("read_only_analysis", "tabula_corpus_read"),
+            evidence=(evidence,),
+        )
+        result = LegacyScoutRuntimeBridge(InMemoryScoutRuntime()).run(request)
+        self.assertEqual(result.evidence_references, (evidence.reference_id,))
+
+    def test_grounded_bridge_rejects_out_of_set_legacy_citation(self):
+        class WrongCitationRuntime:
+            def run_scout(self, request):
+                return ScoutResult(
+                    mission_id=request.context.mission_id,
+                    mission_version=request.context.mission_version,
+                    scout=request.scout,
+                    query=request.query,
+                    evidence=(
+                        ScoutEvidence(
+                            source="66666666-6666-4666-8666-666666666666",
+                            summary="not supplied",
+                            observed_at="2026-09-18T00:01:00Z",
+                        ),
+                    ),
+                    recommendation="invalid citation",
+                )
+
+        evidence = AgentEvidence(
+            reference_id="55555555-5555-4555-8555-555555555555",
+            record_id="record-one",
+            revision="rev-1",
+            canonical_uri="tabula://corpus/record-one/rev-1",
+            content="bounded evidence",
+            retrieved_at="2026-09-18T00:01:00Z",
+        )
+        with self.assertRaisesRegex(
+            CognitionRejected, "COGNITION_EVIDENCE_REFERENCES_INVALID"
+        ):
+            LegacyScoutRuntimeBridge(WrongCitationRuntime()).run(
+                self._request(
+                    logical_capability="grounded_corpus_analysis",
+                    required_capabilities=(
+                        "read_only_analysis",
+                        "tabula_corpus_read",
+                    ),
+                    evidence=(evidence,),
                 )
             )
 

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import sqlite3
+from typing import Any, Callable
+from uuid import uuid4
 
 from legion_kernel import Principal
 from legion_runtime.authority import (
@@ -12,6 +15,9 @@ from legion_runtime.authority import (
 )
 from legion_runtime.agent import AgentIdentity
 from legion_runtime.mission_context import AuthorizedMissionContext
+from legion_runtime.evidence import GroundedEvidenceReadRequest
+from legion_tabula.corpus import ScopeBinding
+from legion_tabula.runtime_adapter import AuthorizedKnowledgeCredential
 
 from .service import AquilaService
 
@@ -119,6 +125,7 @@ class InProcessAquilaAgentAuthority:
                 str(response.body.get("code", "AUTHORITY_DENIED"))
             )
         raise AuthorityUnavailable("AUTHORITY_RESPONSE_UNAVAILABLE")
+
     @staticmethod
     def _view(status_code: int, body: dict[str, object]) -> MissionAuthorityView:
         if status_code == 200:
@@ -139,3 +146,106 @@ class InProcessAquilaAgentAuthority:
         if status_code in {403, 404, 409}:
             raise AuthorityDenied(str(body.get("code", "AUTHORITY_DENIED")))
         raise AuthorityUnavailable("AUTHORITY_RESPONSE_UNAVAILABLE")
+
+
+class InProcessAquilaKnowledgeAuthority:
+    """Authorize each protected Tabula call and issue one fixture credential."""
+
+    def __init__(
+        self,
+        service: AquilaService,
+        credential_issuer: Callable[[dict[str, str]], str],
+    ) -> None:
+        self.service = service
+        self.credential_issuer = credential_issuer
+
+    def authorize_operation(
+        self,
+        request: GroundedEvidenceReadRequest,
+        binding: ScopeBinding,
+    ) -> AuthorizedKnowledgeCredential:
+        try:
+            response = self.service.authorize_grounded_knowledge_operation(
+                workload=request.workload,
+                mission_id=request.mission_id,
+                delegation_id=request.delegation_id,
+                binding=binding,
+                work_item_id=request.work_item_id,
+                attempt_id=request.attempt_id,
+                correlation_id=request.correlation_id,
+            )
+        except (ConnectionError, OSError, TimeoutError, sqlite3.Error) as exc:
+            raise AuthorityUnavailable() from exc
+        if response.status_code in {403, 404, 409}:
+            raise AuthorityDenied(str(response.body.get("code", "AUTHORITY_DENIED")))
+        if response.status_code != 200:
+            raise AuthorityUnavailable("AUTHORITY_RESPONSE_UNAVAILABLE")
+        body = response.body
+        try:
+            now = datetime.now(timezone.utc)
+            claims = {
+                "schema_version": "1.0",
+                "assertion_id": str(uuid4()),
+                "issuer": "aquila",
+                "audience": "pantheon-sts",
+                "subject_id": request.workload.subject,
+                "actor_id": "aquila",
+                "mission_id": request.mission_id,
+                "organization_id": request.organization_id,
+                "workspace_id": request.workspace_id,
+                "target_product": "TABULA",
+                "target_audience": "pantheon-tabula-mcp",
+                "operation": "TABULA_CORPUS_READ",
+                "binding_id": binding.id,
+                "binding_version": binding.version,
+                "issued_at": now.isoformat().replace("+00:00", "Z"),
+                "expires_at": (now + timedelta(minutes=5))
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "correlation_id": request.correlation_id,
+            }
+            token = self.credential_issuer(claims)
+            if not isinstance(token, str) or not token:
+                raise ValueError
+            return AuthorizedKnowledgeCredential(
+                decision_id=str(body["decision_id"]),
+                policy_version=str(body["policy_version"]),
+                invocation_id=str(body["invocation_id"]),
+                token=token,
+            )
+        except (KeyError, TypeError, ValueError):
+            raise AuthorityUnavailable("INVALID_AUTHORITY_RESPONSE") from None
+        except Exception:
+            raise AuthorityUnavailable("CREDENTIAL_ISSUANCE_UNAVAILABLE") from None
+
+    def record_outcome(
+        self,
+        request: GroundedEvidenceReadRequest,
+        binding: ScopeBinding,
+        *,
+        invocation_id: str,
+        result: str,
+        tabula_audit_correlation_id: str | None = None,
+        record_references: tuple[dict[str, str], ...] = (),
+        error_code: str | None = None,
+        successful_authorization_decision_id: str | None = None,
+    ) -> None:
+        try:
+            self.service.record_grounded_knowledge_outcome(
+                workload=request.workload,
+                mission_id=request.mission_id,
+                invocation_id=invocation_id,
+                correlation_id=request.correlation_id,
+                result=result,
+                binding=binding,
+                tabula_audit_correlation_id=tabula_audit_correlation_id,
+                record_references=record_references,
+                error_code=error_code,
+                work_item_id=request.work_item_id,
+                attempt_id=request.attempt_id,
+                successful_authorization_decision_id=(
+                    successful_authorization_decision_id
+                ),
+            )
+        except (ConnectionError, OSError, TimeoutError, sqlite3.Error) as exc:
+            raise AuthorityUnavailable("AUTHORITY_AUDIT_UNAVAILABLE") from exc

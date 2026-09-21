@@ -39,17 +39,23 @@ from .authority import (
     MissionAuthorityView,
 )
 from .cognition import (
+    AgentEvidence,
     AgentCognitionRequest,
     AgentMissionContext,
     CognitionRejected,
     CognitionUnavailable,
     ReadOnlyCognition,
 )
+from .evidence import EvidenceReadError, GroundedEvidenceReadRequest, GroundedEvidenceReader
 from .mission_context import AquilaMissionContext, AuthorizedMissionContext
 from .work import (
+    AttemptStage,
     AttemptStatus,
+    EvidenceSourceType,
     WorkAttempt,
+    WorkEvidenceReference,
     WorkItem,
+    WorkKind,
     WorkResult,
     WorkStatus,
     result_digest,
@@ -87,6 +93,7 @@ class PersistentAgentRuntime:
         id_factory: Callable[[], str] = lambda: str(uuid4()),
         mission_context: AquilaMissionContext | None = None,
         cognition: ReadOnlyCognition | None = None,
+        evidence_reader: GroundedEvidenceReader | None = None,
     ) -> None:
         self.repository = repository
         self.authority = authority
@@ -95,6 +102,8 @@ class PersistentAgentRuntime:
 
         self.mission_context = mission_context
         self.cognition = cognition
+        self.evidence_reader = evidence_reader
+
     def close(self) -> None:
         self.repository.close()
 
@@ -445,10 +454,20 @@ class PersistentAgentRuntime:
         correlation_id: str,
         idempotency_key: str,
         causation_id: str | None = None,
+        work_kind: WorkKind = WorkKind.READ_ONLY_ANALYSIS,
     ) -> WorkItem:
         self._idempotency_key(idempotency_key)
-        if required_capabilities != ("read_only_analysis",):
+        expected_capabilities = {
+            WorkKind.READ_ONLY_ANALYSIS: ("read_only_analysis",),
+            WorkKind.GROUNDED_CORPUS_ANALYSIS: (
+                "read_only_analysis",
+                "tabula_corpus_read",
+            ),
+        }.get(work_kind)
+        if expected_capabilities is None or required_capabilities != expected_capabilities:
             raise RuntimeOperationError("READ_ONLY_CAPABILITY_REQUIRED")
+        if work_kind == WorkKind.GROUNDED_CORPUS_ANALYSIS and len(objective) > 2000:
+            raise RuntimeOperationError("GROUNDED_OBJECTIVE_TOO_LONG")
         binding = self._require_binding(centurion_binding_id)
         candidate_id = self.id_factory()
         now = self.clock()
@@ -467,6 +486,7 @@ class PersistentAgentRuntime:
             causation_id=causation_id,
             created_at=now,
             updated_at=now,
+            kind=work_kind,
         )
         actor = self._actor(workload)
         fingerprint = self._fingerprint(
@@ -477,6 +497,7 @@ class PersistentAgentRuntime:
             required_capabilities=required_capabilities,
             correlation_id=correlation_id,
             causation_id=causation_id,
+            work_kind=work_kind.value,
         )
         with self.repository.transaction(lock_keys=self._work_lock_keys(candidate)):
             centurion_binding, centurion_assignment, centurion = (
@@ -545,6 +566,7 @@ class PersistentAgentRuntime:
                 "work_item_id": candidate.work_item_id,
                 "scout_agent_id": scout.agent_id,
                 "required_capability_count": len(required_capabilities),
+                "work_kind": work_kind.value,
             }
             self._event(
                 event_type="ObjectiveDelegated",
@@ -676,6 +698,11 @@ class PersistentAgentRuntime:
         if self.cognition is None:
             raise RuntimeOperationError("COGNITION_UNAVAILABLE")
         initial = self._require_work(work_item_id)
+        if (
+            initial.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
+            and self.evidence_reader is None
+        ):
+            raise RuntimeOperationError("GROUNDED_EVIDENCE_UNAVAILABLE")
         actor = self._actor(workload)
         fingerprint = self._fingerprint(
             actor=actor,
@@ -710,6 +737,18 @@ class PersistentAgentRuntime:
                     "work_attempt",
                     attempt.attempt_id,
                 )
+            mission_stage = replace(
+                attempt,
+                status=AttemptStatus.RUNNING,
+                attempt_stage=AttemptStage.MISSION_CONTEXT,
+                version=attempt.version + 1,
+                updated_at=self.clock(),
+            )
+            self.repository.save_work_attempt(
+                mission_stage, expected_previous_version=attempt.version
+            )
+
+        attempt = mission_stage
 
         try:
             context = self.mission_context.authorize_and_read(
@@ -748,7 +787,8 @@ class PersistentAgentRuntime:
                 raise RuntimeOperationError("WORK_CANCELLED")
             if (
                 current_work.status != WorkStatus.CLAIMED
-                or current_attempt.status != AttemptStatus.PREPARED
+                or current_attempt.status != AttemptStatus.RUNNING
+                or current_attempt.attempt_stage != AttemptStage.MISSION_CONTEXT
             ):
                 raise RuntimeOperationError("WORK_RECONCILIATION_REQUIRED")
             now = self.clock()
@@ -757,6 +797,11 @@ class PersistentAgentRuntime:
                 status=AttemptStatus.RUNNING,
                 mission_version=context.mission_version,
                 authorization_decision_id=context.authorization_decision_id,
+                attempt_stage=(
+                    AttemptStage.EVIDENCE_RETRIEVAL
+                    if current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
+                    else AttemptStage.COGNITION
+                ),
                 version=current_attempt.version + 1,
                 updated_at=now,
             )
@@ -779,6 +824,156 @@ class PersistentAgentRuntime:
                     "mission_version": context.mission_version,
                 },
             )
+            if current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS:
+                self._event(
+                    event_type="GroundedEvidenceRequested",
+                    agent_id=scout.agent_id,
+                    actor=actor,
+                    result="STARTED",
+                    correlation_id=current_work.correlation_id,
+                    mission_id=current_work.mission_id,
+                    assignment_id=assignment.assignment_id,
+                    binding_id=binding.binding_id,
+                    data={
+                        "work_item_id": work_item_id,
+                        "attempt_id": running.attempt_id,
+                    },
+                )
+
+        cognition_evidence: tuple[AgentEvidence, ...] = ()
+        if work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS:
+            assert self.evidence_reader is not None
+            try:
+                bundle = self.evidence_reader.read(
+                    GroundedEvidenceReadRequest(
+                        organization_id=scout.organization_id,
+                        workspace_id=scout.workspace_id,
+                        mission_id=work.mission_id,
+                        agent_id=scout.agent_id,
+                        assignment_id=assignment.assignment_id,
+                        workload=workload,
+                        delegation_id=binding.grant_id or "",
+                        work_item_id=work_item_id,
+                        attempt_id=running.attempt_id,
+                        query=work.objective,
+                        correlation_id=work.correlation_id,
+                    )
+                )
+            except AuthorityUnavailable as exc:
+                self._fail_work_attempt(work, running, actor, exc.code, retryable=True)
+                raise RuntimeOperationError(exc.code) from exc
+            except AuthorityDenied as exc:
+                self._fail_work_attempt(work, running, actor, exc.code, retryable=False)
+                raise RuntimeOperationError(exc.code) from exc
+            except EvidenceReadError as exc:
+                self._fail_work_attempt(
+                    work, running, actor, exc.code, retryable=exc.retryable
+                )
+                raise RuntimeOperationError(exc.code) from exc
+            except Exception as exc:
+                self._fail_work_attempt(
+                    work,
+                    running,
+                    actor,
+                    "GROUNDED_EVIDENCE_UNAVAILABLE",
+                    retryable=True,
+                )
+                raise RuntimeOperationError("GROUNDED_EVIDENCE_UNAVAILABLE") from exc
+
+            references = tuple(
+                WorkEvidenceReference(
+                    evidence_reference_id=self.id_factory(),
+                    work_item_id=work_item_id,
+                    attempt_id=running.attempt_id,
+                    source_type=EvidenceSourceType.TABULA_CORPUS,
+                    external_record_id=item.record_id,
+                    external_revision=item.revision,
+                    canonical_uri=item.canonical_uri,
+                    scope_binding_id=bundle.scope_binding_id,
+                    scope_binding_version=bundle.scope_binding_version,
+                    successful_authorization_decision_id=(
+                        bundle.successful_authorization_decision_id
+                    ),
+                    tabula_audit_correlation_id=bundle.tabula_audit_correlation_id,
+                    retrieved_at=item.retrieved_at,
+                    created_at=self.clock(),
+                )
+                for item in bundle.records
+            )
+            with self.repository.transaction(lock_keys=self._work_lock_keys(work)):
+                current_work = self._require_work(work_item_id)
+                current_attempt = self._require_work_attempt(running.attempt_id)
+                binding, assignment, scout = self._require_active_actor(
+                    scout_binding_id,
+                    workload,
+                    AgentRole.SCOUT,
+                    assignment_id=current_work.scout_assignment_id,
+                )
+                if current_work.status == WorkStatus.CANCELLED:
+                    raise RuntimeOperationError("WORK_CANCELLED")
+                if (
+                    current_work.status != WorkStatus.CLAIMED
+                    or current_attempt.status != AttemptStatus.RUNNING
+                    or current_attempt.attempt_stage
+                    != AttemptStage.EVIDENCE_RETRIEVAL
+                ):
+                    raise RuntimeOperationError("WORK_RECONCILIATION_REQUIRED")
+                for reference in references:
+                    self.repository.save_work_evidence_reference(reference)
+                running = replace(
+                    current_attempt,
+                    attempt_stage=AttemptStage.COGNITION,
+                    knowledge_authorization_decision_ids=(
+                        bundle.authorization_decision_ids
+                    ),
+                    successful_knowledge_decision_id=(
+                        bundle.successful_authorization_decision_id
+                    ),
+                    evidence_correlation_id=bundle.correlation_id,
+                    tabula_audit_correlation_id=(
+                        bundle.tabula_audit_correlation_id
+                    ),
+                    version=current_attempt.version + 1,
+                    updated_at=self.clock(),
+                )
+                self.repository.save_work_attempt(
+                    running, expected_previous_version=current_attempt.version
+                )
+                self._event(
+                    event_type="GroundedEvidenceReferencesRecorded",
+                    agent_id=scout.agent_id,
+                    actor=actor,
+                    result="SUCCESS",
+                    correlation_id=current_work.correlation_id,
+                    mission_id=current_work.mission_id,
+                    assignment_id=assignment.assignment_id,
+                    binding_id=binding.binding_id,
+                    data={
+                        "work_item_id": work_item_id,
+                        "attempt_id": running.attempt_id,
+                        "evidence_reference_ids": [
+                            item.evidence_reference_id for item in references
+                        ],
+                        "evidence_count": len(references),
+                        "authorization_decision_ids": list(
+                            bundle.authorization_decision_ids
+                        ),
+                        "tabula_audit_correlation_id": (
+                            bundle.tabula_audit_correlation_id
+                        ),
+                    },
+                )
+            cognition_evidence = tuple(
+                AgentEvidence(
+                    reference_id=reference.evidence_reference_id,
+                    record_id=record.record_id,
+                    revision=record.revision,
+                    canonical_uri=record.canonical_uri,
+                    content=record.content,
+                    retrieved_at=record.retrieved_at,
+                )
+                for reference, record in zip(references, bundle.records, strict=True)
+            )
 
         request = AgentCognitionRequest(
             request_id=running.attempt_id,
@@ -789,7 +984,11 @@ class PersistentAgentRuntime:
             attempt_id=running.attempt_id,
             mission_id=work.mission_id,
             mission_version=context.mission_version,
-            logical_capability="read_only_analysis",
+            logical_capability=(
+                "grounded_corpus_analysis"
+                if work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
+                else "read_only_analysis"
+            ),
             objective=work.objective,
             required_capabilities=work.required_capabilities,
             context=AgentMissionContext(
@@ -801,6 +1000,7 @@ class PersistentAgentRuntime:
                 roe_level=context.roe_level,
                 constraints=context.constraints,
             ),
+            evidence=cognition_evidence,
         )
         try:
             cognition_result = self.cognition.run(request)
@@ -825,6 +1025,25 @@ class PersistentAgentRuntime:
                 retryable=False,
             )
             raise RuntimeOperationError("COGNITION_IDENTITY_MISMATCH")
+        if work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS:
+            allowed_references = {item.reference_id for item in cognition_evidence}
+            cited_references = cognition_result.evidence_references
+            if (
+                not cited_references
+                or len(cited_references) > 8
+                or len(set(cited_references)) != len(cited_references)
+                or not set(cited_references).issubset(allowed_references)
+            ):
+                self._fail_work_attempt(
+                    work,
+                    running,
+                    actor,
+                    "COGNITION_EVIDENCE_REFERENCES_INVALID",
+                    retryable=False,
+                )
+                raise RuntimeOperationError(
+                    "COGNITION_EVIDENCE_REFERENCES_INVALID"
+                )
         try:
             result = WorkResult(
                 result_id=self.id_factory(),
@@ -1080,11 +1299,16 @@ class PersistentAgentRuntime:
                     reconciled = work
                 elif attempt.status == AttemptStatus.RUNNING:
                     now = self.clock()
+                    ambiguous_code = {
+                        AttemptStage.MISSION_CONTEXT: "AMBIGUOUS_MISSION_CONTEXT_READ",
+                        AttemptStage.EVIDENCE_RETRIEVAL: "AMBIGUOUS_EVIDENCE_RETRIEVAL",
+                        AttemptStage.COGNITION: "AMBIGUOUS_COGNITION_OUTCOME",
+                    }.get(attempt.attempt_stage, "AMBIGUOUS_COGNITION_OUTCOME")
                     self.repository.save_work_attempt(
                         replace(
                             attempt,
                             status=AttemptStatus.ABANDONED,
-                            error_code="AMBIGUOUS_COGNITION_OUTCOME",
+                            error_code=ambiguous_code,
                             version=attempt.version + 1,
                             updated_at=now,
                         ),
@@ -1111,7 +1335,7 @@ class PersistentAgentRuntime:
                         data={
                             "work_item_id": work_item_id,
                             "attempt_id": attempt.attempt_id,
-                            "error_code": "AMBIGUOUS_COGNITION_OUTCOME",
+                            "error_code": ambiguous_code,
                         },
                     )
                 else:
@@ -1134,6 +1358,17 @@ class PersistentAgentRuntime:
 
     def list_work_for_assignment(self, assignment_id: str) -> list[WorkItem]:
         return self.repository.list_work_for_assignment(assignment_id)
+
+    def list_work_for_mission(self, mission_id: str) -> list[WorkItem]:
+        return self.repository.list_work_for_mission(mission_id)
+
+    def list_work_evidence_references(
+        self, *, work_item_id: str | None = None, attempt_id: str | None = None
+    ) -> list[WorkEvidenceReference]:
+        return self.repository.list_work_evidence_references(
+            work_item_id=work_item_id, attempt_id=attempt_id
+        )
+
     def _authorize_assignment(
         self, assignment_id: str, actor: Principal
     ) -> MissionAssignment:
@@ -1559,6 +1794,25 @@ class PersistentAgentRuntime:
                     "error_code": error_code,
                 },
             )
+            if (
+                current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
+                and current_attempt.attempt_stage == AttemptStage.EVIDENCE_RETRIEVAL
+            ):
+                self._event(
+                    event_type="GroundedEvidenceFailed",
+                    agent_id=current_work.scout_agent_id,
+                    actor=actor,
+                    result="RETRYABLE" if retryable else "FAILED",
+                    correlation_id=current_work.correlation_id,
+                    mission_id=current_work.mission_id,
+                    assignment_id=current_work.scout_assignment_id,
+                    binding_id=current_attempt.scout_binding_id,
+                    data={
+                        "work_item_id": current_work.work_item_id,
+                        "attempt_id": current_attempt.attempt_id,
+                        "error_code": error_code,
+                    },
+                )
 
     def _result_events(
         self, work: WorkItem, result: WorkResult, actor: ActorRef

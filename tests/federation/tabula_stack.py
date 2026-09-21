@@ -65,6 +65,25 @@ class TabulaDisposableStack:
         self._compose_prefix = None
         self._environment = None
 
+    def restart_mcp(self) -> None:
+        """Restart only MCP and wait for Compose health within declared bounds."""
+        if self._compose_prefix is None:
+            raise DisposableStackError("disposable stack is not started")
+        self.runner(
+            self._compose_prefix + ["restart", "--timeout", "10", "mcp-server"],
+            cwd=self.tabula_root,
+            env=self._environment,
+            check=True,
+            timeout=30,
+        )
+        self.runner(
+            self._compose_prefix + ["up", "--detach", "--wait", "mcp-server"],
+            cwd=self.tabula_root,
+            env=self._environment,
+            check=True,
+            timeout=60,
+        )
+
     def _preflight_command(self) -> list[str]:
         environment = dict(os.environ, PANTHEON_FEDERATION_DISPOSABLE="1")
         result = self.runner(

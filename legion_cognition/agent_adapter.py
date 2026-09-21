@@ -17,6 +17,7 @@ from .scout import (
     CognitionRuntimeAdapter,
     MissionContext,
     SCOUT_MISSION_READ_CAPABILITY,
+    ScoutEvidence,
     ScoutRequest,
 )
 
@@ -42,6 +43,14 @@ class LegacyScoutRuntimeBridge(ReadOnlyCognition):
             scout=Principal(PrincipalType.WORKLOAD, request.workload_subject),
             query=request.objective,
             granted_capabilities=frozenset({SCOUT_MISSION_READ_CAPABILITY}),
+            evidence=tuple(
+                ScoutEvidence(
+                    source=item.reference_id,
+                    summary=item.content,
+                    observed_at=item.retrieved_at,
+                )
+                for item in request.evidence
+            ),
         )
         result = self.runtime.run_scout(legacy)
         if (
@@ -50,6 +59,18 @@ class LegacyScoutRuntimeBridge(ReadOnlyCognition):
             or result.scout.subject != request.workload_subject
         ):
             raise CognitionRejected("COGNITION_IDENTITY_MISMATCH")
+        returned_references = tuple(item.source for item in result.evidence)
+        supplied_references = {item.reference_id for item in request.evidence}
+        if request.logical_capability == "grounded_corpus_analysis":
+            if (
+                not returned_references
+                or len(returned_references) > 8
+                or len(set(returned_references)) != len(returned_references)
+                or not set(returned_references).issubset(supplied_references)
+            ):
+                raise CognitionRejected("COGNITION_EVIDENCE_REFERENCES_INVALID")
+        elif returned_references:
+            raise CognitionRejected("COGNITION_EVIDENCE_REFERENCES_INVALID")
         return AgentCognitionResult(
             request_id=request.request_id,
             agent_id=request.agent_id,
@@ -58,7 +79,7 @@ class LegacyScoutRuntimeBridge(ReadOnlyCognition):
             mission_id=request.mission_id,
             mission_version=request.mission_version,
             summary=result.recommendation,
-            evidence_references=tuple(item.source for item in result.evidence),
+            evidence_references=returned_references,
         )
 
     @staticmethod
@@ -76,7 +97,15 @@ class LegacyScoutRuntimeBridge(ReadOnlyCognition):
                 UUID(value)
             except (TypeError, ValueError, AttributeError) as exc:
                 raise CognitionRejected("COGNITION_IDENTITY_INVALID") from exc
-        if request.logical_capability != "read_only_analysis":
+        profiles = {
+            "read_only_analysis": (("read_only_analysis",), False),
+            "grounded_corpus_analysis": (
+                ("read_only_analysis", "tabula_corpus_read"),
+                True,
+            ),
+        }
+        profile = profiles.get(request.logical_capability)
+        if profile is None:
             raise CognitionRejected("COGNITION_CAPABILITY_DENIED")
         if not request.workload_subject.strip() or not request.objective.strip():
             raise CognitionRejected("COGNITION_REQUEST_INVALID")
@@ -85,5 +114,8 @@ class LegacyScoutRuntimeBridge(ReadOnlyCognition):
             or request.context.mission_version != request.mission_version
         ):
             raise CognitionRejected("COGNITION_CONTEXT_MISMATCH")
-        if request.required_capabilities != ("read_only_analysis",):
+        required_capabilities, requires_evidence = profile
+        if request.required_capabilities != required_capabilities:
             raise CognitionRejected("COGNITION_CAPABILITY_DENIED")
+        if requires_evidence != bool(request.evidence):
+            raise CognitionRejected("COGNITION_EVIDENCE_INVALID")

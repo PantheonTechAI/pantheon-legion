@@ -36,13 +36,26 @@ class TabulaDisposableStackTests(unittest.TestCase):
         self.assertIn("console-db", self.calls[3][0])
         self.assertIn("INSERT INTO", self.calls[3][1]["input"])
         self.assertEqual(self.stack.mcp_endpoint, "http://127.0.0.1:18100/mcp")
+        self.stack.restart_mcp()
+        self.assertEqual(
+            self.calls[4][0][-4:],
+            ["restart", "--timeout", "10", "mcp-server"],
+        )
+        self.assertEqual(
+            self.calls[5][0][-4:],
+            ["up", "--detach", "--wait", "mcp-server"],
+        )
         self.stack.cleanup()
-        self.assertEqual(self.calls[4][0][-3:], ["down", "--volumes", "--remove-orphans"])
-        self.assertEqual(self.calls[4][1]["env"]["PANTHEON_STS_INTROSPECTION_URL"], "http://host.docker.internal:19080/v1/introspect")
+        self.assertEqual(self.calls[6][0][-3:], ["down", "--volumes", "--remove-orphans"])
+        self.assertEqual(self.calls[6][1]["env"]["PANTHEON_STS_INTROSPECTION_URL"], "http://host.docker.internal:19080/v1/introspect")
 
     def test_cleanup_before_start_is_a_noop(self):
         self.stack.cleanup()
         self.assertEqual(self.calls, [])
+
+    def test_restart_before_start_is_rejected(self):
+        with self.assertRaisesRegex(RuntimeError, "not started"):
+            self.stack.restart_mcp()
 
 
 if __name__ == "__main__":

@@ -77,8 +77,13 @@ def _mcp_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in arguments.items() if key not in {"organization_id", "workspace_id"}}
 
 
-def _claims(operation: str, arguments: dict[str, Any]) -> dict[str, str]:
-    now = datetime.now(timezone.utc)
+def _claims(
+    operation: str,
+    arguments: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> dict[str, str]:
+    now = now or datetime.now(timezone.utc)
     binding = arguments["binding"]
     return {
         "schema_version": "1.0", "assertion_id": str(uuid4()), "issuer": "aquila", "audience": "pantheon-sts",

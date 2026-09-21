@@ -4,6 +4,11 @@ from .registry import RegistryDiscovery, RegistryEntity, RegistryReadError, Tabu
 
 from .corpus import CorpusRead, CorpusReadError, CorpusRecord, ScopeBinding, TabulaCorpusClient
 from .mcp import McpHttpTransport, McpResponse, McpTransportError
+from .runtime_adapter import (
+    AuthorizedKnowledgeCredential,
+    FederatedCorpusEvidenceReader,
+    KnowledgeOperationAuthority,
+)
 
 from .retrieval import (
     InMemoryTabula,
@@ -14,6 +19,9 @@ from .retrieval import (
 )
 
 __all__ = [
+    "AuthorizedKnowledgeCredential",
+    "FederatedCorpusEvidenceReader",
+    "KnowledgeOperationAuthority",
     "RegistryDiscovery",
     "RegistryEntity",
     "RegistryReadError",

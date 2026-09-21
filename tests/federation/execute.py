@@ -22,7 +22,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("refusing to start containers without --execute")
     stack = TabulaDisposableStack(args.tabula_root, args.project_name, args.env_file)
     try:
-        results = run_disposable_conformance(DisposableRun(stack.mcp_endpoint, stack.start))
+        results = run_disposable_conformance(
+            DisposableRun(
+                stack.mcp_endpoint,
+                stack.start,
+                restart_stack=stack.restart_mcp,
+                exercise_live_faults=True,
+            )
+        )
     finally:
         stack.cleanup()
     print(json.dumps([result.__dict__ for result in results], sort_keys=True))

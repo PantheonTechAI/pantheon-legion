@@ -18,6 +18,7 @@ RUNTIME_TABLES = {
     "runtime_events",
     "runtime_idempotency",
     "runtime_work_attempts",
+    "runtime_work_evidence_references",
     "runtime_work_items",
     "runtime_work_results",
 }
@@ -66,7 +67,8 @@ def reset_runtime_database() -> None:
         with engine.begin() as connection:
             connection.execute(
                 text(
-                    "TRUNCATE TABLE runtime_work_results, runtime_work_attempts, "
+                    "TRUNCATE TABLE runtime_work_results, "
+                    "runtime_work_evidence_references, runtime_work_attempts, "
                     "runtime_work_items, runtime_events, runtime_bindings, "
                     "coordination_checkpoints, mission_assignments, "
                     "runtime_idempotency, agents CASCADE"
