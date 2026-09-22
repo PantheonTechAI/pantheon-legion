@@ -148,6 +148,38 @@ class InProcessAquilaAgentAuthority:
         raise AuthorityUnavailable("AUTHORITY_RESPONSE_UNAVAILABLE")
 
 
+class InProcessAquilaCognitionAuthority:
+    """Translate freshly persisted Aquila decisions; never invoke inference."""
+
+    def __init__(self, service):
+        self.service = service
+
+    def authorize(self, context, facts):
+        from legion_cognition.authorized import CognitionAuthorization
+        from legion_cognition.capability import CognitionError
+        try:
+            response = self.service.authorize_cognition(context=context, facts=facts)
+        except Exception:
+            raise CognitionError("COGNITION_AUTHORITY_UNAVAILABLE", retryable=True) from None
+        if response.status_code == 404:
+            raise CognitionError("COGNITION_MISSION_NOT_FOUND")
+        if response.status_code == 403:
+            raise CognitionError("COGNITION_AUTHORITY_DENIED")
+        if response.status_code != 200:
+            raise CognitionError("COGNITION_AUTHORITY_UNAVAILABLE", retryable=True)
+        try:
+            return CognitionAuthorization(**response.body)
+        except (ValueError, TypeError):
+            raise CognitionError("COGNITION_AUTHORITY_INVALID") from None
+
+    def record_outcome(self, context, facts):
+        from legion_cognition.capability import CognitionError
+        try:
+            self.service.record_cognition_outcome(context=context, facts=facts)
+        except Exception:
+            raise CognitionError("COGNITION_AUDIT_UNAVAILABLE", ambiguous=True) from None
+
+
 class InProcessAquilaKnowledgeAuthority:
     """Authorize each protected Tabula call and issue one fixture credential."""
 

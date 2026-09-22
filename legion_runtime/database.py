@@ -170,7 +170,7 @@ runtime_work_items = Table(
     ),
     CheckConstraint("version > 0", name="ck_runtime_work_items_version"),
     CheckConstraint(
-        "work_kind IN ('READ_ONLY_ANALYSIS', 'GROUNDED_CORPUS_ANALYSIS')",
+        "work_kind IN ('READ_ONLY_ANALYSIS', 'GROUNDED_CORPUS_ANALYSIS', 'TOOL_ASSISTED_CORPUS_ANALYSIS')",
         name="ck_runtime_work_items_kind",
     ),
 )
@@ -209,7 +209,8 @@ runtime_work_attempts = Table(
     CheckConstraint("mission_version IS NULL OR mission_version > 0", name="ck_runtime_work_attempts_mission_version"),
     CheckConstraint(
         "attempt_stage IS NULL OR attempt_stage IN "
-        "('MISSION_CONTEXT', 'EVIDENCE_RETRIEVAL', 'COGNITION')",
+        "('MISSION_CONTEXT', 'EVIDENCE_RETRIEVAL', 'COGNITION', 'COGNITION_SELECTION', "
+        "'COGNITION_INITIAL', 'TOOL_REQUESTED', 'COGNITION_CONTINUATION')",
         name="ck_runtime_work_attempts_stage",
     ),
 )
@@ -219,6 +220,25 @@ Index(
     runtime_work_attempts.c.work_item_id,
     runtime_work_attempts.c.attempt_number,
     unique=True,
+)
+
+cognition_turns = Table(
+    "cognition_turns", metadata,
+    Column("attempt_id", String(36), ForeignKey("runtime_work_attempts.attempt_id"), primary_key=True),
+    Column("turn_ordinal", Integer, primary_key=True),
+    Column("transport_attempt_ordinal", Integer, primary_key=True),
+    Column("work_item_id", String(36), ForeignKey("runtime_work_items.work_item_id"), nullable=False),
+    Column("correlation_id", String(36), nullable=False),
+    *[Column(name, String(256), nullable=False) for name in (
+        "requirement_id", "catalog_revision", "offering_id", "provider_id", "endpoint_id", "node_id",
+        "model_id", "request_digest", "decision_id", "policy_version", "invocation_id", "status")],
+    *[Column(name, String(256)) for name in (
+        "response_id", "response_digest", "finish_reason", "error_code", "tool_name", "tool_call_id", "argument_digest")],
+    *[Column(name, Integer, nullable=False) for name in (
+        "prompt_tokens", "completion_tokens", "reasoning_tokens", "latency_ms")],
+    Column("recorded_at", String(64), nullable=False),
+    CheckConstraint("turn_ordinal IN (1, 2) AND transport_attempt_ordinal IN (1, 2)", name="ck_cognition_turn_ordinals"),
+    CheckConstraint("status IN ('PREPARED', 'SUCCESS', 'FAILED')", name="ck_cognition_turn_status"),
 )
 
 runtime_work_results = Table(

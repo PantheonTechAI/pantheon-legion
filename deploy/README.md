@@ -63,3 +63,30 @@ Mission; browser form fields cannot choose or override either value.
 The example uses the canonical disposable test pair. Before a shared-user test,
 replace both values in `/etc/legion/praetorium.env` with the approved paired
 Organization and Workspace UUIDs for that environment.
+
+## DGX Spark inference
+
+The observed Spark/vLLM deployment and experiments are recorded in the
+[DGX Spark inference deployment handoff](../docs/deployment/dgx-spark-inference-handoff.md).
+The current setup script and systemd unit do not manage Spark or enable the
+planned Cognition/Resource Fabric integration. The direct cleartext inference
+endpoint is development evidence, not production-ready configuration.
+# Capability-selected cognition configuration
+
+`cognition.example.json` is disabled and records the dated Spark deployment as
+an example. Do not enable it in a service environment unchanged. Before using
+`legion_cognition.composition.configured_cognition`, supply an enabled trusted
+catalog with current validation dates and an immutable revision, HTTPS origin,
+authenticated route-restricted ingress (or equivalent), and a transport-only
+secret reference. `TransportPolicy(authenticated_restricted_ingress=True)` is
+an operator assertion that those ingress controls have been installed; it does
+not create them. API-key authentication alone does not restrict all vLLM routes.
+
+Reissue the Scout workload grant with explicit `INVOKE_COGNITION` plus the
+existing read operations. No Agent, Mission, model response, or tool argument
+selects this configuration. No service or Spark configuration is changed by
+this slice; no production secrets manager or credential provider is selected.
+
+Direct unauthenticated cleartext is only available to the opt-in live
+acceptance runner with both explicit development acknowledgements. That runner
+requires a disposable Runtime test database and Tabula isolation preflight.

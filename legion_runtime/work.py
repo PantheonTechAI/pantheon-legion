@@ -29,12 +29,17 @@ class AttemptStatus(str, Enum):
 class WorkKind(str, Enum):
     READ_ONLY_ANALYSIS = "READ_ONLY_ANALYSIS"
     GROUNDED_CORPUS_ANALYSIS = "GROUNDED_CORPUS_ANALYSIS"
+    TOOL_ASSISTED_CORPUS_ANALYSIS = "TOOL_ASSISTED_CORPUS_ANALYSIS"
 
 
 class AttemptStage(str, Enum):
     MISSION_CONTEXT = "MISSION_CONTEXT"
     EVIDENCE_RETRIEVAL = "EVIDENCE_RETRIEVAL"
     COGNITION = "COGNITION"
+    COGNITION_SELECTION = "COGNITION_SELECTION"
+    COGNITION_INITIAL = "COGNITION_INITIAL"
+    TOOL_REQUESTED = "TOOL_REQUESTED"
+    COGNITION_CONTINUATION = "COGNITION_CONTINUATION"
 
 
 class EvidenceSourceType(str, Enum):
@@ -95,16 +100,15 @@ class WorkItem:
                 raise ValueError("cancelled work requires cancellation provenance")
         elif self.cancelled_at is not None or self.cancellation_reason is not None:
             raise ValueError("non-cancelled work cannot have cancellation provenance")
-        if self.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS:
-            if self.required_capabilities != (
-                "read_only_analysis",
-                "tabula_corpus_read",
-            ):
-                raise ValueError("grounded work requires exact capabilities")
-            if len(self.objective) > 2000:
-                raise ValueError("grounded objective exceeds Corpus query limit")
-        elif self.required_capabilities != ("read_only_analysis",):
-            raise ValueError("read-only work requires exact capabilities")
+        profiles = {
+            WorkKind.READ_ONLY_ANALYSIS: ("read_only_analysis",),
+            WorkKind.GROUNDED_CORPUS_ANALYSIS: ("read_only_analysis", "tabula_corpus_read"),
+            WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS: ("read_only_analysis", "model_reasoning", "tabula_corpus_read"),
+        }
+        if self.kind not in profiles or self.required_capabilities != profiles[self.kind]:
+            raise ValueError("work requires exact capabilities")
+        if self.kind != WorkKind.READ_ONLY_ANALYSIS and len(self.objective) > 2000:
+            raise ValueError("grounded objective exceeds Corpus query limit")
 
 
 @dataclass(frozen=True)

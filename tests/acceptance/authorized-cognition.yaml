@@ -1,0 +1,20 @@
+name: Authorized local cognition loop
+scenarios:
+  - id: SCI-001
+    capability: Two-turn authorized grounded result over HTTP
+  - id: SCI-002
+    capability: Revoked inference authority prevents provider use
+  - id: SCI-003
+    capability: Revoked knowledge authority prevents continuation
+  - id: SCI-004
+    capability: Invalid tools cannot cross the knowledge boundary
+  - id: SCI-005
+    capability: Bounded retry obtains fresh authority and respects catalog changes
+  - id: SCI-006
+    capability: Every external stage recovers with one accepted result
+  - id: SCI-007
+    capability: Sensitive fields are absent from safe state and human inspection
+  - id: SCI-008
+    capability: Node endpoint provider and model cardinalities remain distinct
+  - id: SCI-009
+    capability: Historical catalog selections remain interpretable after revision

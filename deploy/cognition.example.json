@@ -1,0 +1,16 @@
+{
+  "enabled": false,
+  "catalog_revision": "spark-development-20260922",
+  "nodes": [{"node_id": "spark-node", "locality": "LOCAL", "trust_zone": "homelab", "enabled": true}],
+  "endpoints": [{"endpoint_id": "spark-inference-8000", "node_id": "spark-node", "origin": "http://spark:8000", "enabled": true}],
+  "providers": [{"provider_id": "spark-vllm", "endpoint_id": "spark-inference-8000", "adapter_type": "openai-compatible",
+    "runtime_family": "vllm", "runtime_version": "0.29.0", "parser_profile": "qwen3-qwen3_xml-auto",
+    "api_prefix": "/v1", "credential_reference": "env:LEGION_COGNITION_API_KEY", "enabled": true}],
+  "offerings": [{"offering_id": "spark-qwen-reasoning", "provider_id": "spark-vllm", "model_id": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+    "context_window": 131072, "priority": 100, "enabled": true, "data_classifications": ["internal"],
+    "features": ["reasoning", "tool_calls", "separated_reasoning"],
+    "validation_record": {"provider_id": "spark-vllm", "runtime_family": "vllm", "runtime_version": "0.29.0",
+      "model_id": "nvidia/Qwen3.6-35B-A3B-NVFP4", "parser_profile": "qwen3-qwen3_xml-auto",
+      "features": ["reasoning", "tool_calls", "separated_reasoning"],
+      "validated_at": "2026-09-21T00:00:00Z", "valid_until": "2026-09-23T00:00:00Z"}}]
+}

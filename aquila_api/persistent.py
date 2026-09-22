@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from functools import wraps
+from threading import RLock
 from typing import Any
 
 from legion_kernel import AuthorizationError, LegionKernel, Principal, RoeLevel, WorkerKilled
@@ -14,10 +16,20 @@ from .authorization import DelegationGrant
 from .service import ApiResponse, AquilaService, _principal_payload
 
 
+def _serialized_operation(method):
+    @wraps(method)
+    def operation(self, *args, **kwargs):
+        # Cover the in-memory mutation as well as its later database commit.
+        with self._operation_lock:
+            return method(self, *args, **kwargs)
+    return operation
+
+
 class PersistentAquilaService(AquilaService):
     """Rehydrate Aquila state from SQLite between service instances."""
 
     def __init__(self, database: str) -> None:
+        self._operation_lock = RLock()
         self.store = SQLiteMissionStore(database)
         self._initialize_auxiliary_tables()
         execution_state = self._load_execution_state()
@@ -28,9 +40,50 @@ class PersistentAquilaService(AquilaService):
         self.action_executions = dict(execution_state.get("action_executions", {}))
         self._restore()
 
+    @_serialized_operation
     def close(self) -> None:
         self.store.close()
 
+    def _persist_cognition_boundary(self, method_name, kwargs):
+        context = kwargs.get("context")
+        mission_id = context.mission_id if context else kwargs["mission_id"]
+        with self.store.transaction():
+            # Evaluate a fresh, isolated view of only this Mission and its grants.
+            authority = AquilaService(authorization=self.authorization)
+            mission = self.store.get_mission(mission_id)
+            if mission is not None:
+                authority.kernel.missions[mission_id] = mission
+                authority.kernel.audit[mission_id] = self.store.get_audit(mission_id)
+                authority.delegations = {grant.grant_id: grant for grant in self._list_delegations(mission_id)}
+            before_sequence = len(authority.kernel.audit.get(mission_id, []))
+            response = getattr(authority, method_name)(**kwargs)
+            for event in authority.kernel.audit.get(mission_id, [])[before_sequence:]:
+                self.store.append_audit(event)
+        # Publish the committed target view while the whole-operation lock is held.
+        # Other Missions and uncommitted mutations are never blanket-restored.
+        if mission is not None:
+            self.kernel.missions[mission_id] = mission
+            self.kernel.audit[mission_id] = authority.kernel.audit[mission_id]
+            self.delegations.update(authority.delegations)
+        return response
+
+    @_serialized_operation
+    def authorize_cognition(self, **kwargs):
+        return self._persist_cognition_boundary("authorize_cognition", kwargs)
+
+    @_serialized_operation
+    def record_cognition_outcome(self, **kwargs):
+        return self._persist_cognition_boundary("record_cognition_outcome", kwargs)
+
+    @_serialized_operation
+    def authorize_grounded_knowledge_operation(self, **kwargs):
+        return self._persist_cognition_boundary("authorize_grounded_knowledge_operation", kwargs)
+
+    @_serialized_operation
+    def record_grounded_knowledge_outcome(self, **kwargs):
+        return self._persist_cognition_boundary("record_grounded_knowledge_outcome", kwargs)
+
+    @_serialized_operation
     def authorize_agent_assignment(self, **kwargs: Any) -> ApiResponse:
         mission_id = str(kwargs["mission_id"])
         mission = self.kernel.missions.get(mission_id)
@@ -44,6 +97,7 @@ class PersistentAquilaService(AquilaService):
             with self.store.transaction():
                 self._persist_operation(mission_id, before_version, before_sequence)
 
+    @_serialized_operation
     def authorize_agent_resume(self, **kwargs: Any) -> ApiResponse:
         mission_id = str(kwargs["mission_id"])
         mission = self.kernel.missions.get(mission_id)
@@ -58,6 +112,7 @@ class PersistentAquilaService(AquilaService):
                 self._persist_operation(mission_id, before_version, before_sequence)
 
 
+    @_serialized_operation
     def authorize_scout_context(self, **kwargs: Any) -> ApiResponse:
         mission_id = str(kwargs["mission_id"])
         mission = self.kernel.missions.get(mission_id)
@@ -70,6 +125,7 @@ class PersistentAquilaService(AquilaService):
         finally:
             with self.store.transaction():
                 self._persist_operation(mission_id, before_version, before_sequence)
+    @_serialized_operation
     def create_mission(self, *, actor: Principal, body: dict[str, Any]) -> ApiResponse:
         response = super().create_mission(actor=actor, body=body)
         if response.status_code == 201:
@@ -81,6 +137,7 @@ class PersistentAquilaService(AquilaService):
                     self.store.append_audit(event)
         return response
 
+    @_serialized_operation
     def submit_command(
         self,
         *,
@@ -108,6 +165,7 @@ class PersistentAquilaService(AquilaService):
                 self._persist_execution_state()
         return response
 
+    @_serialized_operation
     def decide_approval(
         self,
         *,
@@ -126,6 +184,7 @@ class PersistentAquilaService(AquilaService):
                         self._persist_approval(approval.id)
         return response
 
+    @_serialized_operation
     def execute_action(
         self,
         *,
@@ -155,6 +214,7 @@ class PersistentAquilaService(AquilaService):
                         self._persist_approval(approval.id)
                 self._persist_execution_state()
 
+    @_serialized_operation
     def issue_delegation(self, **kwargs: Any) -> str:
         mission_id = str(kwargs["mission_id"])
         before_version = self.kernel.missions[mission_id].version
@@ -170,6 +230,7 @@ class PersistentAquilaService(AquilaService):
             self._persist_delegation(delegation_id)
         return delegation_id
 
+    @_serialized_operation
     def revoke_delegation(self, **kwargs: Any) -> None:
         mission_id = str(kwargs["mission_id"])
         delegation_id = str(kwargs["delegation_id"])
@@ -183,6 +244,7 @@ class PersistentAquilaService(AquilaService):
                 if delegation_id in self.delegations:
                     self._persist_delegation(delegation_id)
 
+    @_serialized_operation
     def invoke_read_tool(self, **kwargs: Any) -> Any:
         """Persist the material authorization and result audit facts for a tool read."""
         mission_id = str(kwargs["mission_id"])
@@ -195,14 +257,22 @@ class PersistentAquilaService(AquilaService):
             with self.store.transaction():
                 self._persist_operation(mission_id, before_version, before_sequence)
 
+    @_serialized_operation
+    def retrieve_knowledge(self, **kwargs: Any) -> Any:
+        """Preserve legacy knowledge authorization audit alongside fresh boundaries."""
+        return self._persist_federated_read("retrieve_knowledge", kwargs)
+
+    @_serialized_operation
     def retrieve_federated_corpus(self, **kwargs: Any) -> Any:
         """Persist the authorization and terminal audit facts for a Tabula corpus read."""
         return self._persist_federated_read("retrieve_federated_corpus", kwargs)
 
+    @_serialized_operation
     def retrieve_federated_registry(self, **kwargs: Any) -> Any:
         """Persist the authorization and terminal audit facts for a Tabula Registry read."""
         return self._persist_federated_read("retrieve_federated_registry", kwargs)
 
+    @_serialized_operation
     def run_scout(self, **kwargs: Any) -> Any:
         """Persist the digest-only model invocation fact when a Scout uses one."""
         mission_id = str(kwargs["mission_id"])
@@ -227,6 +297,7 @@ class PersistentAquilaService(AquilaService):
             with self.store.transaction():
                 self._persist_operation(mission_id, before_version, before_sequence)
 
+    @_serialized_operation
     def cancel_mission(
         self,
         *,

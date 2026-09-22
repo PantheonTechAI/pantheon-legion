@@ -66,6 +66,7 @@ How will the decision be tested or revisited?
 | [ADR-004](./ADR-004-persistent-agent-identity.md) | Persistent Agent identity belongs to Legion Runtime | Accepted for Phase 1 |
 | [ADR-005](./ADR-005-runtime-work-delegation.md) | Agent work delegation belongs to Legion Runtime | Accepted for Persistent Organization Phase 2 |
 | [ADR-006](./ADR-006-runtime-grounded-evidence-retrieval.md) | Runtime-orchestrated grounded evidence retrieval | Accepted for Grounded Persistent Scout Investigation |
+| [ADR-007](./ADR-007-capability-selected-authorized-cognition.md) | Capability-selected and separately authorized cognition | Accepted; implemented and live-verified |
 
 ## Review checklist
 

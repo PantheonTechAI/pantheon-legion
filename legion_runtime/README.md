@@ -140,3 +140,28 @@ Signals are state-checked: `PAUSE` applies to running or waiting work, `RESUME` 
 paused or waiting work, and `WAIT` to running work. Failed work must recover before
 it can complete; recovery preserves paused and waiting state rather than silently
 resuming it.
+# Authorized cognition loop
+
+The opt-in `TOOL_ASSISTED_CORPUS_ANALYSIS` profile requires exactly
+`read_only_analysis`, `model_reasoning`, and `tabula_corpus_read`.
+`PersistentAgentRuntime(..., cognition_invoker=...)` uses a Runtime-owned closed
+session for selection, initial inference, one validated Corpus search, and one
+final continuation. The ordinary and grounded deterministic paths are retained.
+
+Migration `0004` adds `cognition_turns` and the explicit stages
+`COGNITION_SELECTION`, `COGNITION_INITIAL`, `TOOL_REQUESTED`, and
+`COGNITION_CONTINUATION`. Ambiguous stages abandon the attempt and start again
+under fresh authority. Inference and evidence reads may repeat; claim,
+binding/version, cancellation, and unique result fences allow one accepted
+result. A failed post-inference authoritative audit leaves the stage ambiguous.
+
+Turn persistence contains safe selection, authority, digest, count, latency,
+status, and correlation facts. Prompts, explicit provider reasoning, raw tool
+arguments/results, evidence content, and credentials are transient. The final
+accepted summary is retained. References on this WorkKind mean **supporting
+evidence inputs**, not an assertion that each source was cited by the prose.
+Praetorium renders the authorized safe projection and isolates Runtime failure.
+
+This is an invocable capability, not an always-on worker or production provider
+rollout. Operators must deliberately provision `INVOKE_COGNITION` grants;
+existing grants are never broadened automatically.

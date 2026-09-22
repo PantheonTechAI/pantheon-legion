@@ -42,6 +42,10 @@ class TabulaDisposableStack:
         self._compose_prefix = prefix
         self._environment = environment
         self.runner(compose, cwd=self.tabula_root, env=environment, check=True)
+        self._seed_bindings()
+
+    def _seed_bindings(self) -> None:
+        prefix, environment = self._compose_prefix, self._environment
         self.runner(
             prefix + ["exec", "-T", "console", "alembic", "upgrade", "head"],
             cwd=self.tabula_root, env=environment, check=True,

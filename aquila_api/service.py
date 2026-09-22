@@ -341,6 +341,46 @@ class AquilaService:
             data=data,
         )
 
+    def authorize_cognition(self, *, context, facts) -> ApiResponse:
+        """Decide inference consumption; transport remains outside Aquila."""
+        from dataclasses import asdict
+        try:
+            mission = self.kernel.get_mission(context.mission_id)
+        except KeyError:
+            return self._error(404, "NOT_FOUND")
+        decision = self._workload_decision(
+            principal=context.workload, mission_id=context.mission_id,
+            operation="INVOKE_COGNITION", roe_level=mission.roe.level,
+            mission_status=mission.status, delegation_id=context.delegation_id,
+            record_audit=False,
+        )
+        invocation_id = str(uuid4())
+        self.kernel.record_cognition_fact(
+            mission_id=context.mission_id, actor=context.workload,
+            correlation_id=context.correlation_id, event_type="COGNITION_AUTHORIZATION_EVALUATED",
+            result=decision.decision.value,
+            data={**asdict(facts), "invocation_id": invocation_id,
+                  "decision_id": decision.decision_id, "policy_version": decision.policy_version,
+                  "reason": decision.reason, "agent_id": context.agent_id,
+                  "assignment_id": context.assignment_id, "work_item_id": context.work_item_id,
+                  "attempt_id": context.attempt_id, "delegation_id": context.delegation_id},
+        )
+        if decision.decision == Decision.DENY:
+            return self._error(403, decision.reason)
+        return ApiResponse(200, {"decision_id": decision.decision_id,
+                               "policy_version": decision.policy_version,
+                               "invocation_id": invocation_id}, {})
+
+    def record_cognition_outcome(self, *, context, facts) -> None:
+        from dataclasses import asdict
+        self.kernel.record_cognition_fact(
+            mission_id=context.mission_id, actor=context.workload,
+            correlation_id=context.correlation_id, event_type="COGNITION_INVOCATION_COMPLETED",
+            result=facts.status,
+            data={**asdict(facts), "agent_id": context.agent_id, "assignment_id": context.assignment_id,
+                  "work_item_id": context.work_item_id, "attempt_id": context.attempt_id},
+        )
+
     def issue_delegation(
         self,
         *,

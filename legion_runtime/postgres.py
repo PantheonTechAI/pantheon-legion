@@ -25,6 +25,7 @@ from .agent import (
 )
 from .database import (
     agents,
+    cognition_turns,
     coordination_checkpoints,
     mission_assignments,
     runtime_bindings,
@@ -530,6 +531,31 @@ class PostgreSQLAgentStore:
             )
         rows = self._all(statement.order_by(runtime_work_evidence_references.c.created_at, runtime_work_evidence_references.c.evidence_reference_id))
         return [self._work_evidence_reference(row) for row in rows]
+
+    def save_cognition_turn(self, *, work_item_id, attempt_id, correlation_id, facts):
+        from dataclasses import asdict
+        from legion_cognition.authorized import CognitionInvocationFacts
+        if type(facts) is not CognitionInvocationFacts:
+            raise ValueError("SAFE_COGNITION_FACTS_REQUIRED")
+        values = asdict(facts)
+        values.update(values.pop("selection"))
+        values.update(work_item_id=work_item_id, attempt_id=attempt_id, correlation_id=correlation_id)
+        if facts.status == "PREPARED":
+            self._insert(cognition_turns, values, "COGNITION_TURN_ALREADY_EXISTS")
+        else:
+            self._require_updated(update(cognition_turns).where(
+                cognition_turns.c.attempt_id == attempt_id,
+                cognition_turns.c.turn_ordinal == facts.turn_ordinal,
+                cognition_turns.c.transport_attempt_ordinal == facts.transport_attempt_ordinal,
+                cognition_turns.c.invocation_id == facts.invocation_id,
+                cognition_turns.c.status == "PREPARED",
+            ).values(**values), "COGNITION_TURN_CONFLICT")
+
+    def list_cognition_turns(self, work_item_id):
+        return [dict(row) for row in self._all(select(cognition_turns).where(
+            cognition_turns.c.work_item_id == work_item_id
+        ).order_by(cognition_turns.c.recorded_at, cognition_turns.c.turn_ordinal,
+                   cognition_turns.c.transport_attempt_ordinal))]
 
     def append_event(self, event: RuntimeEvent) -> None:
         if event.sequence != self.next_event_sequence(event.agent_id):

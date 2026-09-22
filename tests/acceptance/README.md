@@ -221,3 +221,53 @@ python -m tests.federation.execute \
   --env-file /path/to/disposable.env \
   --execute
 ```
+# Authorized local cognition acceptance
+
+`python -m tests.acceptance.cognition_runner` runs SCI-001 through SCI-009
+sequentially against the migrated disposable Runtime PostgreSQL database.
+The scripted HTTP peer, persistent Aquila, fixture STS, and production Legion
+adapters prove the protocol/state invariants without depending on a model.
+Run all acceptance catalogs sequentially: they reset the same test database.
+
+For actual PostgreSQL restart evidence:
+
+```sh
+python -m tests.acceptance.cognition_postgres_restart seed
+docker compose --env-file deploy/runtime-postgres.env.example restart runtime-db
+python -m tests.acceptance.cognition_postgres_restart verify
+```
+
+The opt-in live entry point is `python -m tests.acceptance.cognition_live`.
+It requires `--config`, `--tabula-root`, `--env-file`, `--project-name`,
+`--execute`, `--acknowledge-cleartext`, and `--acknowledge-unauthenticated`.
+The catalog must be enabled, trusted, and currently validated. Tabula must be
+a separate disposable checkout containing the bounded-content amendment,
+`docker-compose.cognition.yml`, and `tests/federation/seed_cognition_corpus.py`.
+Copy its `tests/federation/cognition.env.example` to `.env.cognition` in that
+checkout; never use the primary checkout's environment. The live fixture
+refuses pre-existing project resources, uses loopback listeners/project-owned
+volumes, provisions a new RushDB project, and seeds one allowed and one
+out-of-scope synthetic document through Tabula's shared write path. No normal
+Tabula user/PAT credential or production service is used.
+
+The Mission asks for a random review code stored only in the document body.
+A live PASS requires that code in the model's final result, the actual allowed
+record in persisted supporting references, separate fresh authority decisions,
+safe Mission projection, and successful fixture cleanup. Literal retrieval is
+used; semantic retrieval quality is not asserted. The short-lived fixture STS
+binds `0.0.0.0` for Docker host-gateway access and exits with the test. No live
+PASS is implied by deterministic acceptance. Reproducible invocation:
+
+```sh
+LEGION_RUNTIME_TEST_DATABASE_URL=... python -m tests.acceptance.cognition_live \
+  --config /path/to/trusted-enabled-catalog.json \
+  --tabula-root /path/to/disposable-tabula \
+  --env-file /path/to/disposable-tabula/.env.cognition \
+  --project-name pantheon-federation-unique-run \
+  --execute --acknowledge-cleartext --acknowledge-unauthenticated
+```
+
+[Two actual live runs and their safe evidence](../../docs/architecture/tabula-bounded-evidence-review.md)
+passed on 2026-09-22, including the final post-remediation run. Do not enable
+the checked-in disabled provider example or reuse dated conformance after an
+offering/runtime/parser change without fresh validation.

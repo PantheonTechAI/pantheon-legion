@@ -36,6 +36,7 @@ class MissionWorkView:
     result_summary: str | None
     result_digest: str | None
     evidence: tuple[MissionEvidenceView, ...]
+    cognition_turns: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -114,6 +115,7 @@ class RepositoryMissionOrganizationReadModel:
                     updated_at=work.updated_at,
                     result_summary=result.summary if result else None,
                     result_digest=result.content_digest if result else None,
+                    cognition_turns=tuple(self.repository.list_cognition_turns(work.work_item_id)),
                     evidence=tuple(
                         MissionEvidenceView(
                             evidence_reference_id=reference.evidence_reference_id,
