@@ -138,10 +138,19 @@ class PraetoriumWSGIApp:
                 if item.result_summary is not None
                 else "<p>No accepted result.</p>"
             )
+            cognition = "".join(
+                "<li>" + escape("; ".join(f"{key}: {turn[key]}" for key in (
+                    "catalog_revision", "offering_id", "provider_id", "endpoint_id", "node_id", "model_id",
+                    "attempt_id", "turn_ordinal", "transport_attempt_ordinal", "status", "decision_id",
+                    "prompt_tokens", "completion_tokens", "reasoning_tokens", "latency_ms"))) + "</li>"
+                for turn in item.cognition_turns
+            )
+            provenance = ("<p>Supporting evidence inputs</p>" if item.work_kind == "TOOL_ASSISTED_CORPUS_ANALYSIS"
+                          else "<p>Accepted citations</p>")
             work_rows.append(
                 f"<li>{escape(item.work_kind)} — {escape(item.status)}"
                 f"<p>{escape(item.objective)}</p>{result}"
-                f"<ul>{citations}</ul></li>"
+                f"{provenance}<ul>{citations}</ul><ul>{cognition}</ul></li>"
             )
         work = "".join(work_rows) or "<li>No delegated work.</li>"
         return (

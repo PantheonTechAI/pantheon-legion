@@ -56,6 +56,22 @@ binding. Registry results are discovery metadata only; any later execution
 still requires Aquila Mission authority, a current DelegationGrant, and Fabrica
 policy.
 
+### Bounded Corpus evidence amendment — 2026-09-22
+
+Tabula populates the existing optional wire-v1 `content` field with the
+selected record's actual body: at most 8 KiB UTF-8 per record and 32 KiB total
+per response. It preserves retrieval order and the requested maximum count;
+byte limits may reduce the number of returned records. Truncation ends at a
+valid UTF-8 boundary and is disclosed in `selection_explanation`. Records
+without usable nonblank body or required provenance are omitted. No citation
+fallback or fabricated content is permitted. The wire shape and its existing
+`content` allowance are unchanged.
+
+Content remains transient input to authorized cognition, never Mission audit
+data or authority. Binding scope, token introspection, and Registry behavior
+remain unchanged. A stored-record projection error is a correlated,
+non-disclosing, nonretryable `INTERNAL_ERROR`.
+
 ## MCP transport contract
 
 Tabula exposes these protected operations only through its Streamable HTTP MCP

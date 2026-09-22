@@ -1,6 +1,12 @@
-# Legion Cognition Adapter
+# Legion Cognition
 
-This package defines the first provider-neutral cognition seam: a read-only
+The current persistent path provides capability-selected, separately authorized
+local cognition. See "Authorized capability-selected cognition" below. The
+following Scout adapters are retained compatibility paths.
+
+## Historical Scout adapters
+
+The original provider-neutral cognition seam is a read-only
 **Scout**. It is deliberately dependency-free and does not select an LLM,
 agent framework, retrieval system, or tool provider.
 
@@ -30,3 +36,29 @@ declared timeout once. Aquila records success or failure as a Mission audit
 fact containing provider/model/response provenance and SHA-256 digests of the
 redacted request and response—never raw prompts, evidence, model output, or
 credentials.
+# Authorized capability-selected cognition
+
+Persistent `TOOL_ASSISTED_CORPUS_ANALYSIS` uses `CognitionRequirement`, a static
+`CognitionRouter`, and `AuthorizedCognitionInvoker`. Agents and work name no
+provider, endpoint, machine, or model. Catalog selections preserve immutable
+revision plus offering/provider/endpoint/node identities. Configuration changes
+require another revision; retry rejects stale selections instead of rerouting.
+
+`configured_cognition(path, authority)` loads operator-owned JSON. The example
+at `deploy/cognition.example.json` is disabled. Production requires HTTPS,
+authenticated route-restricted ingress, and a credential reference resolved by
+the injected secret supplier. The default supplier resolves `env:NAME` only at
+transport. Configuration and provider failures contain safe codes only.
+
+`/health` and exact model discovery precede routing; discovery must advertise
+`max_model_len` sufficient for the configured context. Feature validation is
+separately bound to provider/runtime version, model, parser, and validity dates.
+Model listing does not prove tool/reasoning conformance. Revalidate and revise
+configuration whenever these change.
+
+Each chat attempt obtains fresh Aquila `INVOKE_COGNITION`; one transport retry
+is permitted for connection/timeout/429/5xx failures. Runtime handles the one
+validated `tabula_search` through separate knowledge authority and accepts one
+final continuation. No provider callback executes a tool. Explicit provider
+`message.reasoning` is discarded; ordinary final prose cannot be semantically
+classified as reasoning. There are no durable conversations or raw tool results.

@@ -816,6 +816,13 @@ class LegionKernel:
             },
         )
 
+    def record_cognition_fact(self, *, mission_id, actor, correlation_id, event_type, result, data):
+        """Record a safe inference authority/outcome fact without Mission mutation."""
+        if event_type not in {"COGNITION_AUTHORIZATION_EVALUATED", "COGNITION_INVOCATION_COMPLETED"}:
+            raise ValueError("INVALID_COGNITION_EVENT")
+        self._record(self._mission(mission_id), event_type=event_type, actor=actor,
+                     result=result, correlation_id=correlation_id, data=data)
+
     def record_model_invocation(
         self,
         *,

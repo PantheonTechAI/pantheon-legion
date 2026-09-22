@@ -82,7 +82,7 @@ class Phase2MigrationTests(unittest.TestCase):
                     connection.execute(
                         text("SELECT version_num FROM alembic_version")
                     ).scalar_one(),
-                    "0003",
+                    "0004",
                 )
         finally:
             engine.dispose()

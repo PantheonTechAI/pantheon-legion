@@ -94,6 +94,7 @@ class PersistentAgentRuntime:
         mission_context: AquilaMissionContext | None = None,
         cognition: ReadOnlyCognition | None = None,
         evidence_reader: GroundedEvidenceReader | None = None,
+        cognition_invoker=None,
     ) -> None:
         self.repository = repository
         self.authority = authority
@@ -103,6 +104,7 @@ class PersistentAgentRuntime:
         self.mission_context = mission_context
         self.cognition = cognition
         self.evidence_reader = evidence_reader
+        self.cognition_invoker = cognition_invoker
 
     def close(self) -> None:
         self.repository.close()
@@ -459,6 +461,7 @@ class PersistentAgentRuntime:
         self._idempotency_key(idempotency_key)
         expected_capabilities = {
             WorkKind.READ_ONLY_ANALYSIS: ("read_only_analysis",),
+            WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS: ("read_only_analysis", "model_reasoning", "tabula_corpus_read"),
             WorkKind.GROUNDED_CORPUS_ANALYSIS: (
                 "read_only_analysis",
                 "tabula_corpus_read",
@@ -466,7 +469,7 @@ class PersistentAgentRuntime:
         }.get(work_kind)
         if expected_capabilities is None or required_capabilities != expected_capabilities:
             raise RuntimeOperationError("READ_ONLY_CAPABILITY_REQUIRED")
-        if work_kind == WorkKind.GROUNDED_CORPUS_ANALYSIS and len(objective) > 2000:
+        if work_kind != WorkKind.READ_ONLY_ANALYSIS and len(objective) > 2000:
             raise RuntimeOperationError("GROUNDED_OBJECTIVE_TOO_LONG")
         binding = self._require_binding(centurion_binding_id)
         candidate_id = self.id_factory()
@@ -695,11 +698,12 @@ class PersistentAgentRuntime:
         self._idempotency_key(idempotency_key)
         if self.mission_context is None:
             raise RuntimeOperationError("MISSION_CONTEXT_UNAVAILABLE")
-        if self.cognition is None:
-            raise RuntimeOperationError("COGNITION_UNAVAILABLE")
         initial = self._require_work(work_item_id)
+        tool_assisted = initial.kind == WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS
+        if (self.cognition_invoker if tool_assisted else self.cognition) is None:
+            raise RuntimeOperationError("COGNITION_UNAVAILABLE")
         if (
-            initial.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
+            initial.kind != WorkKind.READ_ONLY_ANALYSIS
             and self.evidence_reader is None
         ):
             raise RuntimeOperationError("GROUNDED_EVIDENCE_UNAVAILABLE")
@@ -798,6 +802,7 @@ class PersistentAgentRuntime:
                 mission_version=context.mission_version,
                 authorization_decision_id=context.authorization_decision_id,
                 attempt_stage=(
+                    AttemptStage.COGNITION_SELECTION if tool_assisted else
                     AttemptStage.EVIDENCE_RETRIEVAL
                     if current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
                     else AttemptStage.COGNITION
@@ -841,9 +846,18 @@ class PersistentAgentRuntime:
                 )
 
         cognition_evidence: tuple[AgentEvidence, ...] = ()
-        if work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS:
+        tool_session = None
+        evidence_query = work.objective
+        if tool_assisted:
+            from .tool_cognition import ToolCognitionSession
+            tool_session = ToolCognitionSession(self, work, running, binding, assignment, scout, workload, context)
+            evidence_query = tool_session.begin()
+            running = tool_session.attempt
+        if work.kind != WorkKind.READ_ONLY_ANALYSIS:
             assert self.evidence_reader is not None
             try:
+                if tool_session:
+                    tool_session.guard()
                 bundle = self.evidence_reader.read(
                     GroundedEvidenceReadRequest(
                         organization_id=scout.organization_id,
@@ -855,10 +869,12 @@ class PersistentAgentRuntime:
                         delegation_id=binding.grant_id or "",
                         work_item_id=work_item_id,
                         attempt_id=running.attempt_id,
-                        query=work.objective,
+                        query=evidence_query,
                         correlation_id=work.correlation_id,
                     )
                 )
+            except RuntimeOperationError:
+                raise
             except AuthorityUnavailable as exc:
                 self._fail_work_attempt(work, running, actor, exc.code, retryable=True)
                 raise RuntimeOperationError(exc.code) from exc
@@ -922,7 +938,7 @@ class PersistentAgentRuntime:
                     self.repository.save_work_evidence_reference(reference)
                 running = replace(
                     current_attempt,
-                    attempt_stage=AttemptStage.COGNITION,
+                    attempt_stage=AttemptStage.COGNITION_CONTINUATION if tool_assisted else AttemptStage.COGNITION,
                     knowledge_authorization_decision_ids=(
                         bundle.authorization_decision_ids
                     ),
@@ -985,7 +1001,7 @@ class PersistentAgentRuntime:
             mission_id=work.mission_id,
             mission_version=context.mission_version,
             logical_capability=(
-                "grounded_corpus_analysis"
+                "tool_assisted_corpus_analysis" if tool_assisted else "grounded_corpus_analysis"
                 if work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
                 else "read_only_analysis"
             ),
@@ -1003,7 +1019,9 @@ class PersistentAgentRuntime:
             evidence=cognition_evidence,
         )
         try:
-            cognition_result = self.cognition.run(request)
+            cognition_result = tool_session.finish(request, running) if tool_session else self.cognition.run(request)
+        except RuntimeOperationError:
+            raise
         except CognitionRejected as exc:
             self._fail_work_attempt(work, running, actor, exc.code, retryable=False)
             raise RuntimeOperationError(exc.code) from exc
@@ -1025,7 +1043,7 @@ class PersistentAgentRuntime:
                 retryable=False,
             )
             raise RuntimeOperationError("COGNITION_IDENTITY_MISMATCH")
-        if work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS:
+        if work.kind != WorkKind.READ_ONLY_ANALYSIS:
             allowed_references = {item.reference_id for item in cognition_evidence}
             cited_references = cognition_result.evidence_references
             if (
@@ -1088,6 +1106,8 @@ class PersistentAgentRuntime:
                     )
                 cancelled = True
             else:
+                if tool_session:
+                    tool_session.guard()
                 if (
                     current_work.status != WorkStatus.CLAIMED
                     or current_attempt.status != AttemptStatus.RUNNING
@@ -1139,6 +1159,9 @@ class PersistentAgentRuntime:
                     expected_previous_revision=centurion_checkpoint.revision,
                 )
                 self._result_events(current_work, result, actor)
+                if tool_session:
+                    tool_session.event("GroundedCognitionCompleted", {"result_id": result.result_id,
+                                       "supporting_evidence_count": len(result.evidence_references)})
         if cancelled:
             raise RuntimeOperationError("WORK_CANCELLED")
         return result
@@ -1303,6 +1326,10 @@ class PersistentAgentRuntime:
                         AttemptStage.MISSION_CONTEXT: "AMBIGUOUS_MISSION_CONTEXT_READ",
                         AttemptStage.EVIDENCE_RETRIEVAL: "AMBIGUOUS_EVIDENCE_RETRIEVAL",
                         AttemptStage.COGNITION: "AMBIGUOUS_COGNITION_OUTCOME",
+                        AttemptStage.COGNITION_SELECTION: "AMBIGUOUS_COGNITION_SELECTION",
+                        AttemptStage.COGNITION_INITIAL: "AMBIGUOUS_COGNITION_INVOCATION",
+                        AttemptStage.TOOL_REQUESTED: "AMBIGUOUS_TOOL_REQUEST",
+                        AttemptStage.COGNITION_CONTINUATION: "AMBIGUOUS_COGNITION_CONTINUATION",
                     }.get(attempt.attempt_stage, "AMBIGUOUS_COGNITION_OUTCOME")
                     self.repository.save_work_attempt(
                         replace(

@@ -1,6 +1,118 @@
 # Pantheon Legion Handoff
 
-Last updated: 2026-09-20
+Last updated: 2026-09-22
+
+## Authorized cognition accepted delivery — 2026-09-22
+
+The owner authorized the reviewed next slice through the pickup instruction.
+ADR-007 is accepted for implementation. The Legion path is implemented on
+`docs/spark-inference-cognition-plan`, from baseline `27f4493`; all prior
+planning changes are preserved. The owner subsequently authorized committing
+and pushing the accepted Legion work only. The separate Tabula changes remain
+uncommitted; no production deployment has been performed or authorized.
+
+Runtime now selects logical cognition through static node/endpoint/provider/
+offering catalogs, requires fresh Aquila authority for each inference attempt,
+validates one Corpus tool request, retrieves separately authorized evidence,
+and accepts one final result with safe durable turns and supporting inputs.
+Migration `0004` is applied only to the disposable Runtime test database.
+
+Post-remediation verification: **247 tests plus 52 subtests PASS**, M1 **7/7**,
+Phase 1 **4/4**, Phase 2 **3/3**, GSI **4/4**, cognition SCI **9/9**, and Alembic
+no drift. The actual Runtime PostgreSQL container restart preserved the same
+Scout, WorkItem, result/digest, catalog revision, and both cognition decision
+IDs. `git diff --check` passes. Existing Alembic deprecation warnings remain.
+
+Claude's first mechanics review found a BLOCKER in a blanket Aquila reload
+that could erase uncommitted Mission changes. It is remediated with serialized
+mutation/commit operations and isolated target-Mission authority views. The
+deterministic interleaving regression passes. Required re-review returned
+**ACCEPT**, resolving the BLOCKER and both minor findings. A final self-check
+also brought legacy knowledge retrieval under the same persistence lock;
+its concurrent-audit regression passes, and focused follow-up review returned
+**ACCEPT** with no BLOCKER or MAJOR. An isolated negative control proved the
+regression fails when that wrapper is removed, without changing source files.
+
+The owner approved the separate Tabula correction. In
+`/tmp/pantheon-kb-federation-worktree` (baseline `21a380c`), the authorized Corpus
+response now returns actual bounded body content; **31 focused tests PASS**.
+The added cognition fixture uses a separate environment file, loopback ports,
+fresh project-owned volumes, disabled optional pollers, and the normal Tabula
+write/read seams. Existing Tabula production services/data are untouched.
+
+**Two real Spark + Tabula runs PASS**, including after review remediation.
+Each returned the random review code found only in the authorized document,
+excluded a same-name out-of-scope control, persisted one result/reference and
+two distinct inference plus three knowledge decisions, and passed the Mission
+projection checks. Final live WorkItem:
+`e949a747-40e0-4f5e-ac48-9b45dcc68a50`. Cleanup inspection confirms **zero fixture
+containers, networks, or volumes remain**. Build images remain cached.
+
+Claude accepted Tabula/fixture mechanics with no BLOCKER or MAJOR; all five
+minor findings were remediated and retested. Final combined evidence review
+returned **ACCEPT**, with no unresolved BLOCKER, MAJOR, or MINOR. All 28 agreed
+criteria are satisfied. This development acceptance does not authorize
+production enablement.
+
+Read [the implementation review package](architecture/spark-inference-cognition-implementation-review-package.md)
+and [the Tabula amendment review](architecture/tabula-bounded-evidence-review.md)
+first, then the plan and ADR-007 below. Keep all database test runners
+sequential. No implementation or acceptance work remains for this agreed slice.
+Next pickup: preserve the separate Tabula worktree and obtain direction before
+committing/pushing its changes. The live fixture requires that Tabula amendment.
+Production deployment and the next implementation slice require separate direction.
+
+## Authorized Spark cognition planning checkpoint - 2026-09-22
+
+The merged Grounded Scout delivery is the clean baseline at `main` commit
+`27f4493`. The next proposed slice is **Authorized Spark Cognition Loop**: a
+persistent Scout requests a logical reasoning capability, Cognition Fabric
+selects an offering on a minimal static Resource Fabric catalog, Aquila freshly
+authorizes inference, Runtime validates one `tabula_search`, the existing
+grounded reader obtains separate Tabula authority/evidence, and one continuation
+produces a safely observable result.
+
+Spark/vLLM/Qwen is initial deployment evidence, not a domain dependency. The
+plan explicitly excludes a scheduler, dynamic discovery, generalized tool
+engine, consequential Fabrica actions, provider management, and always-on
+worker. The current unauthenticated cleartext Spark endpoint is permitted only
+for opt-in live acceptance under two explicit development acknowledgements;
+production composition fails closed until authenticated route-restricted
+ingress (or equivalent), TLS, and secret injection exist.
+
+The self-critique revised resource/API route ownership, feature-conformance
+claims, explicit reasoning-field retention, output bounds, post-audit failure,
+classification scope, and dependency choices, then concluded `PROCEED`.
+Claude Code's first independent review returned `REWORK` because AC-05
+overpromised semantic detection of reasoning-like prose. The plan narrowed the
+guarantee to the explicit provider `message.reasoning` field, added sentinel
+absence evidence and version/model/parser-bound validation, and fixed all four
+minor findings. Mandatory re-review returned `ACCEPT` with no new blocker or
+major finding.
+
+Planning baseline evidence is 211 tests plus 12 subtests PASS, M1 7/7, Phase 1
+4/4, Phase 2 3/3, GSI 4/4, and Alembic no drift. The Phase 2 and GSI catalogs
+were rerun sequentially on this branch and passed 3/3 and 4/4 respectively.
+
+Before acceptance, the owner required an explicit distinction between compute
+node, inference endpoint, provider instance, and model offering. The plan and
+ADR now encode that static graph plus immutable catalog revisioning so Spark is
+never synonymous with Qwen or its TCP/8000 service. Independent amendment
+review returned `ACCEPT`; its two minor findings and two observations were
+remediated in the plan.
+
+The owner's 2026-09-22 pickup instruction authorizes implementation of the
+amended plan and ADR-007. Implementation is now in progress; the planning
+reviews do not constitute implementation acceptance. Starting baseline was
+reproduced: 211 tests plus 12 subtests pass, dedicated PostgreSQL healthy.
+
+Read next:
+
+1. [spark-inference-cognition-plan.md](architecture/spark-inference-cognition-plan.md)
+2. [ADR-007](adr/ADR-007-capability-selected-authorized-cognition.md)
+3. [spark-inference-cognition-claude-review-package.md](architecture/spark-inference-cognition-claude-review-package.md)
+4. [DGX Spark inference deployment handoff](deployment/dgx-spark-inference-handoff.md)
+5. [grounded-scout-investigation-implementation-review-package.md](architecture/grounded-scout-investigation-implementation-review-package.md)
 
 ## Grounded Scout implementation checkpoint - 2026-09-20
 

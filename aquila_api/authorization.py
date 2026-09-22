@@ -65,7 +65,7 @@ class AuthorizationDecision:
 class AuthorizationPolicy:
     version: str = "mvp-1"
     read_operations: frozenset[str] = frozenset(
-        {"READ_MISSION", "READ_TIMELINE", "READ_ARTIFACT", "READ_TOOL", "READ_KNOWLEDGE"}
+        {"READ_MISSION", "READ_TIMELINE", "READ_ARTIFACT", "READ_TOOL", "READ_KNOWLEDGE", "INVOKE_COGNITION"}
     )
     approver_roles: frozenset[str] = frozenset({"APPROVER", "MISSION_OWNER"})
     operator_roles: frozenset[str] = frozenset({"MISSION_OWNER", "OPERATOR"})
@@ -128,6 +128,10 @@ class AuthorizationEngine:
                 return "DELEGATED_OPERATION_DENIED"
             if ROE_ORDER[request.roe_level] > ROE_ORDER[grant.roe_ceiling]:
                 return "DELEGATED_ROE_EXCEEDED"
+
+        if (request.operation == "INVOKE_COGNITION"
+                and request.mission_status in {MissionStatus.CANCELLED, MissionStatus.COMPLETED}):
+            return "MISSION_TERMINAL"
 
         if request.operation in self.policy.read_operations:
             if principal.type == PrincipalType.WORKLOAD:

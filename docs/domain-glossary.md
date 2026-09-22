@@ -212,3 +212,22 @@ The **Cognition Runtime Adapter** is the provider-neutral contract through which
 2. APIs MUST distinguish `requested_by`, `actor`, `delegated_by`, and `executed_by` where more than one identity is involved.
 3. Product aliases such as Aquila, Praetorium, Fabrica, Tabula, Castrum, Scout, Century, and Centurion MAY appear in display names and documentation, but contract field names SHOULD use the canonical domain terms.
 4. New terms MUST be added here or explicitly marked as implementation-local before appearing in a public contract.
+## Capability-selected cognition identities
+
+**ComputeNode** is Resource Fabric's identity for a local or remote compute
+node, with locality, trust zone, and availability. **InferenceEndpoint** is a
+separate network service placement on a node. A node can have many endpoints.
+
+**InferenceProvider** is Cognition Fabric's configured adapter/runtime instance
+on one endpoint. **ModelOffering** is one model and its validated cognitive
+capabilities on a provider. A provider can offer several models, and a model
+can have offerings on several nodes. None is an Agent identity.
+
+**CognitionRequirement** describes required cognitive capability and hard
+context/locality/classification/trust constraints. **CognitionSelection**
+records an immutable catalog revision and the complete offering/provider/
+endpoint/node tuple. A new deployment revision does not rewrite old selections.
+
+**Supporting evidence inputs** are the bounded evidence references supplied to
+the final cognition turn; their attachment does not assert that the prose
+explicitly cited every source.

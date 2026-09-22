@@ -149,7 +149,7 @@ class GroundedScoutMigrationTests(unittest.TestCase):
                     connection.execute(
                         text("SELECT version_num FROM alembic_version")
                     ).scalar_one(),
-                    "0003",
+                    "0004",
                 )
                 self.assertEqual(
                     connection.execute(
