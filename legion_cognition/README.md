@@ -62,3 +62,14 @@ validated `tabula_search` through separate knowledge authority and accepts one
 final continuation. No provider callback executes a tool. Explicit provider
 `message.reasoning` is discarded; ordinary final prose cannot be semantically
 classified as reasoning. There are no durable conversations or raw tool results.
+
+## Offering validation prerequisite
+
+The Strands spike exposed the absence of a repeatable producer for the static
+validation records. CFV-001 adds an opt-in, fixed-probe maintenance validator;
+normal routing and per-call Aquila authorization remain unchanged. It observes
+one deployed local offering, tests reasoning/tool/continuation behavior, and
+publishes a fresh catalog plus safe evidence only after successful Runtime work.
+It never extends an old record's dates or automatically activates configuration.
+See [the validator runbook](../docs/cognition/offering-validation.md) and
+[implementation/live gate status](../docs/architecture/cognition-offering-validator-review.md).

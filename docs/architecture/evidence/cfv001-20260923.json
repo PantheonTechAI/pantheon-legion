@@ -1,0 +1,137 @@
+{
+  "accepted_result_digest": "aa29dc54d2df7b98e82f0234cb7daad0c883bf562fdcc94d755ac773182981b0",
+  "accepted_result_id": "58779597-af7e-4b8a-adfe-248b8a091295",
+  "agent_id": "0d46ab1a-7a03-46a1-81c8-e30f9d2faca1",
+  "attempt_id": "26a39db6-9569-4a8d-a3a4-32c217e00bfb",
+  "catalog_digest": "2ae782159cb2b9bac79ce61f5c8d32e5e2b645b55c7a0b9f3af29076d0863d76",
+  "checks": [
+    "deployment_and_discovery",
+    "separate_reasoning_field",
+    "typed_single_tool_call",
+    "matching_tool_continuation",
+    "deployment_unchanged"
+  ],
+  "code_sha256": {
+    "deployment_observation.py": "ff5b582be88803a84e9999e091640e3be155a828123bef1e83b5746a973664b7",
+    "offering_validation.py": "0eb89ca66dafe58e6d75fec466e452e912c75cbfb1c8c4c48e89ff29ce192b32"
+  },
+  "completed_at": "2026-09-23T15:51:31.003467Z",
+  "correlation_id": "33333333-3333-4333-8333-333333333333",
+  "deployment_after": {
+    "identity": {
+      "address_set": [
+        "192.168.15.17"
+      ],
+      "auto_tool_choice": true,
+      "container_id": "e39da097d69bf1ee943d092e64549b404cc4f84ec4612d6c3aeaef473ecf2bfb",
+      "endpoint_origin": "http://spark:8000",
+      "endpoint_port": 8000,
+      "image_id": "sha256:785fd756b4ae1cacda7612cb859dbf227330e8ced9a6fdea42e9379128bebce0",
+      "listen_port": 8000,
+      "max_model_len": 131072,
+      "model_id": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+      "reasoning_parser": "qwen3",
+      "started_at": "2026-09-21T20:52:19.450921292Z",
+      "tool_call_parser": "qwen3_xml"
+    },
+    "observed_at": "2026-09-23T15:51:30.964180Z"
+  },
+  "deployment_before": {
+    "identity": {
+      "address_set": [
+        "192.168.15.17"
+      ],
+      "auto_tool_choice": true,
+      "container_id": "e39da097d69bf1ee943d092e64549b404cc4f84ec4612d6c3aeaef473ecf2bfb",
+      "endpoint_origin": "http://spark:8000",
+      "endpoint_port": 8000,
+      "image_id": "sha256:785fd756b4ae1cacda7612cb859dbf227330e8ced9a6fdea42e9379128bebce0",
+      "listen_port": 8000,
+      "max_model_len": 131072,
+      "model_id": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+      "reasoning_parser": "qwen3",
+      "started_at": "2026-09-21T20:52:19.450921292Z",
+      "tool_call_parser": "qwen3_xml"
+    },
+    "observed_at": "2026-09-23T15:51:15.803094Z"
+  },
+  "grant_id": "14882813-4d17-425e-a4a1-4c5c6af3c7df",
+  "invocations": [
+    {
+      "argument_digest": null,
+      "completion_tokens": 991,
+      "decision_id": "60508b88-f7da-4c9d-9c72-4c700ad3f3a9",
+      "error_code": null,
+      "finish_reason": "tool_calls",
+      "invocation_id": "002da215-1249-4928-b972-6a72a9713482",
+      "latency_ms": 12867,
+      "model_id": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+      "policy_version": "mvp-1",
+      "prompt_tokens": 347,
+      "reasoning_tokens": 960,
+      "recorded_at": "2026-09-23T15:51:15.821283Z",
+      "request_digest": "db65bce3b470ab25c9ce608a8c2e9eaa2520d2eddf48ffa9b1e9672b30360aef",
+      "requirement_id": "ed433fdbf4cca2dbf194895e86081d793c78a96068aab5f7268b9fa6f00c705e",
+      "response_digest": "afcb6e19707f30ef5d88bb8942ed4d1358d5e763aa54e1b918a1823802a06b7b",
+      "response_id": null,
+      "selection": {
+        "catalog_revision": "cfv-b617cfec-a6f2-4712-ba34-0571452e8e7a",
+        "endpoint_id": "spark-inference-8000",
+        "node_id": "spark-node",
+        "offering_id": "spark-qwen-reasoning",
+        "provider_id": "spark-vllm"
+      },
+      "status": "SUCCESS",
+      "tool_call_id": null,
+      "tool_name": null,
+      "transport_attempt_ordinal": 1,
+      "turn_ordinal": 1
+    },
+    {
+      "argument_digest": null,
+      "completion_tokens": 136,
+      "decision_id": "446c4d16-814f-4452-bd6e-b0f17d4097a4",
+      "error_code": null,
+      "finish_reason": "stop",
+      "invocation_id": "265320ea-7b32-4624-9273-d00dbe1be393",
+      "latency_ms": 1808,
+      "model_id": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+      "policy_version": "mvp-1",
+      "prompt_tokens": 157,
+      "reasoning_tokens": 101,
+      "recorded_at": "2026-09-23T15:51:28.740250Z",
+      "request_digest": "04bda96f65a7c6e540da5cbbb517624d0fe71e18c3062e5361d9f53a5356e33b",
+      "requirement_id": "ed433fdbf4cca2dbf194895e86081d793c78a96068aab5f7268b9fa6f00c705e",
+      "response_digest": "5324f7398cb01eae2c0491dd7b50b8f24b4483b28bf3dd6b74247cbff8083cf9",
+      "response_id": null,
+      "selection": {
+        "catalog_revision": "cfv-b617cfec-a6f2-4712-ba34-0571452e8e7a",
+        "endpoint_id": "spark-inference-8000",
+        "node_id": "spark-node",
+        "offering_id": "spark-qwen-reasoning",
+        "provider_id": "spark-vllm"
+      },
+      "status": "SUCCESS",
+      "tool_call_id": null,
+      "tool_name": null,
+      "transport_attempt_ordinal": 1,
+      "turn_ordinal": 2
+    }
+  ],
+  "mission_id": "95a585ab-55e4-4c69-a054-fbdac9b6c9f7",
+  "publication_commit_marker": "catalog.json",
+  "run_id": "b617cfec-a6f2-4712-ba34-0571452e8e7a",
+  "schema": "legion-offering-conformance-v1",
+  "selection": {
+    "catalog_revision": "cfv-b617cfec-a6f2-4712-ba34-0571452e8e7a",
+    "endpoint_id": "spark-inference-8000",
+    "node_id": "spark-node",
+    "offering_id": "spark-qwen-reasoning",
+    "provider_id": "spark-vllm"
+  },
+  "source_catalog_digest": "6f66a002338e50d853035cbd3b21449f73f7f0ffe7af0e3c612b42e555729e67",
+  "source_catalog_revision": "spark-live-20260922",
+  "started_at": "2026-09-23T15:51:15.439045Z",
+  "status": "PROBES_PASSED",
+  "work_item_id": "85b65c62-22c2-4bf8-9e0f-8d661e07f544"
+}

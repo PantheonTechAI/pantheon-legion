@@ -271,3 +271,14 @@ LEGION_RUNTIME_TEST_DATABASE_URL=... python -m tests.acceptance.cognition_live \
 passed on 2026-09-22, including the final post-remediation run. Do not enable
 the checked-in disabled provider example or reuse dated conformance after an
 offering/runtime/parser change without fresh validation.
+
+## Development offering validation (CFV-001)
+
+`python -m tests.acceptance.validate_offering` provides the bounded prerequisite
+for creating a fresh catalog from actual deployment observations and two fixed,
+separately authorized synthetic probes. It is not a normal-router bypass or
+production deployment command. Follow the [runbook](../../docs/cognition/offering-validation.md)
+for trusted SSH setup, explicit disposable-database reset and development
+acknowledgements, fresh private output paths, evidence and operator handoff.
+Do not run it alongside stateful tests. An expired record is never manually
+extended; failed or incomplete validation produces no catalog for live use.
