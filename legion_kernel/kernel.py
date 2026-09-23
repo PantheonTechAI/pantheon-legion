@@ -823,6 +823,14 @@ class LegionKernel:
         self._record(self._mission(mission_id), event_type=event_type, actor=actor,
                      result=result, correlation_id=correlation_id, data=data)
 
+    def record_spike_action_fact(self, *, mission_id, actor, correlation_id, event_type, result, data):
+        """Narrow experimental action facts; does not grant execution authority."""
+        if event_type not in {"SPIKE_ACTION_PERMIT_ISSUED", "SPIKE_ACTION_DISPATCH_ADMITTED",
+                              "SPIKE_EXTERNAL_EFFECT_RECORDED"}:
+            raise ValueError("INVALID_SPIKE_ACTION_EVENT")
+        self._record(self._mission(mission_id), event_type=event_type, actor=actor,
+                     result=result, correlation_id=correlation_id, data=data)
+
     def record_model_invocation(
         self,
         *,

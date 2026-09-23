@@ -35,6 +35,8 @@ from .database import (
     runtime_work_evidence_references,
     runtime_work_items,
     runtime_work_results,
+    spike_trials,
+    spike_operations,
 )
 from .repository import AgentStoreConflict, DuplicateRuntimeEvent, IdempotencyRecord
 
@@ -556,6 +558,49 @@ class PostgreSQLAgentStore:
             cognition_turns.c.work_item_id == work_item_id
         ).order_by(cognition_turns.c.recorded_at, cognition_turns.c.turn_ordinal,
                    cognition_turns.c.transport_attempt_ordinal))]
+
+    def get_spike_trial(self, work_item_id):
+        from .spike_contracts import SpikeTrial
+        row = self._one(select(spike_trials).where(spike_trials.c.work_item_id == work_item_id))
+        return SpikeTrial(**dict(row)) if row else None
+
+    def save_spike_trial(self, trial, *, expected_previous_version):
+        from dataclasses import asdict
+        from .spike_contracts import SpikeTrial
+        if type(trial) is not SpikeTrial:
+            raise ValueError("SAFE_SPIKE_TRIAL_REQUIRED")
+        values = asdict(trial)
+        if expected_previous_version is None:
+            self._insert(spike_trials, values, "SPIKE_TRIAL_ALREADY_EXISTS")
+        else:
+            self._require_updated(update(spike_trials).where(
+                spike_trials.c.work_item_id == trial.work_item_id,
+                spike_trials.c.version == expected_previous_version,
+            ).values(**values), "SPIKE_TRIAL_CONFLICT")
+
+    def save_spike_operation(self, operation):
+        from dataclasses import asdict
+        from .spike_contracts import SpikeOperation
+        if type(operation) is not SpikeOperation:
+            raise ValueError("SAFE_SPIKE_OPERATION_REQUIRED")
+        values = asdict(operation)
+        if operation.status == "PREPARED":
+            self._insert(spike_operations, values, "SPIKE_OPERATION_ALREADY_EXISTS")
+        else:
+            self._require_updated(update(spike_operations).where(
+                spike_operations.c.operation_id == operation.operation_id,
+                spike_operations.c.work_item_id == operation.work_item_id,
+                spike_operations.c.attempt_id == operation.attempt_id,
+                spike_operations.c.execution_id == operation.execution_id,
+                spike_operations.c.request_digest == operation.request_digest,
+                spike_operations.c.status.in_(("PREPARED", "UNKNOWN")),
+            ).values(**values), "SPIKE_OPERATION_CONFLICT")
+
+    def list_spike_operations(self, work_item_id):
+        from .spike_contracts import SpikeOperation
+        return [SpikeOperation(**dict(row)) for row in self._all(select(spike_operations).where(
+            spike_operations.c.work_item_id == work_item_id,
+        ).order_by(spike_operations.c.recorded_at, spike_operations.c.operation_id))]
 
     def append_event(self, event: RuntimeEvent) -> None:
         if event.sequence != self.next_event_sequence(event.agent_id):

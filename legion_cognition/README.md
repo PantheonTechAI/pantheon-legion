@@ -73,3 +73,18 @@ publishes a fresh catalog plus safe evidence only after successful Runtime work.
 It never extends an old record's dates or automatically activates configuration.
 See [the validator runbook](../docs/cognition/offering-validation.md) and
 [implementation/live gate status](../docs/architecture/cognition-offering-validator-review.md).
+
+## Strands experiment
+
+The isolated prototype lives under `experiments/strands`, not this package's
+default composition. It reuses the accepted selection and transport boundaries,
+while its public Strands Model adapter can only request bounded proxy operations.
+No worker obtains provider credentials or chooses a model/endpoint from context.
+The accepted loop and historical LangGraph implementation remain unchanged.
+
+Only the explicit P2 synthetic experiment may persist native messages in a
+private disposable operational store under ADR-008; production retention above
+is unchanged. The completed experiments recommend **DEFER adoption**: common
+live comparisons and P0 recovery pass, but P1/P2 live recovery fails at fresh
+evidence lookup and no net subsystem/operational elimination is demonstrated.
+See [findings and decision](../docs/architecture/strands-spike-results.md).

@@ -11,6 +11,8 @@ from legion_runtime import PostgreSQLAgentStore
 
 
 RUNTIME_TABLES = {
+    "cognition_spike_trials",
+    "cognition_spike_operations",
     "cognition_turns",
     "agents",
     "mission_assignments",

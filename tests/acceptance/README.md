@@ -282,3 +282,82 @@ for trusted SSH setup, explicit disposable-database reset and development
 acknowledgements, fresh private output paths, evidence and operator handoff.
 Do not run it alongside stateful tests. An expired record is never manually
 extended; failed or incomplete validation produces no catalog for live use.
+
+## Strands live read-only smoke
+
+After successful CFV-001 validation, use the host test environment and existing
+isolated Strands image. Run alone against the disposable Runtime test database:
+
+```sh
+python -m tests.acceptance.strands_live \
+  --config /path/to/fresh-validation-bundle/catalog.json \
+  --tabula-root /path/to/disposable-tabula \
+  --env-file /path/to/disposable-tabula/.env.cognition \
+  --project-name pantheon-federation-unique-strands-run \
+  --report /tmp/unique-strands-report.json \
+  --execute --reset-test-database \
+  --acknowledge-cleartext --acknowledge-unauthenticated
+```
+
+The report must not already exist. This reuses the same isolated Tabula fixture,
+synthetic random-code evidence and current per-call authority, with the actual
+Strands worker. It checks exact allowed provenance, control exclusion, unique
+decisions, content-safe correlated traces and cleanup. Only a single/P0/read-only
+smoke pass is claimed: no synthetic effect, recovery proof or paired performance
+comparison. Failed runs retain safe evidence and are not silently retried.
+
+## Strands completion matrix and comparison
+
+Run stateful suites sequentially, with the same guarded `_test` database and
+rebuilt isolated worker. `LEGION_STRANDS_ACCEPTANCE=1 python -m pytest -q` now
+includes broker subprocess SIGKILL, overlapping workers, four effect crash
+windows, corrupt snapshots, per-mode control/budget failures and network/log
+negative controls. The broker test expects actual `-SIGKILL`, then cleans only
+the recorded labelled worker and reconstructs from owner stores. It never
+restarts PostgreSQL automatically.
+
+The live command retains every sample, including failures, in a new private
+output directory. `all` is 46 fixed samples: 15 alternating B0/Strands pairs,
+six orchestration profiles, nine worker-recovery profiles and one combined
+approval/effect/crash/reconciliation trial. `comparison`, `profiles` and `effect`
+select only their named portions. No automatic rerun or budget relaxation:
+
+```sh
+python -m tests.acceptance.strands_comparison \
+  --config /path/to/fresh-validation-bundle/catalog.json \
+  --tabula-root /path/to/disposable-tabula \
+  --env-file /path/to/disposable-tabula/.env.cognition \
+  --project-name pantheon-federation-unique-strands-comparison \
+  --output /tmp/unique-strands-comparison --suite all \
+  --execute --reset-test-database --approve-synthetic-marker \
+  --acknowledge-cleartext --acknowledge-unauthenticated
+```
+
+`--approve-synthetic-marker` authorizes the trusted test operator to approve
+only the fixed fixture action through Aquila; cognition never approves itself.
+The real STS fixture clock is synchronized when issuing each new five-minute
+token. No catalog, grant or already-issued token is extended. Provider messages
+are represented by digest/size only. Native P2 state is synthetic and deleted
+with the trial. Latency excludes stack setup but includes worker launch/IPC and
+shared Legion checks. Failed samples remain in the denominator; successful
+sample medians are not statistically powered or SDK-only measurements.
+
+For a separately authorized PostgreSQL restart proof, first inspect the exact
+dedicated service/port and other active clients. Run seed, obtain separate
+approval to restart only that service, then verify. Do not run other tests in
+between; never restart a production/shared service as an implicit test step.
+
+```sh
+python -m tests.acceptance.strands_postgres_restart seed \
+  --before /tmp/unique-strands-pg-before.json --acknowledge-test-database
+# Separately inspect and approve the exact dedicated database service restart.
+python -m tests.acceptance.strands_postgres_restart verify \
+  --before /tmp/unique-strands-pg-before.json \
+  --after /tmp/unique-strands-pg-after.json --acknowledge-test-database
+```
+
+The verification requires a changed server start timestamp and identical
+experimental facts, identities, budgets, fences, accepted result and digest.
+See [completion plan](../../docs/architecture/strands-completion-plan.md) and
+[findings](../../docs/architecture/strands-spike-results.md), including failed
+live profiles; a deterministic PASS does not imply live profile success.

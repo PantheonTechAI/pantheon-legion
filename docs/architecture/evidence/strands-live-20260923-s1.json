@@ -1,0 +1,128 @@
+{
+  "agent_id": "83dce42c-f4a1-41fe-b594-048a95452cd0",
+  "attempt_id": "fd3664e3-b2d7-47d1-8492-f5a6da9f4fb7",
+  "completion_tokens": 223,
+  "content_digest": "deef8db4bce41ccb2bbe10d438b87560d738783a95e5b88131a79ad72b04f52f",
+  "disposable_stack_removed": true,
+  "elapsed_ms": 4486,
+  "execution_id": "83e4102c-48f0-4591-b5b4-f3d91ce15554",
+  "inference_decision_ids": [
+    "dc9e9229-205f-479b-875d-4311d83114ac",
+    "e1234cf0-3a73-49ea-bc3c-31eb300f2acf"
+  ],
+  "knowledge_decision_ids": [
+    "b7105a88-6958-4fa3-92db-690c8fd29be9",
+    "35e260a7-5ab1-482e-b12b-eeca709be5b7",
+    "b0dfa251-40e2-4cce-926f-21035b8cabd4"
+  ],
+  "mission_id": "8cf6d12a-365d-411c-86b1-5e8e011f8a25",
+  "model_calls": 2,
+  "model_latency_ms": [
+    2168,
+    1047
+  ],
+  "operation_statuses": [
+    {
+      "kind": "MODEL",
+      "status": "SUCCESS"
+    },
+    {
+      "kind": "RETRIEVAL",
+      "status": "SUCCESS"
+    },
+    {
+      "kind": "MODEL",
+      "status": "SUCCESS"
+    }
+  ],
+  "out_of_scope_excluded": true,
+  "phase": "complete",
+  "profile": "single/P0/read-only",
+  "prompt_tokens": 1184,
+  "reasoning_tokens": 129,
+  "record_id": "01a0cf0d-d0c9-7077-9d78-2e2da70189f3",
+  "result_digest": "a66ddbb90cc51636890fbfae0a1ab31b250adc24efbf9fb2863cdc7b671a3ab3",
+  "result_id": "58ebc3ef-88b3-4989-bc79-05f67c7cb0da",
+  "retrievals": 1,
+  "review_code_matched": true,
+  "sdk_version": "1.56.0",
+  "selection": {
+    "catalog_revision": "cfv-b617cfec-a6f2-4712-ba34-0571452e8e7a",
+    "endpoint_id": "spark-inference-8000",
+    "node_id": "spark-node",
+    "offering_id": "spark-qwen-reasoning",
+    "provider_id": "spark-vllm"
+  },
+  "status": "PASS",
+  "supporting_evidence_count": 1,
+  "tabula_audit_correlation_ids": [
+    "22cec783-c2c8-4e1c-b0ab-51c762c5e830"
+  ],
+  "telemetry": [
+    {
+      "duration_ns": 2216042863,
+      "error": false,
+      "parent_id": "ec878c2fddf6ddf3",
+      "span_id": "f635cce2a647943e",
+      "tokens": {
+        "gen_ai.usage.completion_tokens": 161,
+        "gen_ai.usage.input_tokens": 441,
+        "gen_ai.usage.output_tokens": 161,
+        "gen_ai.usage.prompt_tokens": 441
+      },
+      "trace_id": "56c7190d5f8846df81595d1ba602d289"
+    },
+    {
+      "duration_ns": 216887360,
+      "error": false,
+      "parent_id": "ec878c2fddf6ddf3",
+      "span_id": "e50c7e6f6116ce34",
+      "tokens": {},
+      "trace_id": "56c7190d5f8846df81595d1ba602d289"
+    },
+    {
+      "duration_ns": 2433564098,
+      "error": false,
+      "parent_id": "799244645f9d40f8",
+      "span_id": "ec878c2fddf6ddf3",
+      "tokens": {},
+      "trace_id": "56c7190d5f8846df81595d1ba602d289"
+    },
+    {
+      "duration_ns": 1078938808,
+      "error": false,
+      "parent_id": "2ca0e2fa6de04015",
+      "span_id": "53b767360d2d3648",
+      "tokens": {
+        "gen_ai.usage.completion_tokens": 62,
+        "gen_ai.usage.input_tokens": 743,
+        "gen_ai.usage.output_tokens": 62,
+        "gen_ai.usage.prompt_tokens": 743
+      },
+      "trace_id": "56c7190d5f8846df81595d1ba602d289"
+    },
+    {
+      "duration_ns": 1079282955,
+      "error": false,
+      "parent_id": "799244645f9d40f8",
+      "span_id": "2ca0e2fa6de04015",
+      "tokens": {},
+      "trace_id": "56c7190d5f8846df81595d1ba602d289"
+    },
+    {
+      "duration_ns": 3513231490,
+      "error": false,
+      "parent_id": "83e4102c48f04591",
+      "span_id": "799244645f9d40f8",
+      "tokens": {
+        "gen_ai.usage.completion_tokens": 223,
+        "gen_ai.usage.input_tokens": 1184,
+        "gen_ai.usage.output_tokens": 223,
+        "gen_ai.usage.prompt_tokens": 1184
+      },
+      "trace_id": "56c7190d5f8846df81595d1ba602d289"
+    }
+  ],
+  "trace_id": "56c7190d5f8846df81595d1ba602d289",
+  "work_item_id": "80eb9bb5-7b44-4098-b652-17c7d5aa263c"
+}

@@ -130,6 +130,21 @@ python -m tests.acceptance.grounded_postgres_restart verify
 The production Runtime composition intentionally has no test-STS fallback.
 Grounded retrieval remains unavailable until a production workload credential
 provider is explicitly selected and reviewed.
+## Experimental Strands cognition spike
+
+`COGNITION_INTEGRATION_SPIKE` is a separate, disabled-by-default WorkKind,
+not an extension of the accepted read-only profiles. It requires the exact
+experimental capability tuple and an explicitly injected `experimental_driver`.
+Migration `0005` adds `cognition_spike_trials` and `cognition_spike_operations`;
+downgrade refuses while experimental work or records exist.
+
+Runtime still owns Agent/binding/WorkItem/WorkAttempt identity, cumulative
+budgets, stale-worker fencing and the accepted result. Native SDK sessions
+do not become coordination state. The current single-broker driver keeps its
+control/admission gate through final Runtime result acceptance and checks fresh
+Aquila context there. This is a development fixture, not a production scheduler.
+See [the prototype evidence and remaining gates](../docs/architecture/strands-spike-results.md).
+
 ## Durable execution adapter
 
 The `DurableExecutionAdapter` keeps execution lifecycle semantics independent of Temporal or another workflow provider. Aquila owns Mission authority, ROE, authorization, and approvals; the execution adapter owns durable execution attempts, signals, cancellation, and recovery.
