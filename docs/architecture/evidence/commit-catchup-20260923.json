@@ -1,0 +1,208 @@
+{
+  "acceptance_scenarios_each": {
+    "GSI": 4,
+    "M1": 7,
+    "Phase1": 4,
+    "Phase2": 3,
+    "SCI": 9
+  },
+  "base_commit": "b02282007054906a8f6b16b18a2e3d3efb30d38a",
+  "checks": [
+    {
+      "exit_code": 0,
+      "name": "cfv-migrate"
+    },
+    {
+      "exit_code": 0,
+      "name": "cfv-full-suite"
+    },
+    {
+      "exit_code": 0,
+      "name": "cfv-runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "cfv-phase1_runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "cfv-phase2_runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "cfv-grounded_scout_runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "cfv-cognition_runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "cfv-schema-check"
+    },
+    {
+      "exit_code": 0,
+      "name": "combined-migrate"
+    },
+    {
+      "exit_code": 0,
+      "name": "combined-full-suite"
+    },
+    {
+      "exit_code": 0,
+      "name": "combined-runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "combined-phase1_runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "combined-phase2_runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "combined-grounded_scout_runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "combined-cognition_runner"
+    },
+    {
+      "exit_code": 0,
+      "name": "combined-schema-check"
+    }
+  ],
+  "combined": {
+    "migration_head": "0005_strands_spike",
+    "passed_subtests": 225,
+    "passed_tests": 329,
+    "seconds": 195.82,
+    "strands_acceptance_opt_in": true,
+    "warnings": 16
+  },
+  "commits": {
+    "strands": "518fb731844aa0ccbcda6ad9f4511430a467fd1c",
+    "validator": "c3f9864203d5edce011d75365b90380666204b42"
+  },
+  "date": "2026-09-23",
+  "disposable_database_removed": true,
+  "formatting_only_after_tests": {
+    "after_sha256": "ce3e884e00f0bf593d00f64902e322e61b2bee79a8ab56e32be2c515986164a1",
+    "before_sha256": "642b472aec9367f5dbebe110c76ded252843805a6d5b3ece3da29eb73eb0f320",
+    "change": "remove surplus blank line at EOF; dependency entries and hashes unchanged",
+    "path": "experiments/strands/requirements.lock"
+  },
+  "independent_extraction_review": {
+    "blockers": 0,
+    "majors": 0,
+    "minor": "Contextual forward references to Strands ADR/requirements; resolved in the complete series by the second commit.",
+    "result": "ACCEPT"
+  },
+  "logs_directory": "/tmp/legion-commit-check-ru5qhtbn",
+  "pending_files_sha256": {
+    "aquila_api/spike_actions.py": "ac7f086102ca049f8c75ed4fd744bad701f248bdb2f8edfd4dc4410fa20287d1",
+    "docs/adr/ADR-008-subordinate-strands-cognition-spike.md": "739e97dfe1433282bd7ec803f51437a5be7f7398c10a2ae17d29b18aa57a9ea0",
+    "docs/adr/ADR-009-evidence-producing-offering-validation.md": "ec66fdbeece290c5ea37aff71ad828c4d96b6b2f86df9bfe5620d466d35a4801",
+    "docs/adr/README.md": "1cdf4f72cfab30dc16d39807291d6920ea44d0497649461086ec1486036509c5",
+    "docs/architecture/amazon_agent_ecosystem_findings.md": "c916c1a497d7556a7f2aeadf7cdfe1e93ad6e5ab821957ba3bc921e13abcf8a9",
+    "docs/architecture/cognition-offering-validator-plan.md": "48583c602cad3ac52f83561f5b3c6254b86e9d468e3477aaaf5e272cdd042058",
+    "docs/architecture/cognition-offering-validator-review.md": "e42650796b0ec284f8b88018e102bd6f00a5ce9ad448e8d0744dedf82957ea39",
+    "docs/architecture/evidence/cfv001-20260923.json": "21b3edf0cc8813571436af6e622451f5308231504f198c98a49ef1eb40e8ca0f",
+    "docs/architecture/evidence/strands-completion-live-a-20260923.json": "342f40934348db5b5afa00768ba1d840acbcec1c23b0051625578a74e662557b",
+    "docs/architecture/evidence/strands-completion-live-b-20260923.json": "059d017a1bd907482cb093d03e6c572443b37cc00f918357c8901d3c671eecf9",
+    "docs/architecture/evidence/strands-completion-live-c-20260923.json": "db1ace03919a3054bc67170c9fa19746b0d1d9ae6f9f62f9465b413c95c70c34",
+    "docs/architecture/evidence/strands-live-20260923-s1.json": "e485b83f9b4e3497074ddf5f95cd93244bddfc1ef8447a4ac223dc846244ccda",
+    "docs/architecture/evidence/strands-postgres-restart-20260923.json": "5cfedf75d3c8456d4386618a8d7fca9c69ad0935d8821d32f149b75ea2353a9a",
+    "docs/architecture/next-work-plan-2026-09-23.md": "c78509c58c7344ab270b1e3eca833a4f06c9134d12b359fd29ab9bf742c1767c",
+    "docs/architecture/strands-cognition-spike-claude-review-package.md": "c7c2cbd68b552115689ac34a4a7b5a3571719abef17484de68a90a7769dabe4d",
+    "docs/architecture/strands-cognition-spike-plan.md": "59f5c813af01107696ba9389d4c6e5bb3d8427e306a728bdf8a036cd473a2ec5",
+    "docs/architecture/strands-completion-plan.md": "8fdd6a28100fe251f3e8d538849eff80ed1064e7e29660a097405618493370b8",
+    "docs/architecture/strands-completion-review.md": "7c34a4f84e45b43203fd44366ba9539b4ca9b50ee3f498283f676059b4637a34",
+    "docs/architecture/strands-cost-inventory.md": "95b4f608913b1db5ac06e03bb00d592f7a70e95b05da5d9ec783a8744edfc073",
+    "docs/architecture/strands-live-resumption-review.md": "67464420354c80371724797c24969f59e1d0f832a6fc83d3fac7b84a1f81d764",
+    "docs/architecture/strands-spike-implementation-review.md": "c653a1ac8e94afd459879ad8af554bdfc56bac7f2eb0bb766a2fd9e1170bdba4",
+    "docs/architecture/strands-spike-results.md": "d1c4dac53c7f817b762b35c6acfddde85bbafb7c48735a00e5896175dbffb605",
+    "docs/architecture/strands_legion_spike_requirements.md": "1547a602b51bf24a61940625aa6d635a80b20d68d35014e955657d034913b867",
+    "docs/cognition/offering-validation.md": "e48abea0fddff9ba7f55bc118bc7b895b936701a8e411b4012a38b5e4a8a6255",
+    "docs/handoff.md": "e19ede94fbe444d72220e83f2b33f83ff4d21ef282e9659eb0e12bbbf0649084",
+    "experiments/strands/Dockerfile": "467b0fb563ba909a9d121d05bd8dc6f6c0b34a4a4d8d135314bcce58b0f76215",
+    "experiments/strands/README.md": "5169196541d42ba332428206bb6f2fe90533ff2bcbeb8debf684b2c74a9ebf66",
+    "experiments/strands/__init__.py": "941609025ac8179ea8da386c590fc6232201429e174c523bf3ff587070cc0012",
+    "experiments/strands/bridge.py": "3a349d8f88d54ac7fe146e427903091f473990c9513ef6d1410726cf71136689",
+    "experiments/strands/cleanup.py": "22e6eaee8be375114e1a20b887c0f97c25060c71d72d6dcfd0f44e8e91dff92d",
+    "experiments/strands/enforcer.py": "d743ff7ff0e63d028e31ea08633e5feff2ec4082e7dc2d7af18a2781bc994674",
+    "experiments/strands/model.py": "872c95fffe57727007151cb5c0fca932a1ffa24aef46ffed1d2541ec7e029850",
+    "experiments/strands/protocol.py": "130ac2e735f34183fc99a86974245747365433ef2157f56c2c2b045299e6f100",
+    "experiments/strands/requirements.in": "6b260b437eedd3aecb5acc6f99e9d13d14d23ec5792d56464e00661a14aae4c2",
+    "experiments/strands/requirements.lock": "642b472aec9367f5dbebe110c76ded252843805a6d5b3ece3da29eb73eb0f320",
+    "experiments/strands/s0_probe.py": "c84a4ca04c0b35dd272bcefb1c979ad505c0b38f9ff0f2c3b389c9a64d5024ee",
+    "experiments/strands/state.py": "05b8f9b7098bac1776bac73b9bfe2ded407b02e0c537febd019c076fe86f039f",
+    "experiments/strands/telemetry.py": "19ea9fd10c4d73499c5fb538968935fa31770c35e51a91a9a78266c1d73a0447",
+    "experiments/strands/worker.py": "feb5be2d5fd43295d3fac6aacfc6647863e6354f6f605ceb560b68bc3d0664e0",
+    "legion_cognition/README.md": "8e9f87d66853971bfe54c549680e465a6a3a552bb85742e78b94357555de0894",
+    "legion_cognition/deployment_observation.py": "ff5b582be88803a84e9999e091640e3be155a828123bef1e83b5746a973664b7",
+    "legion_cognition/offering_validation.py": "0eb89ca66dafe58e6d75fec466e452e912c75cbfb1c8c4c48e89ff29ce192b32",
+    "legion_kernel/kernel.py": "4e3e79e45e31ada6f1c9bc251a3fcdf3f58ba0b313899a438998935c1e99228e",
+    "legion_runtime/README.md": "d9afd945c122f567e8b5988e6ffc82791d491e7466f39586c4d031341f531259",
+    "legion_runtime/alembic/versions/0005_strands_spike.py": "5acb02a2b13aeed16d79544cfa0a29e5fc5f44d7815ab307ab614793d246a472",
+    "legion_runtime/database.py": "97120f7bd962a5c211ee14c0c7eb9c838fb6df5edd5967c1526110caa608af02",
+    "legion_runtime/postgres.py": "5d80d070015efb5ed4455eaab865721dbff9acde79eb5d3a65a88cdb66db3fb9",
+    "legion_runtime/repository.py": "0a0621b8f6e0ea3bc935acd09f6f5cbc2446d1bed2dc87ce596a1f38c0024c75",
+    "legion_runtime/service.py": "87459ada2f24d426eaeaa868c9df2b842b53350b52269a87040fe9bf1e5eba65",
+    "legion_runtime/spike_contracts.py": "27241afbf77a1b4f50fca45092b6f170c5a9667b65a60940b59293603f8f017f",
+    "legion_runtime/spike_schema.py": "76de2eb46ef7df84492b3d47d0fc093f29ac8c89bbe3a1598a48ee06235038eb",
+    "legion_runtime/spike_session.py": "bc5652d675b05ea50eb236632c4ab7c5d6b168c5655ed1b28861d059fba42615",
+    "legion_runtime/work.py": "427c44e510c099e1f9b42a110b3643af070f8fd3cddbd5b76d9b13699c2d6559",
+    "tests/acceptance/README.md": "c23c52e11271cc2bc3b35363fea956cd96ffc70fc8201e64a333caf2bad0284d",
+    "tests/acceptance/grounded_scout_runner.py": "d58819142c09fb38cf272a5cf5f37e7d7afc077ad7896c61a43b8232d92ef1db",
+    "tests/acceptance/strands_comparison.py": "711375d88fdd8c27705a155a94e8c1328128cea73524972416e3ffe5ce76b748",
+    "tests/acceptance/strands_live.py": "96e9a320ed1fb1d1f7b7779b97580c334d3d3abc5a0e0874dae3339d05740912",
+    "tests/acceptance/strands_postgres_restart.py": "b5a40abe139175f2d7be44e26f99bccaa6295e424ce1fc21c59cacd0c5832d43",
+    "tests/acceptance/strands_restart.py": "8c0a0fb3e3edc0226fd405ead9b94c6ba5fabd1c3d272b4242b4345c61192d6a",
+    "tests/acceptance/validate_offering.py": "588f5026a06d81c3b655017a01392b7d2d3a7b930d8be6d67b9a86d4f5de9407",
+    "tests/cognition_http.py": "ff5166bed1da5534fd4a95a4d429c26f311b56d29bb30d799083d09f9386681a",
+    "tests/runtime_postgres.py": "e3d6e92cf37ad6eeec44aa59165320b2be890c37e1633f35d8dcd9af578a83db",
+    "tests/strands_fixture.py": "b739668a8de96219213094a43a0373d001e419e40be08a7a9368c4b9dadb605a",
+    "tests/test_grounded_scout_migration.py": "cfef5fcc0e532c956e8a184e7cbb9f130c65bf7bada35965271a8f6ced34c3a2",
+    "tests/test_offering_validation.py": "a098846030558fe0ad9ee5dda1ef72ae134ae85ffd0b45016d12c006bab9005d",
+    "tests/test_offering_validation_publication.py": "5b899c20f4f847a862fe433cd5bfde06265b1ade7189d399a2e90adf41c2cfb6",
+    "tests/test_offering_validation_runtime.py": "293451f6ecea3551470f574844ac18891ee8452ee5d7c4673b438d3ca27ba166",
+    "tests/test_phase2_migration.py": "654aeecc18613431cfe4a4c24d92fe21c62a64cf121f1166fc69d941524e61c6",
+    "tests/test_strands_actions.py": "4aae63be98336ce98c0cdbefe8b40adf82ee419259d11a21ddff8d2c08eb8bcd",
+    "tests/test_strands_boundary_surfaces.py": "f5515cac895ef835a5119a1b567100c60e252f9fc5c000297e42d806f9d5e4ca",
+    "tests/test_strands_broker_restart.py": "0d25dd38edc16c40352c91e4b75eac0703d91d54dd06c476c6fa360204d95a51",
+    "tests/test_strands_comparison.py": "6ce45e817f8df4352ddefa79651024f00ada9b233500be4ce9d5b426862e8f81",
+    "tests/test_strands_completion.py": "f10e9ee19b0b9d8c5c6dd5cd477bf52d5a9adb9569c041b54c59af2159452962",
+    "tests/test_strands_corruption.py": "b0d6a4ab173ddc56888e75b2e0cd66bc357481b3f62560af574985d2b6797e51",
+    "tests/test_strands_isolation.py": "d56e2f462c3488bce3a7d41252dcac98041c95087dfd134d51fa3274cd2f234a",
+    "tests/test_strands_live.py": "b37bbc9762b5275d5e30fb717c0529dd2728342efbc126b69e43fb2400ed6ca9",
+    "tests/test_strands_migration.py": "f2ee985022833ef4b04edba553b698af1e8415fc4294349220bf7eaeb57a9a43",
+    "tests/test_strands_overlap.py": "1d9ad998b37a7e68f51394eb54c19c1d039a4e2dd0fd69d7c37db557039bd2e9",
+    "tests/test_strands_profiles.py": "fbe73435f4a1c0e78754e41916511f3c32a1defd4e287719dec13b9491f9be02",
+    "tests/test_strands_protocol.py": "1c087635db9d170cfd17e24bc8132f1b03db324691d02a289463c330be6f36f2",
+    "tests/test_strands_restart_guards.py": "d7cda643f53859cb0cbaebb02fae173c9eba6ceeebc2ba019f731d499e855b75",
+    "tests/test_strands_spike.py": "1e6e090d327ac49708e7cedda1ca3b9bcc39e825d46bdfb1b759372e3d827e10",
+    "tests/test_strands_state.py": "bf3bdff15b015a0644acb6bdccab6d1e25b11b2de66172e3a23b881619d35bb1"
+  },
+  "scope": "local commit packaging; no new live inference or production deployment",
+  "standalone_cfv": {
+    "migration_head": "0004_authorized_cognition",
+    "passed_subtests": 95,
+    "passed_tests": 266,
+    "seconds": 53.87,
+    "source_files_sha256": {
+      "legion_cognition/deployment_observation.py": "ff5b582be88803a84e9999e091640e3be155a828123bef1e83b5746a973664b7",
+      "legion_cognition/offering_validation.py": "0eb89ca66dafe58e6d75fec466e452e912c75cbfb1c8c4c48e89ff29ce192b32",
+      "tests/acceptance/grounded_scout_runner.py": "d58819142c09fb38cf272a5cf5f37e7d7afc077ad7896c61a43b8232d92ef1db",
+      "tests/acceptance/validate_offering.py": "588f5026a06d81c3b655017a01392b7d2d3a7b930d8be6d67b9a86d4f5de9407",
+      "tests/cognition_http.py": "ff5166bed1da5534fd4a95a4d429c26f311b56d29bb30d799083d09f9386681a",
+      "tests/test_offering_validation.py": "a098846030558fe0ad9ee5dda1ef72ae134ae85ffd0b45016d12c006bab9005d",
+      "tests/test_offering_validation_publication.py": "5b899c20f4f847a862fe433cd5bfde06265b1ade7189d399a2e90adf41c2cfb6",
+      "tests/test_offering_validation_runtime.py": "293451f6ecea3551470f574844ac18891ee8452ee5d7c4673b438d3ca27ba166"
+    },
+    "strands_source_or_experimental_migration_included": false,
+    "warnings": 12
+  },
+  "worker_image": "sha256:920dea37539c09ff011ccdaf0c7567157926d9a6a99ba9a3a4ea6d18de56462f"
+}

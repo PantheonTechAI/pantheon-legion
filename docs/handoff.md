@@ -1,6 +1,223 @@
 # Pantheon Legion Handoff
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
+
+## Current checkpoint — local commits caught up
+
+The owner requested commit catch-up before starting the next implementation
+slice. CFV-001 is independently retained in c3f9864; the completed Strands
+experiment and its DEFER recommendation are preserved separately in 518fb73.
+This supersedes the earlier checkpoints' uncommitted/no-commit status for
+this local work. No remote push, merge or production rollout occurred.
+
+Fresh verification: standalone CFV **266 tests + 95 subtests PASS** on migration
+0004 without spike code; combined work **329 tests + 225 subtests PASS**.
+All five incumbent acceptance suites and schema checks pass in both
+compositions. A fresh disposable database was removed afterward; existing
+databases and running services were preserved. New independent CFV extraction
+review returned **ACCEPT**, with no blocker/major. Its contextual-reference
+minor is resolved by the complete commit series.
+
+See the [commit checkpoint and evidence](architecture/commit-catchup-2026-09-23.md).
+Next proposed work is evidence-reread contract planning and a bounded
+Centurion-led Mission experience; CFV's local retention step is complete.
+
+## Next-work planning — 2026-09-23
+
+The [documentation review and proposed next-work sequence](architecture/next-work-plan-2026-09-23.md)
+recommends retaining CFV-001 as an independently reviewable delivery, then
+planning a framework-independent evidence reread and a bounded Centurion-led
+investigation through Praetorium. These are proposed priorities, not new
+implementation or deployment authorization. The accepted Strands recommendation
+remains DEFER; its failed recovery profiles and original uncommitted work remain
+intact. The plan distinguishes the incumbent's accepted fresh-attempt recovery
+from the proposed ability to reread previously recorded evidence.
+
+## Prior implementation checkpoint — Strands evaluation, recommendation DEFER
+
+The owner directed completion of the remaining recovery/live-comparison work.
+The completion experiments and full regression are finished; independent
+completion re-review returned **ACCEPT** with no open BLOCKER/MAJOR/MINOR.
+Recommendation: **DEFER Strands adoption**,
+retain the incumbent. No default enablement, commit, push or deployment.
+
+- Final regression: **329 tests + 225 subtests PASS**, 16 existing Alembic warnings.
+  M1/Phase 1/Phase 2/GSI/SCI: **7/7, 4/4, 3/3, 4/4, 9/9 PASS**.
+- Actual broker SIGKILL/reconstruction, overlapping workers/stale fences, four
+  effect crash windows, privacy/isolation/corrupt-state matrices and a separately
+  approved dedicated PostgreSQL restart are now evidenced.
+- All 60 paired common-capability live samples pass. Combined actual Spark +
+  disposable Tabula + approval + post-effect worker loss reconciles one marker
+  and the same receipt in seven authorized calls.
+- All 107 live records remain: run A 31/46, B 34/46, C 9/15 PASS. An STS fixture
+  clock bug and a Strands terminal-persona adapter bug were reproduced and fixed.
+  Earlier failures are retained, not replaced by later successes.
+- Final Graph/Swarm executions and P0 recovery pass. All six P1/P2 live recoveries
+  fail closed at fresh evidence retrieval: full-objective literal search is not
+  a durable-provenance reread. This adoption gap is not bypassed or claimed fixed.
+  Earlier strict Graph response failures also remain relevant.
+- Zero incumbent code eliminated; 987 lines of harness plus separate boundary,
+  fixture and dependency costs. No demonstrated net operational simplification.
+- All three exact live projects have no remaining containers/volumes/networks;
+  no spike workers remain. Synthetic native stores were removed; images retained.
+
+Start with [results/decision](architecture/strands-spike-results.md),
+[completion self-evaluation/review](architecture/strands-completion-review.md),
+[cost inventory](architecture/strands-cost-inventory.md) and
+[completion plan](architecture/strands-completion-plan.md). Reproduction commands
+are in `tests/acceptance/README.md`. Fresh catalog still expires at
+**2026-09-24T15:51:31.003467Z**; the old catalog remains unchanged. No new live
+trial should use an expired/drifted offering validation.
+
+Next substantive work needs owner prioritization: retain useful CFV-001 work,
+and separately scope reliable provenance-based fresh evidence recovery if that
+capability is needed. Do not quietly turn this deferred spike into production
+infrastructure or rerun until all profiles happen to pass.
+
+## Prior checkpoint — validated Spark and first Strands live trial
+
+The owner completed SSH host-key enrollment; strict noninteractive access as
+`jtdauria@spark` now works. The unchanged CFV-001 validator passed actual deployed
+vLLM/model/parser inspection and both authorized synthetic probes. Fresh catalog:
+`/tmp/legion-offering-validation-20260923-cfv001-ssh-ready/catalog.json`, valid
+until **2026-09-24T15:51:31.003467Z**. The expired source catalog is byte-for-byte
+unchanged. Never re-date it or reuse the new catalog after expiry/deployment drift.
+
+The first single-agent/P0/read-only Strands + Spark + disposable real Tabula
+trial **PASS**: two inference decisions, three protected-read decisions, exact
+allowed record/random code, excluded control, six safe correlated spans. Trial
+containers and project-owned data were cleaned up; build images retained.
+No production service/data or Spark configuration was changed.
+
+New reproducible runner: `python -m tests.acceptance.strands_live` (explicit
+execution/reset/development acknowledgements and new private report required).
+Final regression: **303 tests + 138 subtests PASS**; 16 existing Alembic warnings.
+Independent review and focused remediation re-review both returned **ACCEPT**
+for this bounded checkpoint, with no remaining material finding.
+See [self-evaluation and review](architecture/strands-live-resumption-review.md),
+[validation evidence](architecture/evidence/cfv001-20260923.json), and
+[live evidence](architecture/evidence/strands-live-20260923-s1.json).
+
+Next: complete SS-16's combined synthetic effect trial, live paired comparisons
+and the remaining failure matrix in the [spike results](architecture/strands-spike-results.md).
+The read-only smoke is not the whole spike or an adoption recommendation.
+All work remains uncommitted; no push or production deployment was authorized.
+
+## Prior prerequisite checkpoint — CFV-001 (SSH blocker resolved above)
+
+The owner authorized a minimum evidence-producing offering validator before
+Strands live tests resume. [CFV-001](architecture/cognition-offering-validator-plan.md)
+and [ADR-009](adr/ADR-009-evidence-producing-offering-validation.md) record the
+work item, bootstrap constraints, acceptance criteria and non-goals.
+
+Investigation found existing catalog expiry enforcement but no repeatable
+model/parser validation/catalog-generation mechanism. Strands exposed this
+pre-existing control-plane gap; the existing fail-closed check prevented a
+model call from bypassing the expired validation. The spike results now record
+both findings. No old validity timestamp has been edited.
+
+At that checkpoint, this host had no trusted SSH key for either documented Spark
+name. Strict verified SSH as `jtdauria` stopped before authentication. Obtain trust
+through the operator's normal process; do not disable host-key verification.
+Validator implementation/fixture tests completed independently. No production
+deployment, commit or push is authorized.
+
+The minimum validator is now implemented. Independent implementation review
+returned **ACCEPT** with no blocker/major; three minor findings were remediated.
+Final regression: **297 tests plus 118 subtests PASS** (16 existing Alembic
+warnings); new validator subset **19 tests plus 43 subtests PASS**. All five
+incumbent acceptance suites pass. Focused independent re-review confirmed all
+minor remediations with **ACCEPT** and no new material finding. See the [review/evidence](architecture/cognition-offering-validator-review.md)
+and [runbook](cognition/offering-validation.md).
+
+Actual validator CLI as `jtdauria` failed closed at management observation with
+`VALIDATION_OBSERVATION_UNAVAILABLE`; no output bundle, database reset or model
+call occurred. The old catalog's SHA-256 is unchanged before/after. No fresh real
+catalog was issued and Strands live tests did not resume. Next: establish trusted
+Spark SSH host identity, then run the documented validator with a fresh output
+path; only an actual successful catalog/evidence bundle can unblock Strands.
+
+## Strands prototype checkpoint before CFV-001 — 2026-09-23
+
+The owner subsequently directed **proceed with implementation**. Current branch:
+`feat/strands-cognition-spike`; ADR-008 is accepted only for the bounded
+development spike, not adoption. No commit, push or production deployment is
+authorized by that instruction. Planning files and all earlier work are preserved.
+
+S0 pinned Strands 1.56.0 in an isolated environment/image: **10 SDK seam probes
+PASS**. S1 uses an isolated Docker worker, a public Model adapter, current Aquila
+inference/knowledge authorization, Runtime-owned experimental attempts/budgets
+and migration 0005 (applied only to the disposable `_test` database). The default
+application does not load Strands and retains the accepted two-turn profile.
+Latest full regression: **278 tests plus 75 subtests PASS** (16 instances of the
+existing Alembic warning). M1 **7/7**, Phase 1 **4/4**, Phase 2 **3/3**, GSI
+**4/4**, SCI **9/9** also pass. Migration roundtrip/refusal/no drift checks pass.
+
+Independent Claude S1 review found one MAJOR: missing post-authorization catalog
+revalidation. A negative control reproduced one HTTP dispatch after offering
+disablement. The fix passed focused re-review. A later grant-revocation timing
+negative control also reproduced one stale dispatch; fresh Mission/grant
+context is now checked after the decision and before admission. Its regression
+passes in the final suite and is included in the new prototype review request.
+A separately reproduced Mission-cancellation-before-result-commit race is fixed
+by keeping the single broker gate through Runtime's final acceptance transaction.
+The review's MINOR stale-handoff finding is addressed by this checkpoint.
+
+S0–S2 received independent stage ACCEPT; its two minor findings are remediated.
+The prototype now includes narrow delegated proposals/durable permits in Aquila,
+native approvals, independent fixed-marker enforcement, actual post-effect
+worker kill/reconciliation, P1/P2 operational storage, native single/Graph/Swarm
+hard-kill recovery and local content-safe OTel. Prototype review found one
+MAJOR multi-tool/handoff attribution gap and two minor test assertions. All
+are remediated and the full suite passes; focused independent re-review returned
+**ACCEPT for the prototype checkpoint**, with no open BLOCKER/MAJOR/MINOR.
+The complete acceptance/failure matrix and live baseline comparison
+remain outstanding; do not describe the whole spike as complete.
+
+Live blocker: `/tmp/legion-cognition-live-20260922.json` expired at
+**2026-09-23 00:00 UTC**. A no-network selection preflight returned
+`COGNITION_NO_MATCH`; no expiry was extended or inference bypass added. The
+operator was asked for a current validated catalog or direction to plan a
+bounded conformance-renewal step. No live stack was started this turn.
+
+Start with [the reviewed plan](architecture/strands-cognition-spike-plan.md),
+[complete evidence/gap matrix](architecture/strands-spike-results.md),
+[experiment commands](../experiments/strands/README.md), and the
+uncommitted implementation/test files. Use sequential stateful tests, disposable
+Runtime PostgreSQL only, and the isolated worker image. No production data changed.
+
+## Historical Strands planning checkpoint — 2026-09-22
+
+The owner supplied revised requirements and authorized **planning only**.
+The documentation branch is `docs/strands-cognition-spike-plan`, based on
+merged Legion main `b02282007054906a8f6b16b18a2e3d3efb30d38a` (PR #73).
+Tabula PR #41 is also merged at `ed7e174ba1c23858faf2688c9e45ce156e569d0c`.
+This supersedes the older checkpoint's uncommitted/unpublished status below;
+no production deployment was authorized or performed.
+
+The proposal evaluates Strands as subordinate computation inside Runtime-owned
+work, with independently enforced inference, evidence and one synthetic effect.
+It compares fresh, sanitized and synthetic-native recovery plus bounded Graph
+and Swarm, and retains Reject/Defer as valid evidence-backed outcomes. The
+accepted two-turn cognition path and its retention policy remain unchanged.
+
+Read [the implementation plan](architecture/strands-cognition-spike-plan.md),
+[normalized requirements](architecture/strands_legion_spike_requirements.md),
+[sourced research](architecture/amazon_agent_ecosystem_findings.md),
+[proposed ADR-008](adr/ADR-008-subordinate-strands-cognition-spike.md), and
+[independent planning review](architecture/strands-cognition-spike-claude-review-package.md).
+
+The unchanged baseline passes **247 tests plus 52 subtests** (12 existing
+Alembic warnings). Claude Code's independent planning review and focused
+post-remediation review both returned **ACCEPT**. The two minor findings
+(canonical digest semantics and ADR structure) are resolved, with no open
+BLOCKER, MAJOR or MINOR. All 19 capabilities and 13 mandatory scenarios map
+to 16 planned acceptance tests; every actual Strands test remains NOT RUN.
+
+No Strands package, implementation, schema change, deployment, commit or push
+is part of this turn. Next gate: explicit owner implementation direction and
+acceptance of proposed ADR-008 for spike scope, followed by pinned-SDK
+feasibility before broader integration work.
 
 ## Authorized cognition accepted delivery — 2026-09-22
 
