@@ -30,6 +30,7 @@ def inference_server(responses=None):
             self.requests = []
             self.responses = list(responses if responses is not None else [tool_response(), final_response()])
             self.models = [{"id": "model-a", "max_model_len": 32768}]
+            self.version = "1"
             self.delays = []
 
     peer = Peer()
@@ -52,12 +53,15 @@ def inference_server(responses=None):
 
         def do_GET(self):
             peer.requests.append((self.path, None, dict(self.headers)))
-            self.reply(200, {"data": peer.models} if self.path == "/v1/models" else {})
+            self.reply(200, {"data": peer.models} if self.path == "/v1/models" else
+                       {"version": peer.version} if self.path == "/version" else {})
 
         def do_POST(self):
             request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             peer.requests.append((self.path, request, dict(self.headers)))
             response = peer.responses.pop(0) if peer.responses else final_response()
+            if callable(response):
+                response = response(request)
             if peer.delays:
                 time.sleep(peer.delays.pop(0))
             status, body = response if isinstance(response, tuple) else (200, response)

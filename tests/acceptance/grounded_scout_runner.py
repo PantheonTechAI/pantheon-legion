@@ -165,15 +165,16 @@ class GroundedScoutAcceptanceRunner:
             assertions=[{"id": value, "status": "PASS"} for value in assertions],
         )
 
-    def _composition(self, directory: str):
+    def _composition(self, directory: str, *, mission_title="Grounded acceptance",
+                     mission_objective="Prove authorized grounded persistent work."):
         aquila = PersistentAquilaService(str(Path(directory) / "aquila.sqlite3"))
         mission = aquila.create_mission(
             actor=self.owner,
             body={
                 "organization_id": ORG,
                 "workspace_id": WORKSPACE,
-                "title": "Grounded acceptance",
-                "objective": "Prove authorized grounded persistent work.",
+                "title": mission_title,
+                "objective": mission_objective,
             },
         )
         mission_id = str(mission.body["id"])

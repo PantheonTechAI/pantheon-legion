@@ -1,0 +1,2 @@
+# Only in the isolated spike environment. No provider/tool extras.
+strands-agents==1.56.0

@@ -30,6 +30,7 @@ class WorkKind(str, Enum):
     READ_ONLY_ANALYSIS = "READ_ONLY_ANALYSIS"
     GROUNDED_CORPUS_ANALYSIS = "GROUNDED_CORPUS_ANALYSIS"
     TOOL_ASSISTED_CORPUS_ANALYSIS = "TOOL_ASSISTED_CORPUS_ANALYSIS"
+    COGNITION_INTEGRATION_SPIKE = "COGNITION_INTEGRATION_SPIKE"
 
 
 class AttemptStage(str, Enum):
@@ -104,6 +105,7 @@ class WorkItem:
             WorkKind.READ_ONLY_ANALYSIS: ("read_only_analysis",),
             WorkKind.GROUNDED_CORPUS_ANALYSIS: ("read_only_analysis", "tabula_corpus_read"),
             WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS: ("read_only_analysis", "model_reasoning", "tabula_corpus_read"),
+            WorkKind.COGNITION_INTEGRATION_SPIKE: ("experimental_cognition", "model_reasoning", "tabula_corpus_read", "fixture_effect"),
         }
         if self.kind not in profiles or self.required_capabilities != profiles[self.kind]:
             raise ValueError("work requires exact capabilities")

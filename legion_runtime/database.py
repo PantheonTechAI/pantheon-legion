@@ -13,9 +13,11 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from .spike_schema import define_spike_tables
 
 
 metadata = MetaData()
+spike_trials, spike_operations = define_spike_tables(metadata)
 
 agents = Table(
     "agents",
@@ -170,7 +172,7 @@ runtime_work_items = Table(
     ),
     CheckConstraint("version > 0", name="ck_runtime_work_items_version"),
     CheckConstraint(
-        "work_kind IN ('READ_ONLY_ANALYSIS', 'GROUNDED_CORPUS_ANALYSIS', 'TOOL_ASSISTED_CORPUS_ANALYSIS')",
+        "work_kind IN ('READ_ONLY_ANALYSIS', 'GROUNDED_CORPUS_ANALYSIS', 'TOOL_ASSISTED_CORPUS_ANALYSIS', 'COGNITION_INTEGRATION_SPIKE')",
         name="ck_runtime_work_items_kind",
     ),
 )

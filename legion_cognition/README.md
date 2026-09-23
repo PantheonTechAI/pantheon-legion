@@ -62,3 +62,29 @@ validated `tabula_search` through separate knowledge authority and accepts one
 final continuation. No provider callback executes a tool. Explicit provider
 `message.reasoning` is discarded; ordinary final prose cannot be semantically
 classified as reasoning. There are no durable conversations or raw tool results.
+
+## Offering validation prerequisite
+
+The Strands spike exposed the absence of a repeatable producer for the static
+validation records. CFV-001 adds an opt-in, fixed-probe maintenance validator;
+normal routing and per-call Aquila authorization remain unchanged. It observes
+one deployed local offering, tests reasoning/tool/continuation behavior, and
+publishes a fresh catalog plus safe evidence only after successful Runtime work.
+It never extends an old record's dates or automatically activates configuration.
+See [the validator runbook](../docs/cognition/offering-validation.md) and
+[implementation/live gate status](../docs/architecture/cognition-offering-validator-review.md).
+
+## Strands experiment
+
+The isolated prototype lives under `experiments/strands`, not this package's
+default composition. It reuses the accepted selection and transport boundaries,
+while its public Strands Model adapter can only request bounded proxy operations.
+No worker obtains provider credentials or chooses a model/endpoint from context.
+The accepted loop and historical LangGraph implementation remain unchanged.
+
+Only the explicit P2 synthetic experiment may persist native messages in a
+private disposable operational store under ADR-008; production retention above
+is unchanged. The completed experiments recommend **DEFER adoption**: common
+live comparisons and P0 recovery pass, but P1/P2 live recovery fails at fresh
+evidence lookup and no net subsystem/operational elimination is demonstrated.
+See [findings and decision](../docs/architecture/strands-spike-results.md).

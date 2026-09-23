@@ -8,6 +8,7 @@ leaves explicit, recoverable fail-closed state.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from contextlib import nullcontext
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -95,6 +96,7 @@ class PersistentAgentRuntime:
         cognition: ReadOnlyCognition | None = None,
         evidence_reader: GroundedEvidenceReader | None = None,
         cognition_invoker=None,
+        experimental_driver=None,
     ) -> None:
         self.repository = repository
         self.authority = authority
@@ -105,6 +107,7 @@ class PersistentAgentRuntime:
         self.cognition = cognition
         self.evidence_reader = evidence_reader
         self.cognition_invoker = cognition_invoker
+        self.experimental_driver = experimental_driver
 
     def close(self) -> None:
         self.repository.close()
@@ -462,11 +465,14 @@ class PersistentAgentRuntime:
         expected_capabilities = {
             WorkKind.READ_ONLY_ANALYSIS: ("read_only_analysis",),
             WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS: ("read_only_analysis", "model_reasoning", "tabula_corpus_read"),
+            WorkKind.COGNITION_INTEGRATION_SPIKE: ("experimental_cognition", "model_reasoning", "tabula_corpus_read", "fixture_effect"),
             WorkKind.GROUNDED_CORPUS_ANALYSIS: (
                 "read_only_analysis",
                 "tabula_corpus_read",
             ),
         }.get(work_kind)
+        if work_kind == WorkKind.COGNITION_INTEGRATION_SPIKE and self.experimental_driver is None:
+            raise RuntimeOperationError("EXPERIMENTAL_COGNITION_DISABLED")
         if expected_capabilities is None or required_capabilities != expected_capabilities:
             raise RuntimeOperationError("READ_ONLY_CAPABILITY_REQUIRED")
         if work_kind != WorkKind.READ_ONLY_ANALYSIS and len(objective) > 2000:
@@ -700,7 +706,10 @@ class PersistentAgentRuntime:
             raise RuntimeOperationError("MISSION_CONTEXT_UNAVAILABLE")
         initial = self._require_work(work_item_id)
         tool_assisted = initial.kind == WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS
-        if (self.cognition_invoker if tool_assisted else self.cognition) is None:
+        experimental = initial.kind == WorkKind.COGNITION_INTEGRATION_SPIKE
+        if experimental and self.experimental_driver is None:
+            raise RuntimeOperationError("EXPERIMENTAL_COGNITION_DISABLED")
+        if not experimental and (self.cognition_invoker if tool_assisted else self.cognition) is None:
             raise RuntimeOperationError("COGNITION_UNAVAILABLE")
         if (
             initial.kind != WorkKind.READ_ONLY_ANALYSIS
@@ -853,7 +862,11 @@ class PersistentAgentRuntime:
             tool_session = ToolCognitionSession(self, work, running, binding, assignment, scout, workload, context)
             evidence_query = tool_session.begin()
             running = tool_session.attempt
-        if work.kind != WorkKind.READ_ONLY_ANALYSIS:
+        if experimental:
+            from .spike_session import SpikeAttemptSession
+            tool_session = SpikeAttemptSession(self, work, running, binding, assignment, scout, workload, context)
+            cognition_evidence = tool_session.run()
+        if work.kind != WorkKind.READ_ONLY_ANALYSIS and not experimental:
             assert self.evidence_reader is not None
             try:
                 if tool_session:
@@ -1001,6 +1014,7 @@ class PersistentAgentRuntime:
             mission_id=work.mission_id,
             mission_version=context.mission_version,
             logical_capability=(
+                "cognition_integration_spike" if experimental else
                 "tool_assisted_corpus_analysis" if tool_assisted else "grounded_corpus_analysis"
                 if work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
                 else "read_only_analysis"
@@ -1085,7 +1099,10 @@ class PersistentAgentRuntime:
             raise RuntimeOperationError("COGNITION_RESULT_INVALID") from exc
 
         cancelled = False
-        with self.repository.transaction(lock_keys=self._work_lock_keys(work)):
+        # The experimental fixture serializes its final authority check and
+        # accepted-result commit with control mutations, in gate -> DB order.
+        completion_gate = tool_session.completion_gate() if experimental else nullcontext()
+        with completion_gate, self.repository.transaction(lock_keys=self._work_lock_keys(work)):
             current_work = self._require_work(work_item_id)
             current_attempt = self._require_work_attempt(running.attempt_id)
             existing = self.repository.get_work_result(work_item_id)
