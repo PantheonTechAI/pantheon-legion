@@ -2,32 +2,79 @@
 
 Last updated: 2026-09-24
 
-## Current checkpoint — PER-001 accepted implementation
+## Current checkpoint — PER-001 merged in both repositories
 
-The owner authorized the reviewed evidence-reread implementation. Legion branch
-feat/provenance-evidence-reread and the separate Tabula worktree branch
-feat/legion-provenance-reread contain the coordinated change. The owner has
-authorized committing and pushing both branches; Tabula's matching implementation
-is commit d9e9374.
-[ADR-010](adr/ADR-010-provenance-bound-evidence-recovery.md) is accepted for this
-opt-in profile; production enablement remains separate.
+The owner merged both reviewed deliveries. Local `main` checkouts were
+fast-forwarded to the following commits and verified clean before this
+documentation refresh:
 
-The real disposable Tabula/SIGKILL proof passes: original ordered bounded
-evidence is reread without search, fresh authority/citations produce one result,
-and revision/content/scope/no-op/actual-ingest/delete mutations safely refuse.
-Runtime stores only provenance metadata. Full Legion regression passes
-352 tests + 240 subtests, all five incumbent acceptance catalogs pass, Tabula
-passes 54 focused tests, and final corruption-guard checks pass 17 + 9 subtests.
-[Implementation evaluation and review](architecture/provenance-evidence-reread-implementation-review.md)
-records independent Claude **ACCEPT**, with no blocker or major findings,
-and a separate **ACCEPT** for the final audit-correlation correction. Two minor
-naming/query-cost observations are recorded as non-blocking follow-ups.
-All PER-01–PER-12 gates are closed. The new schema and shared fixture validate,
-and all 12 schema documents remain structurally valid.
+| Repository | Merged PR | Main commit | Reviewed implementation commit |
+|---|---|---|---|
+| Legion | [#75](https://github.com/PantheonTechAI/pantheon-legion/pull/75) | `30d4b0f` | `0f33b4b` |
+| Tabula | [#42](https://github.com/PantheonTechAI/pantheon-kb/pull/42) | `26a92a8` | `d9e9374` |
 
-Existing fresh-search profiles and Strands DEFER remain unchanged. The next
-product milestone remains a bounded Centurion-led Mission experience; current
-record reread availability must be assessed against actual domain ingest cadence.
+Each merged tree exactly matches its reviewed feature-branch tree. Tabula's
+earlier federated subject-claim and bounded-content fixes are also in its merged
+baseline. Legion is checked out on `main`; Tabula's `main` checkout is
+`/tmp/pantheon-kb`. The separate Tabula feature worktree remains at
+`/tmp/pantheon-kb-federation-worktree`.
+
+[ADR-010](adr/ADR-010-provenance-bound-evidence-recovery.md) is accepted for the
+opt-in provenance-bound Scout profile. Runtime seals the original ordered
+evidence selection, then recovers those exact bounded prefixes under fresh
+authority after process loss. Changed, missing or unauthorized evidence safely
+refuses continuation. Runtime persists provenance metadata, not raw evidence.
+Tabula stores current records; this capability does not provide historical
+revision retrieval.
+
+Recorded implementation validation:
+
+- Full Legion regression: **352 tests + 240 subtests PASS**.
+- All five incumbent acceptance catalogs: M1 **7/7**, Phase 1 **4/4**,
+  Phase 2 **3/3**, GSI **4/4**, SCI **9/9 PASS**.
+- Final corruption-guard checks: **17 tests + 9 subtests PASS**.
+- Final focused Tabula suite: **54 tests PASS**.
+- Real disposable Tabula/SIGKILL proof: **PASS**, including recovery without
+  search, fresh authority and citations, one accepted result, and safe refusals
+  after revision/content/scope/no-op/actual-ingest/delete mutations.
+- Shared request/response fixture validation and all 12 schema document checks:
+  **PASS**.
+
+The [implementation evaluation and review](architecture/provenance-evidence-reread-implementation-review.md)
+records independent Claude **ACCEPT** and a separate **ACCEPT** for the final
+audit-correlation correction. All PER-01–PER-12 gates are closed, with no open
+blocker or major. Two non-blocking naming/query-cost findings remain recorded.
+[Durable evidence](architecture/evidence/per001-20260924.json) retains original
+source fingerprints and earlier failed runs. These are implementation results;
+the merge and handoff refresh did not rerun runtime tests or change the evidence.
+
+Production enablement remains separate. Existing fresh-search profiles and
+Strands **DEFER** remain unchanged. Actual domain ingest cadence must be assessed
+before relying on current-record reread availability.
+
+## Next work — plan the bounded Centurion-led Mission experience
+
+CFV retention and PER-001 are complete and merged. Continue with the
+[Mission experience proposed in the next-work plan](architecture/next-work-plan-2026-09-23.md#3-make-one-centurion-led-investigation-usable-through-praetorium).
+Its earlier retention/reread recommendations are historical checkpoints.
+
+The next deliverable is a concrete implementation plan and critique for one
+read-only human objective submitted through Praetorium, one persistent
+Centurion directing one Scout, and one evidence-backed assessment with visible
+progress, blockers and resumable work. Define a real evaluation objective and
+useful-answer criteria with the owner before implementation.
+
+The plan must cover Centurion cognition and delegation, authenticated Runtime
+commands, idempotent dispatch/recovery, bounded worker lifecycle, human
+cancel/revoke controls, and workload credentials. Reuse the accepted Runtime,
+Aquila, Tabula and cognition boundaries. Production Tabula identity and
+authenticated inference ingress remain separate deployment gates. Follow
+[the delivery process](../Codex_Delivery_Instructions.md), including independent
+plan review, before implementing this new milestone.
+
+Earlier checkpoints below preserve what was known and authorized at the time;
+their pending-commit, pending-merge and next-step statements are superseded by
+this checkpoint.
 
 ## Prior checkpoint — evidence reread planning
 
