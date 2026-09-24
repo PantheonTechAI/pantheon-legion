@@ -23,6 +23,8 @@ class MissionEvidenceView:
     external_revision: str
     canonical_uri: str
     retrieved_at: str
+    content_sha256: str | None = None
+    content_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -37,6 +39,9 @@ class MissionWorkView:
     result_digest: str | None
     evidence: tuple[MissionEvidenceView, ...]
     cognition_turns: tuple[dict, ...] = ()
+    evidence_checkpoint_ids: tuple[str, ...] = ()
+    attempt_stage: str | None = None
+    error_code: str | None = None
 
 
 @dataclass(frozen=True)
@@ -93,6 +98,7 @@ class RepositoryMissionOrganizationReadModel:
                 ):
                     raise ValueError("RUNTIME_PROJECTION_SCOPE_MISMATCH")
             result = self.repository.get_work_result(work.work_item_id)
+            attempt = self.repository.get_latest_work_attempt(work.work_item_id)
             references = self.repository.list_work_evidence_references(
                 work_item_id=work.work_item_id
             )
@@ -116,6 +122,9 @@ class RepositoryMissionOrganizationReadModel:
                     result_summary=result.summary if result else None,
                     result_digest=result.content_digest if result else None,
                     cognition_turns=tuple(self.repository.list_cognition_turns(work.work_item_id)),
+                    evidence_checkpoint_ids=work.evidence_checkpoint.reference_ids if work.evidence_checkpoint else (),
+                    attempt_stage=attempt.attempt_stage.value if attempt else None,
+                    error_code=attempt.error_code if attempt else None,
                     evidence=tuple(
                         MissionEvidenceView(
                             evidence_reference_id=reference.evidence_reference_id,
@@ -123,6 +132,8 @@ class RepositoryMissionOrganizationReadModel:
                             external_revision=reference.external_revision,
                             canonical_uri=reference.canonical_uri,
                             retrieved_at=reference.retrieved_at,
+                            content_sha256=reference.content_sha256,
+                            content_bytes=reference.content_bytes,
                         )
                         for reference in references
                     ),

@@ -3,7 +3,7 @@
 Status: Versioned shared contract for ADR-002 and ADR-003. Tabula target
 implementation, the Legion disposable STS fixture, and live cross-service
 conformance are merged. Product client adapters remain incremental work.<br>
-Contract revision: 1.2 (wire schemas: 1.0)
+Contract revision: 1.3 (wire schemas: 1.0)
 
 These schemas are the shared implementation boundary for the Pantheon STS,
 Aquila, and Tabula. They specify data shape only; transport authentication,
@@ -26,6 +26,7 @@ merged Aquila Corpus and Registry clients, which remain read-only and never use 
 | `sts-delegated-token-introspection.schema.json` | STS | Tabula | Fail-closed token-status result before every protected target operation. |
 | `tabula-scope-binding.schema.json` | Tabula | Aquila, STS, Tabula | Tabula-owned active binding of Legion Organization/Workspace to one narrow plane. |
 | `tabula-corpus-read.schema.json` | Tabula | Aquila | Curated corpus request/response with cited provenance. |
+| `tabula-corpus-reread.schema.json` | Tabula | Legion Runtime | Exact ordered bounded-prefix verification under fresh authority. |
 | `tabula-registry-read.schema.json` | Tabula | Aquila | Governed Registry discovery request/response. |
 | `tabula-federated-read-error.schema.json` | Tabula | Aquila | Normalized, non-disclosing failure response for either protected read. |
 
@@ -83,9 +84,10 @@ permitted in MCP arguments, tool results, errors, or Mission audit payloads.
 | MCP tool name | Operation claim | Arguments | Success result |
 |---|---|---|---|
 | `legion_search_corpus` | `TABULA_CORPUS_READ` | `tabula-corpus-read.schema.json` `$defs.request` | `$defs.response` in the same schema |
+| `legion_reread_corpus` | `TABULA_CORPUS_READ` | `tabula-corpus-reread.schema.json` `$defs.request` | `$defs.response` in the same schema |
 | `legion_discover_registry` | `TABULA_REGISTRY_READ` | `tabula-registry-read.schema.json` `$defs.request` | `$defs.response` in the same schema |
 
-Before either tool evaluates a request, Tabula's transport-authentication layer
+Before any protected tool evaluates a request, Tabula's transport-authentication layer
 MUST introspect the opaque token with STS. A missing bearer, an inactive or
 malformed token, or unavailable/malformed STS introspection receives a generic
 HTTP 401 response before MCP tool dispatch. It does not receive this error
@@ -135,3 +137,38 @@ The bearer header is deliberately omitted from the example because it is
 transport-only. Tabula assigns `tabula_audit_correlation_id` to every success
 and normalized failure; Aquila records that reference, not raw content or
 credentials, in Mission audit.
+
+### Provenance-bound Corpus reread amendment — 2026-09-24
+
+The new separate closed wire-v1 schema is
+[tabula-corpus-reread.schema.json](../../schemas/tabula-corpus-reread.schema.json).
+`legion_reread_corpus` reuses TABULA_CORPUS_READ and the active CORPUS binding.
+It accepts 1–8 distinct ordered IDs/revisions, byte counts (1–8192 each, at most
+32768 total), lowercase SHA-256 digests and `projection: utf8-prefix-v1`.
+There is no query, caller-selected domain, URL, tenant override or credential.
+
+Tabula verifies current-record prefixes and rechecks scope before publication.
+Legion independently verifies exact count/order, IDs/revisions, binding,
+canonical URI, lengths and hashes. Canonical URIs are never fetched.
+Missing/inaccessible, changed, revised or out-of-scope evidence shares one
+AUTHORIZATION_DENIED response, mapped to EVIDENCE_REREAD_UNAVAILABLE by Runtime.
+No newer-revision, search or PAT fallback is allowed.
+
+This backend uses record-specific 403 for absent IDs; 403/404 are opaque
+refusals. Backend 401/configuration failures remain INTERNAL_ERROR; 5xx or
+connection failures are SERVICE_UNAVAILABLE. Exact GETs share one seven-second
+post-auth deadline. Only one explicit service-unavailable response permits a
+fresh-authorized whole-bundle retry; deadline and denial never retry inline.
+
+The real reread client requires a 1 MiB wire cap before JSON/SSE decode, including
+HTTP error bodies. Every protected operation gets fresh authority; a cold
+session plus retry uses at most four decisions. Audit retains validated scalar
+metadata and counts, excluding bodies, invalid fields, credentials and backend
+messages before framework validation.
+
+The shared fixture is
+[tabula-corpus-reread-v1.json](../../tests/contracts/tabula-corpus-reread-v1.json).
+This is bounded current-content verification, not historical storage. Unseen
+suffixes and removed revisions are outside its guarantee.
+[ADR-010](../adr/ADR-010-provenance-bound-evidence-recovery.md) defines the opt-in
+consumer. Production enablement remains separate.

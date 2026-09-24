@@ -15,7 +15,7 @@ from legion_runtime.authority import (
 )
 from legion_runtime.agent import AgentIdentity
 from legion_runtime.mission_context import AuthorizedMissionContext
-from legion_runtime.evidence import GroundedEvidenceReadRequest
+from legion_runtime.evidence import EvidenceAuthorityContext
 from legion_tabula.corpus import ScopeBinding
 from legion_tabula.runtime_adapter import AuthorizedKnowledgeCredential
 
@@ -193,7 +193,7 @@ class InProcessAquilaKnowledgeAuthority:
 
     def authorize_operation(
         self,
-        request: GroundedEvidenceReadRequest,
+        request: EvidenceAuthorityContext,
         binding: ScopeBinding,
     ) -> AuthorizedKnowledgeCredential:
         try:
@@ -252,7 +252,7 @@ class InProcessAquilaKnowledgeAuthority:
 
     def record_outcome(
         self,
-        request: GroundedEvidenceReadRequest,
+        request: EvidenceAuthorityContext,
         binding: ScopeBinding,
         *,
         invocation_id: str,

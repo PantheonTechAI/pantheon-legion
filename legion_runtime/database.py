@@ -158,6 +158,7 @@ runtime_work_items = Table(
     Column("objective", Text, nullable=False),
     Column("required_capabilities", JSONB, nullable=False),
     Column("work_kind", String(64), nullable=False),
+    Column("evidence_checkpoint", JSONB(none_as_null=True)),
     Column("status", String(32), nullable=False),
     Column("version", Integer, nullable=False),
     Column("correlation_id", String(36), nullable=False),
@@ -172,7 +173,7 @@ runtime_work_items = Table(
     ),
     CheckConstraint("version > 0", name="ck_runtime_work_items_version"),
     CheckConstraint(
-        "work_kind IN ('READ_ONLY_ANALYSIS', 'GROUNDED_CORPUS_ANALYSIS', 'TOOL_ASSISTED_CORPUS_ANALYSIS', 'COGNITION_INTEGRATION_SPIKE')",
+        "work_kind IN ('READ_ONLY_ANALYSIS', 'GROUNDED_CORPUS_ANALYSIS', 'TOOL_ASSISTED_CORPUS_ANALYSIS', 'COGNITION_INTEGRATION_SPIKE', 'PROVENANCE_BOUND_CORPUS_ANALYSIS')",
         name="ck_runtime_work_items_kind",
     ),
 )
@@ -211,7 +212,7 @@ runtime_work_attempts = Table(
     CheckConstraint("mission_version IS NULL OR mission_version > 0", name="ck_runtime_work_attempts_mission_version"),
     CheckConstraint(
         "attempt_stage IS NULL OR attempt_stage IN "
-        "('MISSION_CONTEXT', 'EVIDENCE_RETRIEVAL', 'COGNITION', 'COGNITION_SELECTION', "
+        "('MISSION_CONTEXT', 'EVIDENCE_RETRIEVAL', 'EVIDENCE_REREAD', 'COGNITION', 'COGNITION_SELECTION', "
         "'COGNITION_INITIAL', 'TOOL_REQUESTED', 'COGNITION_CONTINUATION')",
         name="ck_runtime_work_attempts_stage",
     ),
@@ -278,6 +279,13 @@ runtime_work_evidence_references = Table(
     Column("source_type", String(32), nullable=False),
     Column("external_record_id", String(512), nullable=False),
     Column("external_revision", String(256), nullable=False),
+    Column("content_sha256", String(64)),
+    Column("content_bytes", Integer),
+    CheckConstraint(
+        "(content_sha256 IS NULL AND content_bytes IS NULL) OR "
+        "(content_sha256 IS NOT NULL AND content_bytes IS NOT NULL "
+        "AND content_sha256 ~ '^[0-9a-f]{64}$' AND content_bytes BETWEEN 1 AND 8192)",
+        name="ck_runtime_work_evidence_content"),
     Column("canonical_uri", String(2048), nullable=False),
     Column("scope_binding_id", String(512), nullable=False),
     Column("scope_binding_version", String(256), nullable=False),

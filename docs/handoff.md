@@ -1,8 +1,58 @@
 # Pantheon Legion Handoff
 
-Last updated: 2026-09-23
+Last updated: 2026-09-24
 
-## Current checkpoint — local commits caught up
+## Current checkpoint — PER-001 accepted implementation
+
+The owner authorized the reviewed evidence-reread implementation. Legion branch
+feat/provenance-evidence-reread and the separate Tabula worktree branch
+feat/legion-provenance-reread contain the coordinated change. The owner has
+authorized committing and pushing both branches; Tabula's matching implementation
+is commit d9e9374.
+[ADR-010](adr/ADR-010-provenance-bound-evidence-recovery.md) is accepted for this
+opt-in profile; production enablement remains separate.
+
+The real disposable Tabula/SIGKILL proof passes: original ordered bounded
+evidence is reread without search, fresh authority/citations produce one result,
+and revision/content/scope/no-op/actual-ingest/delete mutations safely refuse.
+Runtime stores only provenance metadata. Full Legion regression passes
+352 tests + 240 subtests, all five incumbent acceptance catalogs pass, Tabula
+passes 54 focused tests, and final corruption-guard checks pass 17 + 9 subtests.
+[Implementation evaluation and review](architecture/provenance-evidence-reread-implementation-review.md)
+records independent Claude **ACCEPT**, with no blocker or major findings,
+and a separate **ACCEPT** for the final audit-correlation correction. Two minor
+naming/query-cost observations are recorded as non-blocking follow-ups.
+All PER-01–PER-12 gates are closed. The new schema and shared fixture validate,
+and all 12 schema documents remain structurally valid.
+
+Existing fresh-search profiles and Strands DEFER remain unchanged. The next
+product milestone remains a bounded Centurion-led Mission experience; current
+record reread availability must be assessed against actual domain ingest cadence.
+
+## Prior checkpoint — evidence reread planning
+
+PR #74 is merged at d5fe8bf; local main was fast-forwarded to the same commit
+with a clean tree before this planning work. CFV retention and the separate
+deferred Strands experiment are now in that merged baseline.
+
+The owner directed proceeding with evidence-reread planning.
+[PER-001](architecture/provenance-evidence-reread-plan.md) defines a joint
+Legion/Tabula contract and an opt-in persistent Scout recovery profile.
+[ADR-010](adr/ADR-010-provenance-bound-evidence-recovery.md) remains Proposed.
+Tabula's inspected local 10133cf baseline stores current records, so the plan
+promises exact previously delivered content or safe refusal, not historical
+revision retrieval. Runtime would persist only ordered provenance, byte counts
+and digests, then reread under fresh authority after process loss.
+
+Focused existing baseline checks pass: Legion 15 tests, Tabula 16 tests.
+The [planning evaluation/review](architecture/provenance-evidence-reread-review.md)
+records the evidence and final independent Claude **ACCEPT** after remediation,
+with no open material findings. No implementation or Tabula source change has
+been made. Existing fresh-search recovery and the
+Strands DEFER recommendation remain in effect. The bounded Centurion-led
+Mission experience remains the next product milestone after this contract work.
+
+## Prior checkpoint — local commits caught up
 
 The owner requested commit catch-up before starting the next implementation
 slice. CFV-001 is independently retained in c3f9864; the completed Strands

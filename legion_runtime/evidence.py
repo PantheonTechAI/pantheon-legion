@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Protocol
 
 from legion_kernel import Principal
 
-from .work import _bounded, _timestamp, _utf8_bounded, _uuid
+from .work import EvidenceCheckpointInvalid, WorkEvidenceReference, _bounded, _timestamp, _utf8_bounded, _uuid
 
 
 MAX_EVIDENCE_RECORDS = 8
@@ -109,3 +110,64 @@ class GroundedEvidenceBundle:
 
 class GroundedEvidenceReader(Protocol):
     def read(self, request: GroundedEvidenceReadRequest) -> GroundedEvidenceBundle: ...
+
+
+class EvidenceAuthorityContext(Protocol):
+    organization_id: str
+    workspace_id: str
+    mission_id: str
+    agent_id: str
+    assignment_id: str
+    workload: Principal
+    delegation_id: str
+    work_item_id: str
+    attempt_id: str
+    correlation_id: str
+
+
+@dataclass(frozen=True)
+class GroundedEvidenceRereadRequest:
+    organization_id: str
+    workspace_id: str
+    mission_id: str
+    agent_id: str
+    assignment_id: str
+    workload: Principal
+    delegation_id: str
+    work_item_id: str
+    attempt_id: str
+    correlation_id: str
+    references: tuple[WorkEvidenceReference, ...]
+
+    def __post_init__(self):
+        for name in ("organization_id", "workspace_id", "mission_id", "agent_id",
+                     "assignment_id", "work_item_id", "attempt_id", "correlation_id"):
+            _uuid(getattr(self, name), name)
+        _bounded(self.delegation_id, "delegation_id", 1, 512)
+        validate_recorded_references(self.work_item_id, self.references)
+
+
+def validate_recorded_references(work_item_id, references):
+    try:
+        if (not isinstance(references, tuple) or not 1 <= len(references) <= 8
+                or any(type(ref) is not WorkEvidenceReference for ref in references)
+                or any(ref.work_item_id != work_item_id or ref.content_bytes is None
+                       or ref.content_sha256 is None for ref in references)
+                or len({ref.evidence_reference_id for ref in references}) != len(references)
+                or len({ref.external_record_id for ref in references}) != len(references)
+                or len({ref.attempt_id for ref in references}) != 1
+                or len({(ref.scope_binding_id, ref.scope_binding_version) for ref in references}) != 1
+                or sum(ref.content_bytes for ref in references) > MAX_EVIDENCE_TOTAL_BYTES):
+            raise ValueError
+        for ref in references:
+            ref.__post_init__()
+            _uuid(ref.scope_binding_id, "scope_binding_id")
+            if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", ref.scope_binding_version):
+                raise ValueError
+            _bounded(ref.external_revision, "external_revision", 1, 128)
+    except (ValueError, TypeError, AttributeError):
+        raise EvidenceCheckpointInvalid() from None
+
+
+class GroundedEvidenceRereader(Protocol):
+    def reread(self, request: GroundedEvidenceRereadRequest) -> GroundedEvidenceBundle: ...

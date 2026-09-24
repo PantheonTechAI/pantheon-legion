@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
 import json
+import re
 from uuid import UUID
 
 
@@ -29,6 +30,7 @@ class AttemptStatus(str, Enum):
 class WorkKind(str, Enum):
     READ_ONLY_ANALYSIS = "READ_ONLY_ANALYSIS"
     GROUNDED_CORPUS_ANALYSIS = "GROUNDED_CORPUS_ANALYSIS"
+    PROVENANCE_BOUND_CORPUS_ANALYSIS = "PROVENANCE_BOUND_CORPUS_ANALYSIS"
     TOOL_ASSISTED_CORPUS_ANALYSIS = "TOOL_ASSISTED_CORPUS_ANALYSIS"
     COGNITION_INTEGRATION_SPIKE = "COGNITION_INTEGRATION_SPIKE"
 
@@ -36,6 +38,7 @@ class WorkKind(str, Enum):
 class AttemptStage(str, Enum):
     MISSION_CONTEXT = "MISSION_CONTEXT"
     EVIDENCE_RETRIEVAL = "EVIDENCE_RETRIEVAL"
+    EVIDENCE_REREAD = "EVIDENCE_REREAD"
     COGNITION = "COGNITION"
     COGNITION_SELECTION = "COGNITION_SELECTION"
     COGNITION_INITIAL = "COGNITION_INITIAL"
@@ -45,6 +48,38 @@ class AttemptStage(str, Enum):
 
 class EvidenceSourceType(str, Enum):
     TABULA_CORPUS = "TABULA_CORPUS"
+
+
+class EvidenceCheckpointInvalid(ValueError):
+    def __init__(self):
+        super().__init__("EVIDENCE_CHECKPOINT_INVALID")
+
+
+@dataclass(frozen=True)
+class EvidenceCheckpoint:
+    reference_ids: tuple[str, ...]
+    projection: str = "utf8-prefix-v1"
+
+    def __post_init__(self):
+        try:
+            if (self.projection != "utf8-prefix-v1" or not isinstance(self.reference_ids, tuple)
+                    or not 1 <= len(self.reference_ids) <= 8
+                    or len(set(self.reference_ids)) != len(self.reference_ids)):
+                raise ValueError
+            for value in self.reference_ids:
+                _uuid(value, "evidence_reference_id")
+        except (ValueError, TypeError):
+            raise EvidenceCheckpointInvalid() from None
+
+    def payload(self):
+        return {"projection": self.projection, "reference_ids": list(self.reference_ids)}
+
+    @classmethod
+    def from_payload(cls, value):
+        if (not isinstance(value, dict) or set(value) != {"projection", "reference_ids"}
+                or not isinstance(value["reference_ids"], list)):
+            raise EvidenceCheckpointInvalid()
+        return cls(tuple(value["reference_ids"]), value["projection"])
 
 
 @dataclass(frozen=True)
@@ -66,6 +101,7 @@ class WorkItem:
     cancelled_at: str | None = None
     cancellation_reason: str | None = None
     kind: WorkKind = WorkKind.READ_ONLY_ANALYSIS
+    evidence_checkpoint: EvidenceCheckpoint | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -104,11 +140,17 @@ class WorkItem:
         profiles = {
             WorkKind.READ_ONLY_ANALYSIS: ("read_only_analysis",),
             WorkKind.GROUNDED_CORPUS_ANALYSIS: ("read_only_analysis", "tabula_corpus_read"),
+            WorkKind.PROVENANCE_BOUND_CORPUS_ANALYSIS: ("read_only_analysis", "model_reasoning", "tabula_corpus_read"),
             WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS: ("read_only_analysis", "model_reasoning", "tabula_corpus_read"),
             WorkKind.COGNITION_INTEGRATION_SPIKE: ("experimental_cognition", "model_reasoning", "tabula_corpus_read", "fixture_effect"),
         }
         if self.kind not in profiles or self.required_capabilities != profiles[self.kind]:
             raise ValueError("work requires exact capabilities")
+        if self.evidence_checkpoint is not None and (
+            type(self.evidence_checkpoint) is not EvidenceCheckpoint
+            or self.kind != WorkKind.PROVENANCE_BOUND_CORPUS_ANALYSIS
+        ):
+            raise EvidenceCheckpointInvalid()
         if self.kind != WorkKind.READ_ONLY_ANALYSIS and len(self.objective) > 2000:
             raise ValueError("grounded objective exceeds Corpus query limit")
 
@@ -195,8 +237,15 @@ class WorkEvidenceReference:
     tabula_audit_correlation_id: str
     retrieved_at: str
     created_at: str
+    content_sha256: str | None = None
+    content_bytes: int | None = None
 
     def __post_init__(self) -> None:
+        if self.content_sha256 is not None or self.content_bytes is not None:
+            if (type(self.content_bytes) is not int or not 1 <= self.content_bytes <= 8192
+                    or not isinstance(self.content_sha256, str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", self.content_sha256)):
+                raise EvidenceCheckpointInvalid()
         for name in (
             "evidence_reference_id",
             "work_item_id",

@@ -11,6 +11,13 @@ CFV is in c3f9864; the deferred experiment is separately recorded in 518fb73.
 The baseline and uncommitted descriptions below describe the original review
 checkpoint. Evidence-reread and Mission-loop priorities remain proposed.
 
+PR #74 subsequently merged at d5fe8bf. The owner-directed evidence-reread
+planning step is now elaborated in [PER-001](provenance-evidence-reread-plan.md)
+and subsequently accepted ADR-010. The owner then authorized the bounded
+implementation; see its implementation review package. That joint inspection found current-only Tabula records
+and the bounded-content amendment committed locally at 10133cf; it makes no
+claim about Tabula remote merge or deployed state.
+
 ## Intent and evidence boundary
 
 Select the smallest useful next delivery toward a persistent organization that

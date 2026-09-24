@@ -69,6 +69,7 @@ How will the decision be tested or revisited?
 | [ADR-007](./ADR-007-capability-selected-authorized-cognition.md) | Capability-selected and separately authorized cognition | Accepted; implemented and live-verified |
 | [ADR-008](./ADR-008-subordinate-strands-cognition-spike.md) | Isolated evaluation of a subordinate Strands cognition harness | Spike evidence independently accepted; DEFER adoption recommendation |
 | [ADR-009](./ADR-009-evidence-producing-offering-validation.md) | Evidence-producing offering validation | Bounded development validator independently accepted; live validation PASS (2026-09-23) |
+| [ADR-010](./ADR-010-provenance-bound-evidence-recovery.md) | Opt-in provenance-bound evidence recovery | Accepted for opt-in PER-001 implementation |
 
 ## Review checklist
 

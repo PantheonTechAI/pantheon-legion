@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from datetime import datetime
 from typing import Any, Callable, Protocol
 import re
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-from .mcp import McpResponse, McpTransportError
+from .mcp import McpHttpTransport, McpResponse, McpTransportError
 
 _ERROR_CODES = frozenset({"INVALID_REQUEST", "AUTHORIZATION_DENIED", "DEADLINE_EXCEEDED", "SERVICE_UNAVAILABLE", "INTERNAL_ERROR"})
 _INTENTS = frozenset({"SCOUT_EVIDENCE", "OPERATOR_CONTEXT"})
@@ -91,7 +92,7 @@ class CorpusReadError(RuntimeError):
 
 
 class TabulaCorpusClient:
-    """Calls only ``legion_search_corpus`` and validates contract-v1 responses."""
+    """Validate bounded federated search and exact provenance reread contracts."""
 
     def __init__(self, transport: McpTransport) -> None:
         self._transport = transport
@@ -136,6 +137,79 @@ class TabulaCorpusClient:
                 continue
             raise error
         raise AssertionError("unreachable")
+
+    def reread(self, *, token: Callable[[], str], binding: ScopeBinding,
+               references: tuple[CorpusReference, ...], correlation_id: str) -> CorpusRead:
+        if (not callable(token) or not isinstance(references, tuple) or not 1 <= len(references) <= 8
+                or any(type(ref) is not CorpusReference for ref in references)
+                or len({ref.record_id for ref in references}) != len(references)
+                or sum(ref.content_bytes for ref in references) > 32768):
+            raise ValueError("TABULA_CORPUS_REQUEST_INVALID")
+        if isinstance(self._transport, McpHttpTransport) and (
+            self._transport.max_response_bytes is None or self._transport.max_response_bytes > 1024 * 1024
+        ):
+            raise ValueError("TABULA_REREAD_TRANSPORT_UNBOUNDED")
+        _require_uuid(correlation_id)
+        for attempt in range(2):
+            request_id = str(uuid4())
+            request = {"schema_version": "1.0", "request_id": request_id,
+                       "correlation_id": correlation_id, "binding": binding.payload(),
+                       "intent": "SCOUT_EVIDENCE", "projection": "utf8-prefix-v1",
+                       "references": [ref.payload() for ref in references]}
+            try:
+                reply = self._transport(token, {"name": "legion_reread_corpus", "arguments": request})
+            except McpTransportError as exc:
+                raise CorpusReadError(exc.code, request_id=request_id, correlation_id=correlation_id) from None
+            except OSError:
+                raise CorpusReadError("SERVICE_UNAVAILABLE", request_id=request_id, correlation_id=correlation_id) from None
+            if reply.status_code == 401:
+                raise CorpusReadError("UNAUTHENTICATED", request_id=request_id, correlation_id=correlation_id)
+            if reply.status_code != 200 or not isinstance(reply.body, dict):
+                raise CorpusReadError("TABULA_PROTOCOL_ERROR", request_id=request_id, correlation_id=correlation_id)
+            if "code" in reply.body:
+                error = _parse_error(reply.body, request_id, correlation_id)
+                if error.code == "SERVICE_UNAVAILABLE" and attempt == 0:
+                    continue
+                raise error
+            result = _parse_success(reply.body, request_id, correlation_id, binding, len(references))
+            try:
+                if len(result.records) != len(references):
+                    raise ValueError
+                for record, ref in zip(result.records, references, strict=True):
+                    raw = record.content.encode("utf-8") if isinstance(record.content, str) else b""
+                    if ((record.record_id, record.revision, record.canonical_uri) !=
+                            (ref.record_id, ref.revision, ref.canonical_uri)
+                            or len(raw) != ref.content_bytes or sha256(raw).hexdigest() != ref.content_sha256):
+                        raise ValueError
+            except (ValueError, TypeError, UnicodeError):
+                raise CorpusReadError("TABULA_PROTOCOL_ERROR", request_id=request_id,
+                                      correlation_id=correlation_id,
+                                      tabula_audit_correlation_id=result.tabula_audit_correlation_id) from None
+            return result
+        raise AssertionError("unreachable")
+
+
+@dataclass(frozen=True)
+class CorpusReference:
+    record_id: str
+    revision: str
+    canonical_uri: str
+    content_bytes: int
+    content_sha256: str
+
+    def __post_init__(self):
+        for value, maximum in ((self.record_id, 512), (self.revision, 128), (self.canonical_uri, 2048)):
+            if not isinstance(value, str) or not 1 <= len(value) <= maximum:
+                raise ValueError("TABULA_CORPUS_REFERENCE_INVALID")
+            value.encode("utf-8")
+        _require_uri(self.canonical_uri)
+        if (type(self.content_bytes) is not int or not 1 <= self.content_bytes <= 8192
+                or not isinstance(self.content_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", self.content_sha256)):
+            raise ValueError("TABULA_CORPUS_REFERENCE_INVALID")
+
+    def payload(self):
+        return {"record_id": self.record_id, "revision": self.revision,
+                "content_bytes": self.content_bytes, "content_sha256": self.content_sha256}
 
 
 def _parse_success(body: dict[str, Any], request_id: str, correlation_id: str, binding: ScopeBinding, limit: int) -> CorpusRead:

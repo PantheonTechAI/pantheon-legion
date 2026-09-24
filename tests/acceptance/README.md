@@ -361,3 +361,40 @@ experimental facts, identities, budgets, fences, accepted result and digest.
 See [completion plan](../../docs/architecture/strands-completion-plan.md) and
 [findings](../../docs/architecture/strands-spike-results.md), including failed
 live profiles; a deterministic PASS does not imply live profile success.
+
+## PER-001 provenance-bound recovery
+
+The opt-in proof uses real disposable Tabula, a dedicated Runtime test database
+and deterministic local HTTP inference through AuthorizedCognitionInvoker.
+No real model or Strands dependency is needed. Set
+LEGION_RUNTIME_TEST_DATABASE_URL to a new dedicated database ending in _test,
+migrate it to head, and create a Tabula fixture env file from
+tests/federation/cognition.env.example with unique loopback ports and a
+disposable CREDENTIAL_ENCRYPTION_KEY.
+
+~~~sh
+python -m tests.acceptance.provenance_runner \
+  --execute --reset-test-database \
+  --tabula-root /path/to/isolated-tabula-worktree \
+  --env-file /path/to/isolated-tabula-worktree/.env.per001 \
+  --project-name pantheon-federation-unique-per001 \
+  --report /tmp/unique-per001-report.json
+~~~
+
+The env file must be inside the isolated worktree and must never be committed.
+The runner requires a fresh project, disables telemetry, Tabula inference and
+pollers, seeds synthetic records, and removes its owned containers/volumes/
+network. It resets the explicitly named test database; create a dedicated one
+and remove it afterward. No database server restart is performed.
+
+A first worker searches and commits a five-record checkpoint before actual
+SIGKILL. A fresh worker reconciles and rereads with search disabled, verifies
+8189/8189/8189/8189/12-byte prefixes, six distinct knowledge decisions across
+cold sessions and one fresh cognition decision, and accepts one cited result.
+Then revision, prefix, domain, no-op save, actual no-revision ingest and
+delete/recreate mutations must each refuse. Invalid requests, audit/log
+sentinels, source fingerprints, shared fixtures and cleanup are checked.
+
+The new 0600 report contains safe metadata. Failed reports are retained and
+must not be overwritten. A deterministic inference PASS proves the invocation
+contract and exact inputs, not real-model assessment quality.

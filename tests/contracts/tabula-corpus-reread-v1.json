@@ -1,0 +1,65 @@
+{
+  "request": {
+    "schema_version": "1.0",
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "correlation_id": "22222222-2222-4222-8222-222222222222",
+    "binding": {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "version": "1.0.0"
+    },
+    "intent": "SCOUT_EVIDENCE",
+    "projection": "utf8-prefix-v1",
+    "references": [
+      {
+        "record_id": "0191cc35-1400-7000-8000-000000000001",
+        "revision": "1",
+        "content_bytes": 6,
+        "content_sha256": "3f081536ae8da48f2006638654672fb6bc6fe7f5917c6332717c030cb21013d5"
+      },
+      {
+        "record_id": "0191cc35-1400-7000-8000-000000000002",
+        "revision": "1",
+        "content_bytes": 4,
+        "content_sha256": "8950abfda7b727630760dd35bcf5c3daa7631aff223a90f7728c0d2521dde10c"
+      }
+    ]
+  },
+  "response": {
+    "schema_version": "1.0",
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "correlation_id": "22222222-2222-4222-8222-222222222222",
+    "binding": {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "version": "1.0.0"
+    },
+    "results": [
+      {
+        "record_id": "0191cc35-1400-7000-8000-000000000001",
+        "revision": "1",
+        "domain": "standards",
+        "canonical_uri": "urn:pantheon:tabula:corpus:0191cc35-1400-7000-8000-000000000001",
+        "source": {
+          "citation": "Synthetic shared conformance fixture"
+        },
+        "recorded_at": "2024-09-08T00:00:00Z",
+        "retrieved_at": "2026-09-24T00:00:00Z",
+        "selection_explanation": "Verified recorded prefix.",
+        "content": "ab\ud83d\ude00"
+      },
+      {
+        "record_id": "0191cc35-1400-7000-8000-000000000002",
+        "revision": "1",
+        "domain": "standards",
+        "canonical_uri": "urn:pantheon:tabula:corpus:0191cc35-1400-7000-8000-000000000002",
+        "source": {
+          "citation": "Synthetic shared conformance fixture"
+        },
+        "recorded_at": "2024-09-08T00:00:00Z",
+        "retrieved_at": "2026-09-24T00:00:00Z",
+        "selection_explanation": "Verified recorded prefix.",
+        "content": "tiny"
+      }
+    ],
+    "tabula_audit_correlation_id": "44444444-4444-4444-8444-444444444444"
+  }
+}

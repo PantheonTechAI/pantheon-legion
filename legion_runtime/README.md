@@ -180,3 +180,37 @@ Praetorium renders the authorized safe projection and isolates Runtime failure.
 This is an invocable capability, not an always-on worker or production provider
 rollout. Operators must deliberately provision `INVOKE_COGNITION` grants;
 existing grants are never broadened automatically.
+
+## Provenance-bound evidence recovery (PER-001)
+
+`PROVENANCE_BOUND_CORPUS_ANALYSIS` is opt-in and requires
+`read_only_analysis`, `model_reasoning`, and `tabula_corpus_read`. Supply
+`FederatedCorpusEvidenceReader` with
+`McpHttpTransport(endpoint, max_response_bytes=1048576)` and an
+`AuthorizedCognitionInvoker`. It uses one closed assessment, no model tools,
+generic ReadOnlyCognition, stored conversation or Strands.
+
+The first objective search atomically records evidence references and an
+immutable ordered checkpoint. Only metadata, delivered UTF-8 byte counts and
+SHA-256 digests are stored. Replacement attempts use `legion_reread_corpus`,
+fresh citations and fresh knowledge/cognition decisions. At most one result is
+accepted. Missing invokers or incompatible servers fail explicitly.
+
+This verifies current records. Missing/revised/out-of-scope or changed prefixes
+refuse the whole bundle. No-op revision bumps and reingest removing revision
+also refuse. Unseen suffixes are outside the guarantee. Existing grounded and
+tool-assisted profiles retain fresh-search recovery.
+
+Apply migration `0006` explicitly. Legacy metadata stays null; downgrade
+refuses populated provenance or new-profile data. The read model exposes
+checkpoint IDs, current attempt stage/error and accepted evidence hashes/counts.
+
+Recovery runbook: inspect the latest attempt and checkpoint, restore the
+original authorized scope if appropriate, then reconcile and claim. A retry
+never broadens scope or changes evidence. `EVIDENCE_REREAD_UNAVAILABLE` and
+`EVIDENCE_CHECKPOINT_INVALID` require an explicit decision to create fresh work
+if fresh evidence is wanted. Do not clear the checkpoint to force recovery.
+
+See [ADR-010](../docs/adr/ADR-010-provenance-bound-evidence-recovery.md),
+[plan](../docs/architecture/provenance-evidence-reread-plan.md), and
+[acceptance instructions](../tests/acceptance/README.md).

@@ -1,0 +1,508 @@
+{
+  "accepted_attempt_id": "849eda08-2df5-453a-8099-033edf467750",
+  "agent_id": "a49c43fb-eb8e-4f0b-b5a7-0221965b2b91",
+  "backend_probe": {
+    "bounded_exact_count": 1,
+    "keys": [
+      "message",
+      "statusCode"
+    ],
+    "sdk": "RushDBError",
+    "sdk_status": 500,
+    "status": 500
+  },
+  "byte_counts": [
+    8189,
+    8189,
+    8189,
+    8189,
+    12
+  ],
+  "checkpoint_unchanged": true,
+  "disposable_stack_removed": true,
+  "exit_signal": "SIGKILL",
+  "first_attempt_id": "945af6cc-53f5-4ecd-8e0d-b901dc505315",
+  "independent_review": {
+    "addendum": "ACCEPT; no blocker, major or minor findings",
+    "addendum_review": "per001-claude-addendum-20260924.md",
+    "blocker_count": 0,
+    "major_count": 0,
+    "minor_count": 2,
+    "minor_disposition": "Recorded non-blocking naming/query-cost follow-ups",
+    "review": "per001-claude-review-20260924.md",
+    "verdict": "ACCEPT"
+  },
+  "inference": "deterministic local HTTP fixture through AuthorizedCognitionInvoker",
+  "inference_decision_ids": [
+    "9d7584ba-a120-4a91-ac5c-8b6145113ad0"
+  ],
+  "initial_byte_counts": [
+    8189,
+    8189,
+    8189,
+    8189,
+    12
+  ],
+  "initial_record_count": 5,
+  "initial_tools": [
+    "legion_search_corpus"
+  ],
+  "knowledge_decision_ids": [
+    [
+      "182d8885-84ef-467e-a36a-67bcecdcdd10",
+      "43e79305-6891-437c-a43d-eb19743e80e9",
+      "43e78014-b5d3-4310-b760-43d67449b3bd"
+    ],
+    [
+      "e473fcba-5242-4167-be94-0c18c23b53db",
+      "21e6d23c-4888-4b76-b466-8822d9e930a3",
+      "60c2b4a1-f90a-419a-a415-f912b2a15209"
+    ]
+  ],
+  "limits": {
+    "bundle_bytes": 32768,
+    "post_auth_seconds": 7,
+    "record_bytes": 8192,
+    "records": 8,
+    "wire_bytes": 1048576
+  },
+  "mutation_metadata": {
+    "changed": {
+      "action": "changed",
+      "revision_present": true
+    },
+    "delete": {
+      "missing_data_empty": true,
+      "missing_data_type": "NoneType",
+      "missing_keys": [
+        "error",
+        "message",
+        "statusCode"
+      ],
+      "missing_status": 403,
+      "replacement_id": "01a0d41e-a9f0-756e-abcb-7387a2c2de7a"
+    },
+    "ingest": {
+      "action": "ingest",
+      "revision_present": false
+    },
+    "noop": {
+      "action": "noop",
+      "revision_present": true
+    },
+    "revision": {
+      "action": "revision",
+      "revision_present": true
+    },
+    "scope": {
+      "action": "scope",
+      "revision_present": true
+    }
+  },
+  "phase": "complete",
+  "post_proof_remediation": {
+    "files_sha256": {
+      "mcp_server/main.py": "6fb300bdeca469598ad1102990406decc56f3acac54a99b8a3fac8ef0f3049d4",
+      "tests/test_reread_middleware.py": "85877f1962345521e34cd7fb2667b985f9a462cd98b762630fec0098850e90e4"
+    },
+    "focused_addendum": "ACCEPT; no blocker, major or minor findings",
+    "full_review": "ACCEPT; no blocker or major findings",
+    "issue": "Unexpected middleware exception lacked the response correlation ID in its audit row",
+    "regression_before_fix": {
+      "failed": 1,
+      "passed": 1
+    }
+  },
+  "prior_runs": [
+    {
+      "disposable_stack_removed": true,
+      "error_frames": [
+        {
+          "file": "provenance_runner.py",
+          "function": "main",
+          "line": 263
+        },
+        {
+          "file": "provenance_runner.py",
+          "function": "execute",
+          "line": 166
+        }
+      ],
+      "error_type": "AssertionError",
+      "phase": "recovery_and_mutation_proof",
+      "report": "/tmp/per001-live-eef9ae5d.json",
+      "status": "FAIL"
+    },
+    {
+      "disposable_stack_removed": true,
+      "error_frames": [
+        {
+          "file": "provenance_runner.py",
+          "function": "main",
+          "line": 264
+        },
+        {
+          "file": "provenance_runner.py",
+          "function": "execute",
+          "line": 170
+        },
+        {
+          "file": "provenance_runner.py",
+          "function": "run_worker",
+          "line": 140
+        }
+      ],
+      "error_type": "RuntimeError",
+      "initial_byte_counts": [
+        8189,
+        8189,
+        8189,
+        8189,
+        12
+      ],
+      "initial_record_count": 5,
+      "phase": "recovery_and_mutation_proof",
+      "report": "/tmp/per001-live-eef9ae5d-second.json",
+      "status": "FAIL"
+    },
+    {
+      "backend_probe": {
+        "keys": [
+          "message",
+          "statusCode"
+        ],
+        "sdk": "RushDBError",
+        "sdk_status": 500,
+        "status": 500
+      },
+      "disposable_stack_removed": true,
+      "error_frames": [
+        {
+          "file": "provenance_runner.py",
+          "function": "main",
+          "line": 265
+        },
+        {
+          "file": "provenance_runner.py",
+          "function": "execute",
+          "line": 171
+        },
+        {
+          "file": "provenance_runner.py",
+          "function": "run_worker",
+          "line": 140
+        }
+      ],
+      "error_type": "RuntimeError",
+      "initial_byte_counts": [
+        8189,
+        8189,
+        8189,
+        8189,
+        12
+      ],
+      "initial_record_count": 5,
+      "phase": "recovery_and_mutation_proof",
+      "report": "/tmp/per001-live-eef9ae5d-third.json",
+      "status": "FAIL"
+    },
+    {
+      "backend_probe": {
+        "bounded_exact_count": 1,
+        "keys": [
+          "message",
+          "statusCode"
+        ],
+        "sdk": "RushDBError",
+        "sdk_status": 500,
+        "status": 500
+      },
+      "disposable_stack_removed": true,
+      "error_frames": [
+        {
+          "file": "provenance_runner.py",
+          "function": "main",
+          "line": 265
+        },
+        {
+          "file": "provenance_runner.py",
+          "function": "execute",
+          "line": 212
+        }
+      ],
+      "error_type": "AssertionError",
+      "initial_byte_counts": [
+        8189,
+        8189,
+        8189,
+        8189,
+        12
+      ],
+      "initial_record_count": 5,
+      "phase": "recovery_and_mutation_proof",
+      "report": "/tmp/per001-live-eef9ae5d-fourth.json",
+      "status": "FAIL"
+    },
+    {
+      "backend_probe": {
+        "bounded_exact_count": 1,
+        "keys": [
+          "message",
+          "statusCode"
+        ],
+        "sdk": "RushDBError",
+        "sdk_status": 500,
+        "status": 500
+      },
+      "disposable_stack_removed": true,
+      "error_frames": [
+        {
+          "file": "provenance_runner.py",
+          "function": "main",
+          "line": 302
+        },
+        {
+          "file": "provenance_runner.py",
+          "function": "execute",
+          "line": 229
+        }
+      ],
+      "error_type": "AssertionError",
+      "initial_byte_counts": [
+        8189,
+        8189,
+        8189,
+        8189,
+        12
+      ],
+      "initial_record_count": 5,
+      "phase": "recovery_and_mutation_proof",
+      "real_mutation_refusals": {
+        "changed": "EVIDENCE_REREAD_UNAVAILABLE",
+        "delete": "INTERNAL_ERROR",
+        "ingest": "EVIDENCE_REREAD_UNAVAILABLE",
+        "noop": "EVIDENCE_REREAD_UNAVAILABLE",
+        "revision": "EVIDENCE_REREAD_UNAVAILABLE",
+        "scope": "EVIDENCE_REREAD_UNAVAILABLE"
+      },
+      "report": "/tmp/per001-live-eef9ae5d-fifth.json",
+      "status": "FAIL"
+    },
+    {
+      "backend_probe": {
+        "bounded_exact_count": 1,
+        "keys": [
+          "message",
+          "statusCode"
+        ],
+        "sdk": "RushDBError",
+        "sdk_status": 500,
+        "status": 500
+      },
+      "disposable_stack_removed": true,
+      "error_frames": [
+        {
+          "file": "provenance_runner.py",
+          "function": "main",
+          "line": 303
+        },
+        {
+          "file": "provenance_runner.py",
+          "function": "execute",
+          "line": 230
+        }
+      ],
+      "error_type": "AssertionError",
+      "initial_byte_counts": [
+        8189,
+        8189,
+        8189,
+        8189,
+        12
+      ],
+      "initial_record_count": 5,
+      "phase": "recovery_and_mutation_proof",
+      "real_mutation_refusals": {
+        "changed": "EVIDENCE_REREAD_UNAVAILABLE",
+        "delete": "INTERNAL_ERROR",
+        "ingest": "EVIDENCE_REREAD_UNAVAILABLE",
+        "noop": "EVIDENCE_REREAD_UNAVAILABLE",
+        "revision": "EVIDENCE_REREAD_UNAVAILABLE",
+        "scope": "EVIDENCE_REREAD_UNAVAILABLE"
+      },
+      "report": "/tmp/per001-live-eef9ae5d-sixth.json",
+      "status": "FAIL"
+    },
+    {
+      "backend_probe": {
+        "bounded_exact_count": 1,
+        "keys": [
+          "message",
+          "statusCode"
+        ],
+        "sdk": "RushDBError",
+        "sdk_status": 500,
+        "status": 500
+      },
+      "disposable_stack_removed": true,
+      "initial_byte_counts": [
+        8189,
+        8189,
+        8189,
+        8189,
+        12
+      ],
+      "initial_record_count": 5,
+      "phase": "complete",
+      "real_mutation_refusals": {
+        "changed": "EVIDENCE_REREAD_UNAVAILABLE",
+        "delete": "EVIDENCE_REREAD_UNAVAILABLE",
+        "ingest": "EVIDENCE_REREAD_UNAVAILABLE",
+        "noop": "EVIDENCE_REREAD_UNAVAILABLE",
+        "revision": "EVIDENCE_REREAD_UNAVAILABLE",
+        "scope": "EVIDENCE_REREAD_UNAVAILABLE"
+      },
+      "report": "/tmp/per001-live-eef9ae5d-seventh.json",
+      "status": "PASS"
+    }
+  ],
+  "profile": "PER-001",
+  "raw_content_absent_from_runtime_facts": true,
+  "raw_sentinels_absent_from_aquila_audit": true,
+  "raw_sentinels_absent_from_service_logs": true,
+  "real_invalid_request_refused": true,
+  "real_mutation_refusals": {
+    "changed": "EVIDENCE_REREAD_UNAVAILABLE",
+    "delete": "EVIDENCE_REREAD_UNAVAILABLE",
+    "ingest": "EVIDENCE_REREAD_UNAVAILABLE",
+    "noop": "EVIDENCE_REREAD_UNAVAILABLE",
+    "revision": "EVIDENCE_REREAD_UNAVAILABLE",
+    "scope": "EVIDENCE_REREAD_UNAVAILABLE"
+  },
+  "record_count": 5,
+  "recovery_tools": [
+    "legion_reread_corpus"
+  ],
+  "result_id": "5d03637a-5e76-458a-adcc-88b56beb9ae9",
+  "shared_fixture_sha256": "cbcfbe170ceb89b193d04479d45160e670f711ffa836e0ddb72a971065603b50",
+  "sources": {
+    "legion": {
+      "changed_file_sha256": {
+        "aquila_api/runtime_authority.py": "0be70e02c17f6b104470ef4866f4542aaab5bb014e88b2f31a9280e696d0dc39",
+        "docs/adr/ADR-010-provenance-bound-evidence-recovery.md": "09d9b2ef74fb112837056f945e9fcda1180e6e0acfcc9716cbc32e53e2291c5d",
+        "docs/adr/README.md": "cad856fc5a930c208db2755f77a34d016dd2de412ba694ef878aa8f74f8114c8",
+        "docs/architecture/next-work-plan-2026-09-23.md": "105ed95079c9afb26ab5d8d74a816167ef6646ca837fda83bf2f168758b4916a",
+        "docs/architecture/provenance-evidence-reread-plan.md": "8381b650035360a47a49100259e4a9dfebf8d1e86ac8f188cd6a06802bcbf715",
+        "docs/architecture/provenance-evidence-reread-review.md": "45412e0776c2d6d4e1f68d29155bc18495014d2568a4b93d1e2fa8650dd10f9a",
+        "docs/handoff.md": "41e6d146a58de3dbc512560d5fb3cf5637d6c27c4bb02d8093c84b214e1dcf57",
+        "legion_runtime/alembic/versions/0006_provenance_evidence.py": "88e162ffd4f877c6f09b6d5621ab5ae3af2fb2bba9eda811b8a982e3124dcbfa",
+        "legion_runtime/database.py": "01723a71829a580b07c04012e6f9c7ae8b586bd8e4c72dc42f40dd6aa1c5bde1",
+        "legion_runtime/evidence.py": "ba7012882a4492a9372632569b7709cefd37a7ce40947bc786af541a8ad2a1a2",
+        "legion_runtime/postgres.py": "9844a427672ff67bc25b85af7a0f512a8d0b1e7b26ba0b5e1719796875642532",
+        "legion_runtime/provenance.py": "d1ab9e7ee13f28a8e880e28ac23d2d7d266a5865fcdb69af12a18632c5a0654e",
+        "legion_runtime/read_model.py": "4f08aba28247b9fb72586c5823dbd930897cff74fa9213d8aa2bdd8e6c1d5934",
+        "legion_runtime/service.py": "79093478026bc0153a66419d0b0cc6c33482b18ec9dab840d5ffd6a25ff29a8c",
+        "legion_runtime/work.py": "c7c4b193969f2523a982af5ff6a01e1d0384ab3d970ef866690e7aae570b3b6d",
+        "legion_tabula/corpus.py": "cc656e5000053615696e0ed88c50d9bae7741c1a0d90741fc6f4293f180b72aa",
+        "legion_tabula/mcp.py": "daaa1f13d41ddca63b2fd0d7cc025b3c1197e23f4431bf7d8b82fa54c64a41aa",
+        "legion_tabula/runtime_adapter.py": "6c39e3867a183871007fc830c5ef09a02d44d0f729bdade0ff6500748b0f441c",
+        "schemas/tabula-corpus-reread.schema.json": "f7bf3d31d5eec705f1f9ae5b0ca8660e066a0a86c1f195e6fd96117d657b52af",
+        "tests/acceptance/provenance_runner.py": "248d2f5efd76a815fda928626ceb470ef44aaf00ef60e925846b32475da4be44",
+        "tests/contracts/tabula-corpus-reread-v1.json": "cbcfbe170ceb89b193d04479d45160e670f711ffa836e0ddb72a971065603b50",
+        "tests/test_corpus_reread.py": "58381e75cbc17edc55d6326cba02d961785eee519450b19ae2267a6a1c6516c0",
+        "tests/test_grounded_scout_migration.py": "66859aee3072539a01f36c7b8b23f314e233ab10b10eb76399f43415bdf584b3",
+        "tests/test_phase2_migration.py": "0a75648eee48ee06163aa1f8e09d296cab70f5b7d13ae8bdd1a37c43db2b2f18",
+        "tests/test_provenance_recovery.py": "9eebf946a130fe4b1a46d91d44cd50dfe3f3dc4f03a3dd3bb373145c6e247373",
+        "tests/test_provenance_runtime.py": "a34675a13083366e7b51850b5ab643437664a7558b34633280ee5b441a1b2c73",
+        "tests/test_reread_contract_fixture.py": "405e1c5f54adb9d7f7e1b4112e040a50ffb511840da696eb095c98aa20c848f2"
+      },
+      "commit": "d5fe8bf6e74f34943868d02e1efa07e58bc9ac6a"
+    },
+    "tabula": {
+      "changed_file_sha256": {
+        "kb_common/exact_read.py": "5f7c0cd0d6b7b76755a97d7b57472d15cf6f6a49d736b6c3354491fe3453925e",
+        "mcp_server/auth/reread.py": "4911dbd2d4a25976a2ee4836fe3a914809b1d8f85ad5b1b800bcc97b901c268e",
+        "mcp_server/main.py": "929bf33e154ed99b941f86ee6314f10581367a0700e5ced3d2b088d785495a0a",
+        "tests/federation/corpus-reread-v1.json": "cbcfbe170ceb89b193d04479d45160e670f711ffa836e0ddb72a971065603b50",
+        "tests/federation/provenance_fixture.py": "52acf9e83f97ceb5c2219c959ee2a032a6d6176e04da5567a0b7b37456bd3ae8",
+        "tests/test_exact_read.py": "c3c429fd8d150ee26fc08979bd4cb29637183f768fb33f39ebcb9ec2fc24eaff",
+        "tests/test_federated_corpus_reread.py": "bc370e6eec13287f4c1175800f39f791be1709f8b7b54c1fcdd2c56959bbf0a0",
+        "tests/test_reread_contract_fixture.py": "b1316a579d5637524faaa20023313f63bbd93a10f64d456645c3dfd3f0fbabc6"
+      },
+      "commit": "10133cf4a4413b20d4f5cd3210a7753db4742b2a"
+    }
+  },
+  "status": "PASS",
+  "tabula_audit": {
+    "correlation_ids": [
+      "916e40c4-f337-4742-abed-8a43b512429b",
+      "db30d6a5-c5a6-4e4b-85fa-33075b5471d7",
+      "21867f1c-a12e-4790-84f3-6cb4af4c0e31",
+      "2fcfbb73-11f6-4ca2-8a90-6c91ef698296",
+      "09149ac9-a5ef-464f-b91d-310ad5dfb0c5",
+      "bdd41d45-c851-4e92-9b1e-45617a7b8781",
+      "26c58f75-ff09-4b5e-a1dd-e5d0483845d0",
+      "665ae998-07f9-423e-8a9d-1deb771744e6"
+    ],
+    "raw_sentinels_absent": true,
+    "reread_audit_rows": 8
+  },
+  "verification": {
+    "incumbent_catalogs": [
+      {
+        "count": 7,
+        "exit_code": 0,
+        "passed": true,
+        "suite": "runner"
+      },
+      {
+        "count": 4,
+        "exit_code": 0,
+        "passed": true,
+        "suite": "phase1_runner"
+      },
+      {
+        "count": 3,
+        "exit_code": 0,
+        "passed": true,
+        "suite": "phase2_runner"
+      },
+      {
+        "count": 4,
+        "exit_code": 0,
+        "passed": true,
+        "suite": "grounded_scout_runner"
+      },
+      {
+        "count": 9,
+        "exit_code": 0,
+        "passed": true,
+        "suite": "cognition_runner"
+      }
+    ],
+    "legion_full": {
+      "evidence": "/tmp/per001-check-ba7dp2_5",
+      "passed": 352,
+      "seconds": 211.33,
+      "subtests_passed": 240
+    },
+    "post_guard_focused": {
+      "evidence": "/tmp/per001-check-ygg096iy",
+      "passed": 17,
+      "subtests_passed": 9
+    },
+    "schemas": {
+      "count": 12,
+      "shared_request_response_conform": true
+    },
+    "tabula_after_audit_fix": {
+      "passed": 54,
+      "seconds": 0.67
+    },
+    "tabula_focused": {
+      "passed": 52,
+      "seconds": 0.65
+    }
+  },
+  "work_item_id": "d7d003cd-6500-4b9d-a1a0-d59d0bb847fe"
+}

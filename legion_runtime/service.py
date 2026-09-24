@@ -53,6 +53,8 @@ from .work import (
     AttemptStage,
     AttemptStatus,
     EvidenceSourceType,
+    EvidenceCheckpoint,
+    EvidenceCheckpointInvalid,
     WorkAttempt,
     WorkEvidenceReference,
     WorkItem,
@@ -465,6 +467,7 @@ class PersistentAgentRuntime:
         expected_capabilities = {
             WorkKind.READ_ONLY_ANALYSIS: ("read_only_analysis",),
             WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS: ("read_only_analysis", "model_reasoning", "tabula_corpus_read"),
+            WorkKind.PROVENANCE_BOUND_CORPUS_ANALYSIS: ("read_only_analysis", "model_reasoning", "tabula_corpus_read"),
             WorkKind.COGNITION_INTEGRATION_SPIKE: ("experimental_cognition", "model_reasoning", "tabula_corpus_read", "fixture_effect"),
             WorkKind.GROUNDED_CORPUS_ANALYSIS: (
                 "read_only_analysis",
@@ -706,10 +709,11 @@ class PersistentAgentRuntime:
             raise RuntimeOperationError("MISSION_CONTEXT_UNAVAILABLE")
         initial = self._require_work(work_item_id)
         tool_assisted = initial.kind == WorkKind.TOOL_ASSISTED_CORPUS_ANALYSIS
+        provenance = initial.kind == WorkKind.PROVENANCE_BOUND_CORPUS_ANALYSIS
         experimental = initial.kind == WorkKind.COGNITION_INTEGRATION_SPIKE
         if experimental and self.experimental_driver is None:
             raise RuntimeOperationError("EXPERIMENTAL_COGNITION_DISABLED")
-        if not experimental and (self.cognition_invoker if tool_assisted else self.cognition) is None:
+        if not experimental and (self.cognition_invoker if tool_assisted or provenance else self.cognition) is None:
             raise RuntimeOperationError("COGNITION_UNAVAILABLE")
         if (
             initial.kind != WorkKind.READ_ONLY_ANALYSIS
@@ -812,8 +816,9 @@ class PersistentAgentRuntime:
                 authorization_decision_id=context.authorization_decision_id,
                 attempt_stage=(
                     AttemptStage.COGNITION_SELECTION if tool_assisted else
+                    AttemptStage.EVIDENCE_REREAD if provenance and current_work.evidence_checkpoint is not None else
                     AttemptStage.EVIDENCE_RETRIEVAL
-                    if current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
+                    if current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS or provenance
                     else AttemptStage.COGNITION
                 ),
                 version=current_attempt.version + 1,
@@ -838,7 +843,7 @@ class PersistentAgentRuntime:
                     "mission_version": context.mission_version,
                 },
             )
-            if current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS:
+            if current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS or provenance:
                 self._event(
                     event_type="GroundedEvidenceRequested",
                     agent_id=scout.agent_id,
@@ -862,6 +867,9 @@ class PersistentAgentRuntime:
             tool_session = ToolCognitionSession(self, work, running, binding, assignment, scout, workload, context)
             evidence_query = tool_session.begin()
             running = tool_session.attempt
+        if provenance:
+            from .provenance import ProvenanceAssessment
+            tool_session = ProvenanceAssessment(self, work, running, binding, assignment, scout, workload, context)
         if experimental:
             from .spike_session import SpikeAttemptSession
             tool_session = SpikeAttemptSession(self, work, running, binding, assignment, scout, workload, context)
@@ -871,8 +879,7 @@ class PersistentAgentRuntime:
             try:
                 if tool_session:
                     tool_session.guard()
-                bundle = self.evidence_reader.read(
-                    GroundedEvidenceReadRequest(
+                evidence_request = GroundedEvidenceReadRequest(
                         organization_id=scout.organization_id,
                         workspace_id=scout.workspace_id,
                         mission_id=work.mission_id,
@@ -885,7 +892,11 @@ class PersistentAgentRuntime:
                         query=evidence_query,
                         correlation_id=work.correlation_id,
                     )
-                )
+                if provenance:
+                    from .provenance import read_evidence
+                    bundle = read_evidence(self.repository, self.evidence_reader, work, evidence_request)
+                else:
+                    bundle = self.evidence_reader.read(evidence_request)
             except RuntimeOperationError:
                 raise
             except AuthorityUnavailable as exc:
@@ -926,9 +937,18 @@ class PersistentAgentRuntime:
                     tabula_audit_correlation_id=bundle.tabula_audit_correlation_id,
                     retrieved_at=item.retrieved_at,
                     created_at=self.clock(),
+                    content_bytes=len(item.content.encode("utf-8")) if provenance else None,
+                    content_sha256=hashlib.sha256(item.content.encode("utf-8")).hexdigest() if provenance else None,
                 )
                 for item in bundle.records
             )
+            if provenance:
+                from .evidence import validate_recorded_references
+                try:
+                    validate_recorded_references(work_item_id, references)
+                except EvidenceCheckpointInvalid:
+                    self._fail_work_attempt(work, running, actor, "EVIDENCE_CHECKPOINT_INVALID", retryable=False)
+                    raise RuntimeOperationError("EVIDENCE_CHECKPOINT_INVALID") from None
             with self.repository.transaction(lock_keys=self._work_lock_keys(work)):
                 current_work = self._require_work(work_item_id)
                 current_attempt = self._require_work_attempt(running.attempt_id)
@@ -943,12 +963,23 @@ class PersistentAgentRuntime:
                 if (
                     current_work.status != WorkStatus.CLAIMED
                     or current_attempt.status != AttemptStatus.RUNNING
-                    or current_attempt.attempt_stage
-                    != AttemptStage.EVIDENCE_RETRIEVAL
+                    or current_attempt.version != running.version
+                    or current_attempt.attempt_stage not in (
+                        (AttemptStage.EVIDENCE_RETRIEVAL, AttemptStage.EVIDENCE_REREAD)
+                        if provenance else (AttemptStage.EVIDENCE_RETRIEVAL,)
+                    )
                 ):
                     raise RuntimeOperationError("WORK_RECONCILIATION_REQUIRED")
+                if provenance:
+                    tool_session._fence()
                 for reference in references:
                     self.repository.save_work_evidence_reference(reference)
+                if provenance and current_work.evidence_checkpoint is None:
+                    sealed = replace(current_work,
+                        evidence_checkpoint=EvidenceCheckpoint(tuple(ref.evidence_reference_id for ref in references)),
+                        version=current_work.version + 1, updated_at=self.clock())
+                    self.repository.save_work_item(sealed, expected_previous_version=current_work.version)
+                    work = current_work = sealed
                 running = replace(
                     current_attempt,
                     attempt_stage=AttemptStage.COGNITION_CONTINUATION if tool_assisted else AttemptStage.COGNITION,
@@ -984,6 +1015,9 @@ class PersistentAgentRuntime:
                             item.evidence_reference_id for item in references
                         ],
                         "evidence_count": len(references),
+                        **({"operation": "reread" if current_attempt.attempt_stage == AttemptStage.EVIDENCE_REREAD else "search",
+                            "content_bytes": sum(item.content_bytes for item in references),
+                            "checkpoint_reference_ids": list(current_work.evidence_checkpoint.reference_ids)} if provenance else {}),
                         "authorization_decision_ids": list(
                             bundle.authorization_decision_ids
                         ),
@@ -1015,6 +1049,7 @@ class PersistentAgentRuntime:
             mission_version=context.mission_version,
             logical_capability=(
                 "cognition_integration_spike" if experimental else
+                "provenance_bound_corpus_analysis" if provenance else
                 "tool_assisted_corpus_analysis" if tool_assisted else "grounded_corpus_analysis"
                 if work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
                 else "read_only_analysis"
@@ -1034,6 +1069,8 @@ class PersistentAgentRuntime:
         )
         try:
             cognition_result = tool_session.finish(request, running) if tool_session else self.cognition.run(request)
+            if provenance:
+                running = tool_session.attempt
         except RuntimeOperationError:
             raise
         except CognitionRejected as exc:
@@ -1124,7 +1161,10 @@ class PersistentAgentRuntime:
                 cancelled = True
             else:
                 if tool_session:
-                    tool_session.guard()
+                    try:
+                        tool_session.guard()
+                    except (AuthorityDenied, AuthorityUnavailable) as exc:
+                        raise RuntimeOperationError(exc.code) from None
                 if (
                     current_work.status != WorkStatus.CLAIMED
                     or current_attempt.status != AttemptStatus.RUNNING
@@ -1342,6 +1382,7 @@ class PersistentAgentRuntime:
                     ambiguous_code = {
                         AttemptStage.MISSION_CONTEXT: "AMBIGUOUS_MISSION_CONTEXT_READ",
                         AttemptStage.EVIDENCE_RETRIEVAL: "AMBIGUOUS_EVIDENCE_RETRIEVAL",
+                        AttemptStage.EVIDENCE_REREAD: "AMBIGUOUS_EVIDENCE_REREAD",
                         AttemptStage.COGNITION: "AMBIGUOUS_COGNITION_OUTCOME",
                         AttemptStage.COGNITION_SELECTION: "AMBIGUOUS_COGNITION_SELECTION",
                         AttemptStage.COGNITION_INITIAL: "AMBIGUOUS_COGNITION_INVOCATION",
@@ -1839,8 +1880,8 @@ class PersistentAgentRuntime:
                 },
             )
             if (
-                current_work.kind == WorkKind.GROUNDED_CORPUS_ANALYSIS
-                and current_attempt.attempt_stage == AttemptStage.EVIDENCE_RETRIEVAL
+                current_work.kind in {WorkKind.GROUNDED_CORPUS_ANALYSIS, WorkKind.PROVENANCE_BOUND_CORPUS_ANALYSIS}
+                and current_attempt.attempt_stage in {AttemptStage.EVIDENCE_RETRIEVAL, AttemptStage.EVIDENCE_REREAD}
             ):
                 self._event(
                     event_type="GroundedEvidenceFailed",
@@ -2011,7 +2052,10 @@ class PersistentAgentRuntime:
         return binding
 
     def _require_work(self, work_item_id: str) -> WorkItem:
-        work = self.repository.get_work_item(work_item_id)
+        try:
+            work = self.repository.get_work_item(work_item_id)
+        except EvidenceCheckpointInvalid:
+            raise RuntimeOperationError("EVIDENCE_CHECKPOINT_INVALID") from None
         if work is None:
             raise RuntimeOperationError("WORK_ITEM_NOT_FOUND")
         return work
