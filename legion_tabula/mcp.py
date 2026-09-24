@@ -40,7 +40,7 @@ class _HttpResponse:
 class McpHttpTransport:
     """Invoke a Tabula MCP tool through a negotiated Streamable HTTP session."""
 
-    def __init__(self, endpoint: str, *, timeout_seconds: float = 10.0) -> None:
+    def __init__(self, endpoint: str, *, timeout_seconds: float = 10.0, max_response_bytes: int | None = None) -> None:
         if not endpoint.startswith(("http://", "https://")):
             raise ValueError("MCP endpoint must be an HTTP URL")
         if (
@@ -52,7 +52,17 @@ class McpHttpTransport:
             raise ValueError("MCP timeout must be positive")
         self._endpoint = endpoint
         self._timeout_seconds = timeout_seconds
+        if max_response_bytes is not None and (type(max_response_bytes) is not int or max_response_bytes <= 0):
+            raise ValueError("MCP response limit must be positive")
+        self.max_response_bytes = max_response_bytes
         self._session_id: str | None = None
+
+    def _read_body(self, response):
+        limit = self.max_response_bytes
+        raw = response.read() if limit is None else response.read(limit + 1)
+        if limit is not None and len(raw) > limit:
+            raise McpTransportError("TABULA_PROTOCOL_ERROR")
+        return _decode_body(raw)
 
     def __call__(self, token: str | Callable[[], str], request: dict[str, Any]) -> McpResponse:
         next_token = (lambda: token) if isinstance(token, str) else token
@@ -93,9 +103,12 @@ class McpHttpTransport:
             if remaining <= 0:
                 raise McpTransportError("DEADLINE_EXCEEDED")
             with urlopen(http_request, timeout=remaining) as response:
-                return _HttpResponse(response.status, _decode_body(response.read()), response.headers.get("Mcp-Session-Id"))
+                return _HttpResponse(response.status, self._read_body(response), response.headers.get("Mcp-Session-Id"))
         except HTTPError as error:
-            return _HttpResponse(error.code, _decode_body(error.read()), error.headers.get("Mcp-Session-Id"))
+            try:
+                return _HttpResponse(error.code, self._read_body(error), error.headers.get("Mcp-Session-Id"))
+            finally:
+                error.close()
         except McpTransportError:
             raise
         except TimeoutError:

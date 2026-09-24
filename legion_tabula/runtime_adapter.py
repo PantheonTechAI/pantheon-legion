@@ -11,6 +11,8 @@ from typing import Protocol
 
 from legion_runtime.evidence import (
     EvidenceReadError,
+    EvidenceAuthorityContext,
+    GroundedEvidenceRereadRequest,
     GroundedEvidenceBundle,
     GroundedEvidenceReadRequest,
     GroundedEvidenceReader,
@@ -19,7 +21,7 @@ from legion_runtime.evidence import (
     MAX_EVIDENCE_TOTAL_BYTES,
 )
 
-from .corpus import CorpusReadError, ScopeBinding, TabulaCorpusClient
+from .corpus import CorpusReadError, CorpusReference, ScopeBinding, TabulaCorpusClient
 
 
 @dataclass(frozen=True, repr=False)
@@ -41,13 +43,13 @@ class AuthorizedKnowledgeCredential:
 class KnowledgeOperationAuthority(Protocol):
     def authorize_operation(
         self,
-        request: GroundedEvidenceReadRequest,
+        request: EvidenceAuthorityContext,
         binding: ScopeBinding,
     ) -> AuthorizedKnowledgeCredential: ...
 
     def record_outcome(
         self,
-        request: GroundedEvidenceReadRequest,
+        request: EvidenceAuthorityContext,
         binding: ScopeBinding,
         *,
         invocation_id: str,
@@ -74,6 +76,15 @@ class FederatedCorpusEvidenceReader(GroundedEvidenceReader):
         self.binding = binding
 
     def read(self, request: GroundedEvidenceReadRequest) -> GroundedEvidenceBundle:
+        return self._read(request, reread=False)
+
+    def reread(self, request: GroundedEvidenceRereadRequest) -> GroundedEvidenceBundle:
+        if any((ref.scope_binding_id, ref.scope_binding_version) !=
+               (self.binding.id, self.binding.version) for ref in request.references):
+            raise EvidenceReadError("EVIDENCE_REREAD_UNAVAILABLE")
+        return self._read(request, reread=True)
+
+    def _read(self, request, *, reread):
         issued: list[AuthorizedKnowledgeCredential] = []
 
         def token() -> str:
@@ -84,14 +95,19 @@ class FederatedCorpusEvidenceReader(GroundedEvidenceReader):
             return credential.token
 
         try:
-            read = self.client.read(
-                token=token,
-                binding=self.binding,
-                query=request.query,
-                correlation_id=request.correlation_id,
-                intent="SCOUT_EVIDENCE",
-                limit=MAX_EVIDENCE_RECORDS,
-            )
+            if reread:
+                read = self.client.reread(
+                    token=token, binding=self.binding, correlation_id=request.correlation_id,
+                    references=tuple(CorpusReference(
+                        ref.external_record_id, ref.external_revision, ref.canonical_uri,
+                        ref.content_bytes, ref.content_sha256) for ref in request.references),
+                )
+            else:
+                read = self.client.read(
+                    token=token, binding=self.binding, query=request.query,
+                    correlation_id=request.correlation_id, intent="SCOUT_EVIDENCE",
+                    limit=MAX_EVIDENCE_RECORDS,
+                )
         except CorpusReadError as exc:
             if issued:
                 self.authority.record_outcome(
@@ -104,7 +120,7 @@ class FederatedCorpusEvidenceReader(GroundedEvidenceReader):
                     successful_authorization_decision_id=issued[-1].decision_id,
                 )
             raise EvidenceReadError(
-                exc.code,
+                "EVIDENCE_REREAD_UNAVAILABLE" if reread and exc.code == "AUTHORIZATION_DENIED" else exc.code,
                 retryable=exc.code in {"SERVICE_UNAVAILABLE", "DEADLINE_EXCEEDED"},
             ) from None
         except EvidenceReadError:

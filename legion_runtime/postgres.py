@@ -5,7 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Iterator, Mapping, Any
 
-from sqlalchemy import Engine, create_engine, func, insert, select, text, update
+from sqlalchemy import Engine, create_engine, func, insert, or_, select, text, update
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
 
@@ -44,6 +44,7 @@ from .work import (
     AttemptStage,
     AttemptStatus,
     EvidenceSourceType,
+    EvidenceCheckpoint,
     WorkAttempt,
     WorkEvidenceReference,
     WorkItem,
@@ -345,6 +346,7 @@ class PostgreSQLAgentStore:
             "objective": work_item.objective,
             "required_capabilities": list(work_item.required_capabilities),
             "work_kind": work_item.kind.value,
+            "evidence_checkpoint": work_item.evidence_checkpoint.payload() if work_item.evidence_checkpoint else None,
             "status": work_item.status.value,
             "version": work_item.version,
             "correlation_id": work_item.correlation_id,
@@ -362,6 +364,8 @@ class PostgreSQLAgentStore:
             .where(
                 runtime_work_items.c.work_item_id == work_item.work_item_id,
                 runtime_work_items.c.version == expected_previous_version,
+                or_(runtime_work_items.c.evidence_checkpoint.is_(None),
+                    runtime_work_items.c.evidence_checkpoint == values["evidence_checkpoint"]),
             )
             .values(
                 **{
@@ -506,6 +510,8 @@ class PostgreSQLAgentStore:
                 "source_type": reference.source_type.value,
                 "external_record_id": reference.external_record_id,
                 "external_revision": reference.external_revision,
+                "content_sha256": reference.content_sha256,
+                "content_bytes": reference.content_bytes,
                 "canonical_uri": reference.canonical_uri,
                 "scope_binding_id": reference.scope_binding_id,
                 "scope_binding_version": reference.scope_binding_version,
@@ -778,6 +784,8 @@ class PostgreSQLAgentStore:
             objective=row["objective"],
             required_capabilities=tuple(row["required_capabilities"]),
             kind=WorkKind(row["work_kind"]),
+            evidence_checkpoint=EvidenceCheckpoint.from_payload(row["evidence_checkpoint"])
+            if row["evidence_checkpoint"] is not None else None,
             status=WorkStatus(row["status"]),
             version=row["version"],
             correlation_id=row["correlation_id"],
@@ -823,6 +831,8 @@ class PostgreSQLAgentStore:
             source_type=EvidenceSourceType(row["source_type"]),
             external_record_id=row["external_record_id"],
             external_revision=row["external_revision"],
+            content_sha256=row["content_sha256"],
+            content_bytes=row["content_bytes"],
             canonical_uri=row["canonical_uri"],
             scope_binding_id=row["scope_binding_id"],
             scope_binding_version=row["scope_binding_version"],
