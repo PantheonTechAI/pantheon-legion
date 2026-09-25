@@ -53,6 +53,11 @@ class AquilaWSGIApp:
                 return self.service.get_mission(actor=actor, mission_id=mission_id)
         if len(segments) == 3 and segments[0] == "missions":
             mission_id, action = segments[1:]
+            if action == "investigation" and method == "GET":
+                get_investigation = getattr(self.service, "get_investigation", None)
+                if get_investigation is None:
+                    return ApiResponse(404, {"code": "NOT_FOUND"}, {})
+                return get_investigation(actor=actor, mission_id=mission_id)
             if action == "commands" and method == "POST":
                 return self.service.submit_command(
                     actor=actor,

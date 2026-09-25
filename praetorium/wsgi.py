@@ -11,6 +11,7 @@ from html import escape
 import io
 import json
 from urllib.parse import parse_qs, quote, urlparse
+from uuid import uuid4
 
 from aquila_api.auth import AuthenticationError, BearerAuthenticator
 from aquila_api.service import AquilaService
@@ -51,6 +52,8 @@ class PraetoriumWSGIApp:
         parts = [part for part in path.split("/") if part]
         if len(parts) == 3 and parts[:2] == ["praetorium", "missions"] and method == "GET":
             return self._mission(start_response, actor, parts[2])
+        if len(parts) == 4 and parts[:2] == ["praetorium", "missions"] and parts[3] == "investigation" and method == "POST":
+            return self._start_investigation(start_response, actor, parts[2], environ)
         if len(parts) == 4 and parts[:2] == ["praetorium", "missions"] and parts[3] == "commands" and method == "POST":
             return self._command(start_response, actor, parts[2], environ)
         if len(parts) == 5 and parts[:2] == ["praetorium", "missions"] and parts[3] == "approvals" and method == "POST":
@@ -94,6 +97,7 @@ class PraetoriumWSGIApp:
         if mission.status_code != 200:
             return self._error(start_response, mission)
         organization_panel = self._organization_panel(mission_id)
+        investigation_panel = self._investigation_panel(actor, mission_id, mission.body)
         events = "".join(f"<li>{escape(event['event_type'])}: {escape(event['result'])}</li>" for event in timeline.body.get("events", []))
         approval_forms = "".join(
             f'<li>{escape(item["status"])} — {escape(item["scope"]["capability"])}'
@@ -104,8 +108,75 @@ class PraetoriumWSGIApp:
         ) or "<li>No approvals.</li>"
         command_form = f'''<form method="post" action="/praetorium/missions/{quote(mission_id)}/commands">
 <input type="hidden" name="expected_version" value="{mission.body['version']}"><input name="idempotency_key" required placeholder="idempotency key"><input name="command_type" required placeholder="START"><textarea name="payload_json">{{}}</textarea><button>Submit command</button></form>'''
-        body = f"<p>{escape(notice)}</p><h1>{escape(mission.body['title'])}</h1><p>{escape(mission.body['objective'])}</p><p>Status: {escape(mission.body['status'])}; version {mission.body['version']}</p>{command_form}{organization_panel}<h2>Approvals</h2><ul>{approval_forms}</ul><h2>Timeline</h2><ul>{events}</ul><p><a href=\"{escape(self.tabula_console_url, quote=True)}\">Open Tabula Console</a></p>"
+        body = f"<p>{escape(notice)}</p><h1>{escape(mission.body['title'])}</h1><p>{escape(mission.body['objective'])}</p><p>Status: {escape(mission.body['status'])}; version {mission.body['version']}</p>{investigation_panel}{command_form}{organization_panel}<h2>Approvals</h2><ul>{approval_forms}</ul><h2>Timeline</h2><ul>{events}</ul><p><a href=\"{escape(self.tabula_console_url, quote=True)}\">Open Tabula Console</a></p>"
         return self._send(start_response, 200, self._page("Praetorium Mission", body))
+
+    def _investigation_panel(self, actor, mission_id: str, mission: dict) -> str:
+        heading = "<h2>Investigation</h2>"
+        get_status = getattr(self.service, "get_investigation", None)
+        if get_status is None:
+            return heading + "<p>Investigation launch is unavailable.</p>"
+        response = get_status(actor=actor, mission_id=mission_id)
+        if response.status_code != 200:
+            return heading + "<p>Investigation status unavailable.</p>"
+        status = response.body
+        if status.get("requested"):
+            stage = escape(str(status["status"]))
+            blocker = status.get("last_error_code")
+            detail = f"; blocker {escape(blocker)}" if blocker else ""
+            return heading + f"<p>Requested; delivery {stage}{detail}.</p>"
+        if not status.get("available", False):
+            return heading + "<p>Investigation launch is not configured.</p>"
+        if mission["status"] not in {"DRAFT", "ACTIVE"}:
+            return heading + "<p>This Mission cannot start an investigation.</p>"
+        return (heading + f'<form method="post" action="/praetorium/missions/{quote(mission_id)}/investigation">'
+                '<button type="submit">Start investigation</button></form>')
+
+    def _start_investigation(self, start_response, actor, mission_id: str, environ):
+        origin = environ.get("HTTP_ORIGIN", "")
+        host = environ.get("HTTP_HOST", "")
+        parsed_origin = urlparse(origin)
+        if (parsed_origin.scheme not in {"http", "https"}
+                or parsed_origin.netloc != host or parsed_origin.username is not None):
+            return self._send(start_response, 403, self._page(
+                "Request denied", "<p>Invalid request origin.</p>"))
+        get_status = getattr(self.service, "get_investigation", None)
+        if get_status is None:
+            return self._mission(start_response, actor, mission_id, "Investigation launch unavailable.")
+        current = self.service.get_mission(actor=actor, mission_id=mission_id)
+        if current.status_code != 200:
+            return self._error(start_response, current)
+        existing = get_status(actor=actor, mission_id=mission_id)
+        if existing.status_code != 200:
+            return self._error(start_response, existing)
+        if existing.body.get("requested"):
+            return self._redirect(start_response, f"/praetorium/missions/{quote(mission_id)}")
+        if not existing.body.get("available", False):
+            return self._mission(start_response, actor, mission_id,
+                                 "Investigation launch is not configured.")
+        version = current.body["version"]
+        if current.body["status"] == "DRAFT":
+            started = self.service.submit_command(actor=actor, mission_id=mission_id, body={
+                "expected_version": version,
+                "idempotency_key": f"investigation-start:{uuid4()}",
+                "command_type": "START", "payload": {},
+            })
+            if started.status_code != 200:
+                return self._mission(start_response, actor, mission_id,
+                                     started.body.get("code", "Investigation start failed."))
+            version = started.body["mission_version"]
+        elif current.body["status"] != "ACTIVE":
+            return self._mission(start_response, actor, mission_id, "Mission is not active.")
+        launched = self.service.submit_command(actor=actor, mission_id=mission_id, body={
+            "expected_version": version,
+            "idempotency_key": f"investigation-launch:{uuid4()}",
+            "command_type": "REQUEST_INVESTIGATION",
+            "payload": {"profile": "READ_ONLY_CORPUS_V1"},
+        })
+        if launched.status_code != 200:
+            return self._mission(start_response, actor, mission_id,
+                                 launched.body.get("code", "Investigation launch failed."))
+        return self._redirect(start_response, f"/praetorium/missions/{quote(mission_id)}")
 
     def _organization_panel(self, mission_id: str) -> str:
         heading = "<h2>Persistent organization</h2>"
@@ -175,6 +246,9 @@ class PraetoriumWSGIApp:
             body = {"expected_version": int(form["expected_version"]), "idempotency_key": form["idempotency_key"], "command_type": form["command_type"], "payload": json.loads(form["payload_json"])}
         except (KeyError, ValueError, json.JSONDecodeError):
             return self._mission(start_response, actor, mission_id, "Invalid command form.")
+        if body["command_type"] == "REQUEST_INVESTIGATION":
+            return self._mission(start_response, actor, mission_id,
+                                 "Use Start investigation for this request.")
         response = self.service.submit_command(actor=actor, mission_id=mission_id, body=body)
         return self._mission(start_response, actor, mission_id, response.body.get("code") or response.body.get("status", "Command submitted"))
 

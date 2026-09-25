@@ -50,6 +50,10 @@ from .repository import (
     IdempotencyRecord,
 )
 from .postgres import PostgreSQLAgentStore
+from .investigation import (
+    InvestigationAdmissionError, InvestigationIntake, InvestigationStatus,
+    RuntimeInvestigationAdmissions,
+)
 from .read_model import (
     MissionAgentView,
     MissionEvidenceView,
@@ -109,6 +113,10 @@ __all__ = [
     "GroundedEvidenceReader",
     "GroundedEvidenceRecord",
     "IdempotencyRecord",
+    "InvestigationAdmissionError",
+    "InvestigationIntake",
+    "InvestigationStatus",
+    "RuntimeInvestigationAdmissions",
     "InMemoryDurableExecutionAdapter",
     "MissionAssignment",
     "MissionAuthorityView",

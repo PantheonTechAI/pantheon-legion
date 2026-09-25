@@ -53,6 +53,7 @@
         "SUSPEND",
         "RESUME",
         "REQUEST_ACTION",
+        "REQUEST_INVESTIGATION",
         "CANCEL",
         "COMPLETE"
       ]

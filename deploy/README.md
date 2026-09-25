@@ -64,6 +64,17 @@ The example uses the canonical disposable test pair. Before a shared-user test,
 replace both values in `/etc/legion/praetorium.env` with the approved paired
 Organization and Workspace UUIDs for that environment.
 
+## Investigation foundation deployment gate
+
+The current Praetorium code can show investigation intent status and accept the
+fixed read-only launch command only when both
+`LEGION_CENTURION_WORKLOAD_SUBJECT` and `LEGION_SCOUT_WORKLOAD_SUBJECT` are
+configured. The AI-box environment does not yet configure them or a Runtime
+database URL. Keep launch disabled until the independent dispatcher, Runtime
+migration, Mission-scoped human reads, and worker authority checks are
+composed and tested. The present code has no Centurion/Scout worker or final
+assessment path, so it cannot support a full investigation user test.
+
 ## DGX Spark inference
 
 The observed Spark/vLLM deployment and experiments are recorded in the

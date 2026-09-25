@@ -260,17 +260,22 @@ class PersistentAquilaServiceTests(unittest.TestCase):
         first.submit_command(actor=self.owner, mission_id=mission_id, body={
             'expected_version': 1, 'idempotency_key': 'winner', 'command_type': 'START', 'payload': {},
         })
-        with self.assertRaises(StoreConflict):
-            second.submit_command(actor=self.owner, mission_id=mission_id, body={
-                'expected_version': 1, 'idempotency_key': 'loser', 'command_type': 'START', 'payload': {},
-            })
+        stale = second.submit_command(actor=self.owner, mission_id=mission_id, body={
+            'expected_version': 1, 'idempotency_key': 'loser', 'command_type': 'START', 'payload': {},
+        })
+        self.assertEqual(stale.status_code, 409)
+        self.assertEqual(stale.body['code'], 'VERSION_CONFLICT')
+        self.assertEqual(second.get_mission(actor=self.owner, mission_id=mission_id).body['version'], 2)
         first.close()
         second.close()
 
         recovered = self.create_service()
         self.assertEqual(recovered.get_mission(actor=self.owner, mission_id=mission_id).body['version'], 2)
-        self.assertIsNone(recovered.store.get_idempotency(mission_id=mission_id, idempotency_key='loser'))
-        self.assertEqual(len(recovered.get_timeline(actor=self.owner, mission_id=mission_id).body['events']), 3)
+        self.assertEqual(recovered.store.get_idempotency(
+            mission_id=mission_id, idempotency_key='loser',
+        )['result']['body']['code'], 'VERSION_CONFLICT')
+        events = recovered.get_timeline(actor=self.owner, mission_id=mission_id).body['events']
+        self.assertEqual(sum(event['event_type'] == 'COMMAND_ACCEPTED' for event in events), 1)
         recovered.close()
 
     def test_participant_projection_survives_service_restart(self):

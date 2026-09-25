@@ -15,6 +15,7 @@ from .agent import (
 )
 
 from .work import WorkAttempt, WorkEvidenceReference, WorkItem, WorkResult
+from .investigation import InvestigationIntake
 
 class AgentStoreConflict(RuntimeError):
     pass
@@ -43,6 +44,12 @@ class AgentRepository(Protocol):
     ) -> AbstractContextManager[None]: ...
 
     def close(self) -> None: ...
+
+    def save_investigation_intake(
+        self, intake: InvestigationIntake, *, expected_previous_version: int | None
+    ) -> None: ...
+    def get_investigation_by_command(self, command_id: str) -> InvestigationIntake | None: ...
+    def get_investigation_by_mission(self, mission_id: str) -> InvestigationIntake | None: ...
 
     def save_agent(
         self, agent: AgentIdentity, *, expected_previous_version: int | None

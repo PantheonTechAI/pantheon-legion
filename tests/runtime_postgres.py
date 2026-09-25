@@ -11,6 +11,7 @@ from legion_runtime import PostgreSQLAgentStore
 
 
 RUNTIME_TABLES = {
+    "runtime_investigations",
     "cognition_spike_trials",
     "cognition_spike_operations",
     "cognition_turns",
@@ -70,7 +71,7 @@ def reset_runtime_database() -> None:
         with engine.begin() as connection:
             connection.execute(
                 text(
-                    "TRUNCATE TABLE runtime_work_results, "
+                    "TRUNCATE TABLE runtime_investigations, runtime_work_results, "
                     "runtime_work_evidence_references, runtime_work_attempts, "
                     "runtime_work_items, runtime_events, runtime_bindings, "
                     "coordination_checkpoints, mission_assignments, "

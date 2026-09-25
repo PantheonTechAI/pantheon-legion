@@ -189,6 +189,33 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
 
+  /missions/{mission_id}/investigation:
+    parameters:
+      - $ref: '#/components/parameters/MissionId'
+    get:
+      operationId: getMissionInvestigation
+      summary: Read the Mission investigation delivery state
+      description: |
+        Returns only safe Aquila intent and local delivery metadata after a
+        fresh Mission read decision. Accepted intent does not imply that a
+        Centurion has begun work or produced an assessment.
+      tags: [Missions]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Mission investigation intent status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvestigationIntentStatus'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /missions/{mission_id}/approvals:
     parameters:
       - $ref: '#/components/parameters/MissionId'
@@ -440,6 +467,38 @@ components:
           type: [string, 'null']
         message:
           type: [string, 'null']
+        investigation_intent_id:
+          type: string
+          format: uuid
+        delivery_status:
+          type: string
+          enum: [PENDING, DELIVERED, BLOCKED]
+    InvestigationIntentStatus:
+      type: object
+      additionalProperties: false
+      required: [requested]
+      properties:
+        requested:
+          type: boolean
+        available:
+          type: boolean
+        command_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, DELIVERED, BLOCKED]
+        last_error_code:
+          type: [string, 'null']
+        intake_id:
+          type: [string, 'null']
+          format: uuid
+        profile:
+          type: string
+          enum: [READ_ONLY_CORPUS_V1]
+        expires_at:
+          type: string
+          format: date-time
     RulesOfEngagement:
       $ref: '../schemas/rules-of-engagement.schema.json'
     AuditEvent:
@@ -529,6 +588,7 @@ components:
             - SUSPEND
             - RESUME
             - REQUEST_ACTION
+            - REQUEST_INVESTIGATION
             - CANCEL
             - COMPLETE
         payload:

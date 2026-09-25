@@ -31,6 +31,7 @@ from .database import (
     runtime_bindings,
     runtime_events,
     runtime_idempotency,
+    runtime_investigations,
     runtime_work_attempts,
     runtime_work_evidence_references,
     runtime_work_items,
@@ -39,6 +40,7 @@ from .database import (
     spike_operations,
 )
 from .repository import AgentStoreConflict, DuplicateRuntimeEvent, IdempotencyRecord
+from .investigation import InvestigationIntake, InvestigationStatus
 
 from .work import (
     AttemptStage,
@@ -674,6 +676,39 @@ class PostgreSQLAgentStore:
             )
         )
         return IdempotencyRecord(**dict(row)) if row else None
+
+    def save_investigation_intake(
+        self, intake: InvestigationIntake, *, expected_previous_version: int | None,
+    ) -> None:
+        values = {**intake.__dict__, "status": intake.status.value}
+        if expected_previous_version is None:
+            self._insert(runtime_investigations, values, "INVESTIGATION_INTAKE_CONFLICT")
+            return
+        statement = (
+            update(runtime_investigations)
+            .where(runtime_investigations.c.intake_id == intake.intake_id,
+                   runtime_investigations.c.version == expected_previous_version)
+            .values(**{key: value for key, value in values.items() if key != "intake_id"})
+        )
+        self._require_updated(statement, "INVESTIGATION_INTAKE_VERSION_CONFLICT")
+
+    def get_investigation_by_command(self, command_id: str) -> InvestigationIntake | None:
+        row = self._one(select(runtime_investigations).where(
+            runtime_investigations.c.command_id == command_id
+        ))
+        return self._investigation(row) if row else None
+
+    def get_investigation_by_mission(self, mission_id: str) -> InvestigationIntake | None:
+        row = self._one(select(runtime_investigations).where(
+            runtime_investigations.c.mission_id == mission_id
+        ))
+        return self._investigation(row) if row else None
+
+    @staticmethod
+    def _investigation(row: Mapping[str, Any]) -> InvestigationIntake:
+        return InvestigationIntake(**{
+            **dict(row), "status": InvestigationStatus(row["status"]),
+        })
 
     def _acquire_lock(self, lock_key: str) -> None:
         self._write().execute(
