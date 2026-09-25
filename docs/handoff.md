@@ -15,13 +15,24 @@ and useful-answer rubric are still open, and CME-01–CME-09 are not accepted.
 
 The [foundation evaluation and review package](architecture/centurion-mission-foundation-implementation-review.md)
 records the initial independent Claude **REVISE** findings, remediation,
-and final **ACCEPT** for the bounded foundation, plus validation and remaining gates. Full Legion regression passed **368 tests,
-39 expected skips** on an isolated PostgreSQL test database; migration drift
-checks and `git diff --check` passed. No production deployment, merge, push or
-commit occurred. ADR-011 is the selected local delivery decision. The next
-increment must address Mission-scoped reads, terminal Agent release and a
-same-Mission retry contract, then add the bounded Centurion/Scout worker and
-assessment. The owner objective/rubric is needed for end-to-end acceptance.
+and final **ACCEPT** for the bounded foundation, plus validation and remaining gates.
+The implementation is locally committed as `92c2954` on `main`; it has not
+been pushed or merged remotely. The AI-box `legion-praetorium.service` now
+loads this checkout after installing the declared SQLAlchemy, Alembic and
+psycopg dependencies missing from its `.venv`. It is active; unauthenticated
+loopback requests return 401 and the public route redirects to Authentik (302).
+The existing deployment environment contains no investigation workload
+subjects or Runtime database URL, so the new launch remains unavailable.
+There is no deployed dispatcher or Centurion/Scout worker, and no production
+Runtime PostgreSQL migration was applied. The container's configured database
+is a test database.
+
+Full Legion regression in the service's `.venv` passed **368 tests, 39 expected
+skips** against an isolated PostgreSQL test database; migration drift checks
+and `git diff --check` passed. ADR-011 is the selected local delivery decision.
+The next increment must address Mission-scoped reads, terminal Agent release
+and a same-Mission retry contract, then add the bounded Centurion/Scout worker
+and assessment. The owner objective/rubric is needed for end-to-end acceptance.
 
 Earlier next-step statements below are historical checkpoints superseded by
 this implementation status.

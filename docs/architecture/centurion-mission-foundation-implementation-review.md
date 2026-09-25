@@ -21,8 +21,9 @@ and transient delivery failure, poisoned correlation data, and UI retry after
 rejection. The full Legion regression on the isolated
 `legion_cme_20260924_test` PostgreSQL database passed **368 tests, 39 expected
 skips**. Alembic migration drift checks reported no new operations. The
-isolated database is a test fixture; no production schema or service was
-changed. `git diff --check` passed.
+isolated database is a test fixture; no production schema was changed during
+validation. Current service deployment is recorded in the handoff.
+`git diff --check` passed.
 
 ## Acceptance traceability
 
