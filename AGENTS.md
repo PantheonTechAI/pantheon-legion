@@ -46,7 +46,7 @@ If not, challenge whether the work belongs in Legion or whether its scope has dr
 
 For every substantive unit of work, follow:
 
-`CODEX_DELIVERY_INSTRUCTIONS.md`
+`Codex_Delivery_Instructions.md`
 
 That document defines the required delivery lifecycle:
 
@@ -79,7 +79,7 @@ Use the following precedence:
 2. Accepted product objectives and North Star.
 3. Current architecture documentation and Architecture Decision Records.
 4. Current requirements and acceptance criteria.
-5. `CODEX_DELIVERY_INSTRUCTIONS.md`.
+5. `Codex_Delivery_Instructions.md`.
 6. This `AGENTS.md`.
 7. Component-specific documentation and nested `AGENTS.md`.
 8. Existing implementation.
@@ -629,7 +629,7 @@ Evidence may include:
 - failure/recovery testing;
 - reproducible commands.
 
-Follow `CODEX_DELIVERY_INSTRUCTIONS.md` for the complete acceptance process.
+Follow `Codex_Delivery_Instructions.md` for the complete acceptance process.
 
 ---
 

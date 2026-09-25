@@ -72,6 +72,7 @@ An accepted command MUST return the resulting Mission version or an explicit dur
 | `SUSPEND` | Suspension reason | `ACTIVE`/`PAUSED`/`AWAITING_APPROVAL` → `SUSPENDED`; durable work receives a pause signal. |
 | `RESUME` | Empty object | `PAUSED`/`SUSPENDED`/authorized `FAILED` → `ACTIVE`. |
 | `REQUEST_ACTION` | Action ID, capability, arguments, side-effect class | Creates a bounded action request; may enter `AWAITING_APPROVAL`. |
+| `REQUEST_INVESTIGATION` | `profile: READ_ONLY_CORPUS_V1` | Records one human-requested read-only investigation intent and a durable Aquila outbox reference. Runtime work begins only after separate delivery and fresh authority checks. |
 | `CANCEL` | Empty object | Any non-terminal state → `CANCELLED`; pending and approved Approvals expire. |
 | `COMPLETE` | Empty object | `ACTIVE` → `COMPLETED` when completion authority is satisfied. |
 

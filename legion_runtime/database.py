@@ -347,3 +347,35 @@ runtime_idempotency = Table(
     Column("resource_type", String(64), nullable=False),
     Column("resource_id", String(36), nullable=False),
 )
+
+runtime_investigations = Table(
+    "runtime_investigations",
+    metadata,
+    Column("intake_id", String(36), primary_key=True),
+    Column("command_id", String(36), nullable=False, unique=True),
+    Column("mission_id", String(36), nullable=False, unique=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("workspace_id", String(36), nullable=False),
+    Column("profile", String(64), nullable=False),
+    Column("intent_digest", String(64), nullable=False),
+    Column("mission_version", Integer, nullable=False),
+    Column("centurion_grant_id", String(512), nullable=False),
+    Column("scout_grant_id", String(512), nullable=False),
+    Column("expires_at", String(64), nullable=False),
+    Column("deadline_at", String(64), nullable=False),
+    Column("correlation_id", String(36), nullable=False),
+    Column("requested_by", String(512), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("created_at", String(64), nullable=False),
+    Column("updated_at", String(64), nullable=False),
+    Column("last_error_code", String(256)),
+    CheckConstraint("profile = 'READ_ONLY_CORPUS_V1'", name="ck_runtime_investigations_profile"),
+    CheckConstraint(
+        "status IN ('WAITING_CAPACITY', 'ACTIVE', 'BLOCKED', 'COMPLETED', "
+        "'CANCELLED', 'CAPACITY_EXPIRED', 'AUTHORITY_EXPIRED')",
+        name="ck_runtime_investigations_status",
+    ),
+    CheckConstraint("mission_version > 0 AND version > 0", name="ck_runtime_investigations_version"),
+)
+Index("ix_runtime_investigations_status", runtime_investigations.c.status)

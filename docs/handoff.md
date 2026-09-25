@@ -1,6 +1,30 @@
 # Pantheon Legion Handoff
 
-Last updated: 2026-09-24
+Last updated: 2026-09-25
+
+## Current checkpoint — Centurion Mission foundation implementation underway
+
+The owner directed implementation of the
+[bounded Centurion-led Mission experience](architecture/centurion-mission-experience-plan.md).
+The first uncommitted increment adds a dedicated Praetorium start action, an
+atomic Aquila `REQUEST_INVESTIGATION` command with closed expiring grants and a
+SQLite outbox, a restartable same-host dispatcher, and a PostgreSQL Runtime
+intake with a finite capacity-wait deadline. It does **not** yet run a
+Centurion, delegate Scout work or produce an assessment. The owner objective
+and useful-answer rubric are still open, and CME-01–CME-09 are not accepted.
+
+The [foundation evaluation and review package](architecture/centurion-mission-foundation-implementation-review.md)
+records the initial independent Claude **REVISE** findings, remediation,
+and final **ACCEPT** for the bounded foundation, plus validation and remaining gates. Full Legion regression passed **368 tests,
+39 expected skips** on an isolated PostgreSQL test database; migration drift
+checks and `git diff --check` passed. No production deployment, merge, push or
+commit occurred. ADR-011 is the selected local delivery decision. The next
+increment must address Mission-scoped reads, terminal Agent release and a
+same-Mission retry contract, then add the bounded Centurion/Scout worker and
+assessment. The owner objective/rubric is needed for end-to-end acceptance.
+
+Earlier next-step statements below are historical checkpoints superseded by
+this implementation status.
 
 ## Current checkpoint — PER-001 merged in both repositories
 
@@ -58,11 +82,19 @@ CFV retention and PER-001 are complete and merged. Continue with the
 [Mission experience proposed in the next-work plan](architecture/next-work-plan-2026-09-23.md#3-make-one-centurion-led-investigation-usable-through-praetorium).
 Its earlier retention/reread recommendations are historical checkpoints.
 
-The next deliverable is a concrete implementation plan and critique for one
-read-only human objective submitted through Praetorium, one persistent
-Centurion directing one Scout, and one evidence-backed assessment with visible
-progress, blockers and resumable work. Define a real evaluation objective and
-useful-answer criteria with the owner before implementation.
+The [source-grounded implementation draft](architecture/centurion-mission-experience-plan.md)
+now maps the missing Mission-to-Runtime command, bounded worker and Centurion
+decision loop. It remains a planning draft: the owner evaluation objective and
+useful-answer rubric and exact authority/delivery ADR remain outstanding.
+Independent Claude Code re-review accepted the revised planning draft, with no
+blocker or major finding. No implementation or production enablement is
+claimed by that draft.
+
+To finalize the next deliverable, settle the real read-only evaluation objective
+and useful-answer criteria with the owner, then independently review the linked
+plan. The planned implementation connects one Praetorium objective to one
+persistent Centurion, one Scout and an evidence-backed assessment with visible
+progress, blockers and resumable work.
 
 The plan must cover Centurion cognition and delegation, authenticated Runtime
 commands, idempotent dispatch/recovery, bounded worker lifecycle, human

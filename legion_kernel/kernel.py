@@ -61,7 +61,7 @@ ROE_ORDER = {
 COMMAND_TYPES = frozenset({
     "UPDATE_OBJECTIVE", "ADD_CONSTRAINT", "REMOVE_CONSTRAINT", "SET_ROE",
     "ADD_PARTICIPANT", "REMOVE_PARTICIPANT", "START", "PAUSE", "SUSPEND",
-    "RESUME", "REQUEST_ACTION", "CANCEL", "COMPLETE",
+    "RESUME", "REQUEST_ACTION", "REQUEST_INVESTIGATION", "CANCEL", "COMPLETE",
 })
 
 
@@ -448,6 +448,8 @@ class LegionKernel:
                     )
         elif command_type == "COMPLETE":
             mission.status = MissionStatus.COMPLETED
+        elif command_type == "REQUEST_INVESTIGATION":
+            event_type = "INVESTIGATION_REQUESTED"
         elif command_type == "REQUEST_ACTION":
             action = self._make_action(payload, requested_by, command_id)
             if self._capability_denied(mission.roe, action):
@@ -484,6 +486,8 @@ class LegionKernel:
         event_data = {"command_type": command_type, "requested_by": requested_by.subject}
         if command_type == "SUSPEND":
             event_data["reason"] = payload["reason"].strip()
+        if command_type == "REQUEST_INVESTIGATION":
+            event_data["profile"] = payload["profile"]
         if command_type == "ADD_PARTICIPANT":
             event_data["participant"] = {
                 "subject": participant.principal.subject,
@@ -1018,6 +1022,7 @@ class LegionKernel:
             "REMOVE_PARTICIPANT": ({"subject"}, {"subject"}),
             "SUSPEND": ({"reason"}, {"reason"}),
             "REQUEST_ACTION": ({"action_id", "capability", "arguments"}, {"action_id", "capability", "arguments", "target", "side_effect_class"}),
+            "REQUEST_INVESTIGATION": ({"profile"}, {"profile"}),
         }
         required, allowed = fields.get(command_type, (set(), set()))
         if set(payload) - allowed:
@@ -1027,6 +1032,8 @@ class LegionKernel:
         if command_type == "SET_ROE" and not LegionKernel._valid_roe_payload(payload):
             return "INVALID_COMMAND_PAYLOAD"
         if command_type == "ADD_PARTICIPANT" and not LegionKernel._valid_participant_payload(payload):
+            return "INVALID_COMMAND_PAYLOAD"
+        if command_type == "REQUEST_INVESTIGATION" and payload["profile"] != "READ_ONLY_CORPUS_V1":
             return "INVALID_COMMAND_PAYLOAD"
         if command_type == "REQUEST_ACTION" and not LegionKernel._valid_action_payload(payload):
             return "INVALID_COMMAND_PAYLOAD"
@@ -1182,6 +1189,7 @@ class LegionKernel:
             },
             "COMPLETE": {MissionStatus.ACTIVE},
             "REQUEST_ACTION": {MissionStatus.ACTIVE},
+            "REQUEST_INVESTIGATION": {MissionStatus.ACTIVE},
         }
         if command_type in allowed and mission.status not in allowed[command_type]:
             return "INVALID_STATE_TRANSITION"

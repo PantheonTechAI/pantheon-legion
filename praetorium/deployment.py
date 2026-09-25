@@ -90,7 +90,14 @@ def main() -> None:
         workspace_id = str(UUID(os.environ["LEGION_DEFAULT_WORKSPACE_ID"]))
     except ValueError as exc:
         raise SystemExit("LEGION_DEFAULT_ORGANIZATION_ID and LEGION_DEFAULT_WORKSPACE_ID must be UUIDs") from exc
-    service = PersistentAquilaService(os.environ["LEGION_DATABASE"])
+    centurion_subject = os.environ.get("LEGION_CENTURION_WORKLOAD_SUBJECT", "").strip()
+    scout_subject = os.environ.get("LEGION_SCOUT_WORKLOAD_SUBJECT", "").strip()
+    if bool(centurion_subject) != bool(scout_subject):
+        raise SystemExit("configure both investigation workload subjects or neither")
+    subjects = (centurion_subject, scout_subject) if centurion_subject else None
+    service = PersistentAquilaService(
+        os.environ["LEGION_DATABASE"], investigation_subjects=subjects,
+    )
     organization_read_model, runtime_engine = runtime_read_model_from_environment()
     mapper = AuthentikPrincipalMapper(AuthentikConfig(issuer=os.environ["LEGION_OIDC_ISSUER"], audience=os.environ["LEGION_OIDC_AUDIENCE"]))
     app = PraetoriumWSGIApp(
