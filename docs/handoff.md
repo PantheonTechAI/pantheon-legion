@@ -2,22 +2,32 @@
 
 Last updated: 2026-09-25
 
-## Current checkpoint — Centurion Mission foundation implementation underway
+## Current checkpoint — Mission foundation merged; first testable increment planned
 
 The owner directed implementation of the
 [bounded Centurion-led Mission experience](architecture/centurion-mission-experience-plan.md).
-The first uncommitted increment adds a dedicated Praetorium start action, an
+The merged foundation adds a dedicated Praetorium start action, an
 atomic Aquila `REQUEST_INVESTIGATION` command with closed expiring grants and a
 SQLite outbox, a restartable same-host dispatcher, and a PostgreSQL Runtime
 intake with a finite capacity-wait deadline. It does **not** yet run a
 Centurion, delegate Scout work or produce an assessment. The owner objective
-and useful-answer rubric are still open, and CME-01–CME-09 are not accepted.
+is now an accepted-ADR question about Scout delegation and evidence; the owner
+selected an isolated local stack for the first human test. The
+[first testable increment plan](architecture/centurion-mission-first-testable-increment-plan.md)
+sets a two-slice implementation order and evidence gates. The separately
+[precommitted answer rubric](architecture/centurion-mission-adr-answer-rubric.md)
+awaits owner review for final CME-01 acceptance. Focused independent Claude
+review **ACCEPTED** the plan after remediation; implementation and CME-01–CME-09
+remain open.
 
 The [foundation evaluation and review package](architecture/centurion-mission-foundation-implementation-review.md)
 records the initial independent Claude **REVISE** findings, remediation,
 and final **ACCEPT** for the bounded foundation, plus validation and remaining gates.
-The implementation is locally committed as `92c2954` on `main`; it has not
-been pushed or merged remotely. The AI-box `legion-praetorium.service` now
+The implementation merged to Legion `main` in
+[#77](https://github.com/PantheonTechAI/pantheon-legion/pull/77) at `696d58c`.
+Tabula's unchanged read contract and the cross-repository checkpoint merged in
+[#44](https://github.com/PantheonTechAI/pantheon-kb/pull/44) at `f750585`.
+The AI-box `legion-praetorium.service` now
 loads this checkout after installing the declared SQLAlchemy, Alembic and
 psycopg dependencies missing from its `.venv`. It is active; unauthenticated
 loopback requests return 401 and the public route redirects to Authentik (302).
@@ -30,9 +40,12 @@ is a test database.
 Full Legion regression in the service's `.venv` passed **368 tests, 39 expected
 skips** against an isolated PostgreSQL test database; migration drift checks
 and `git diff --check` passed. ADR-011 is the selected local delivery decision.
-The next increment must address Mission-scoped reads, terminal Agent release
-and a same-Mission retry contract, then add the bounded Centurion/Scout worker
-and assessment. The owner objective/rubric is needed for end-to-end acceptance.
+The next increment first adds a bounded Centurion/Scout worker and assessment
+for one fresh Mission in the selected disposable stack with actual ADR
+records. A second slice closes Mission-scoped reads, terminal Agent release,
+same-Mission retry, full recovery and capacity evidence before broadening use.
+The first trial does not use the current AI-box service or establish full CME
+acceptance.
 
 Earlier next-step statements below are historical checkpoints superseded by
 this implementation status.

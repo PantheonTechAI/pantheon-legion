@@ -1,7 +1,7 @@
 # Bounded Centurion-led Mission experience — implementation plan
 
 - Date: 2026-09-24
-- Status: Implementation underway; command/outbox/intake foundation independently ACCEPTED; full experience and owner evaluation objective/rubric remain open
+- Status: Foundation merged; owner selected isolated accepted-ADR evaluation objective; rubric proposed; full CME acceptance remains open
 - Legion baseline inspected: clean `main` at `ed88470` before this documentation change
 - Scope: one read-only Mission, one persistent Centurion, one persistent Scout, one bounded assessment
 
@@ -25,12 +25,12 @@ knowledge and cognition contracts into one human-commanded organizational
 outcome. The result is a useful, inspectable Mission experience, not a general
 agent scheduler.
 
-The owner must choose a real read-only evaluation objective and useful-answer
-criteria before end-to-end acceptance and live answer-quality evaluation. A candidate is a bounded question over an
-existing Tabula corpus whose answer requires at least two cited records and a
-stated uncertainty. The acceptance fixture must retain the owner's actual
-wording and an independently written answer rubric. No live-model quality
-claim should be based only on a synthetic self-authored question.
+The owner selected the accepted ADR corpus and an isolated local stack for the
+first trial on 2026-09-25. The exact question and precommitted evaluator-authored
+rubric are in the [first-test rubric](centurion-mission-adr-answer-rubric.md).
+The owner still needs to review the detailed rubric and result before final
+CME-01 acceptance. No live-model quality claim should be based only on a
+synthetic self-authored question.
 
 ## Inspected baseline and handoff findings
 
@@ -342,3 +342,15 @@ Aquila view for commands, grants and worker-facing authorizations. The focused
 re-review returned **PROCEED for the command/outbox foundation**. Its remaining
 non-blocking scope note about Agent authorization refresh is incorporated in
 ADR-011. Owner objective/rubric is still the end-to-end usefulness gate.
+
+## First-test sequencing amendment — 2026-09-25
+
+The owner prioritized a useful test soon and selected an isolated ADR-corpus
+trial. The [first testable increment plan](centurion-mission-first-testable-increment-plan.md)
+therefore separates a fresh, single-Mission exploratory result (slice A) from
+same-Mission re-request, Agent release, multi-tenant human policy and the full
+CME-01–CME-09 recovery/quality gate (slice B). The earlier checkpoint's
+instruction to implement release and attempt history before any worker is
+superseded **only for the isolated slice A sequence**. None of the CME criteria
+is waived. The first trial cannot be called a full test or production-ready.
+The detailed rubric is evaluator-authored and still awaits owner review.
